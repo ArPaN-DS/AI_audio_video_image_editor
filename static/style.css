@@ -35,6 +35,12 @@
     --card: #FFFFFF;
     --surface: #F8FAFC;
     --surface-2: #EEF2F7;
+    --control: #FFFFFF;          /* interactive control surface (chips, inputs, buttons) */
+    --waveform-bg: #FAFBFC;
+    --overlay-bg: rgba(255, 255, 255, 0.88);
+    --checker-a: #E9EEF4;
+    --checker-b: #F6F9FC;
+    --canvas-bg: #FFFFFF;
 
     /* ── Text ── */
     --text: #1E293B;
@@ -45,6 +51,7 @@
     --border: #E2E8F0;
     --border-hover: #CBD5E1;
     --border-focus: var(--primary);
+    --ring: rgba(37, 99, 235, 0.45);
 
     /* ── Shadows ── */
     --shadow-sm: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
@@ -62,6 +69,102 @@
     /* ── Motion ── */
     --speed: 0.2s;
     --ease: cubic-bezier(0.4, 0, 0.2, 1);
+
+    color-scheme: light;
+}
+
+/* ═══════════════════════════════════════
+   DARK THEME — Studio Slate
+   Premium dark surface for a pro media suite.
+   Only tokens are overridden; every component
+   that uses the tokens re-themes automatically.
+   ═══════════════════════════════════════ */
+:root[data-theme="dark"] {
+    /* Primary lifts slightly for contrast on dark */
+    --primary: #3B82F6;
+    --primary-hover: #60A5FA;
+    --primary-light: rgba(59, 130, 246, 0.14);
+    --primary-glow: rgba(59, 130, 246, 0.30);
+
+    --ai-accent: #2DD4BF;
+    --ai-accent-hover: #5EEAD4;
+    --ai-accent-light: rgba(45, 212, 191, 0.14);
+    --ai-accent-glow: rgba(45, 212, 191, 0.28);
+
+    --cta: #FB923C;
+    --cta-hover: #FDBA74;
+    --cta-glow: rgba(251, 146, 60, 0.34);
+
+    --danger: #F87171;
+    --danger-light: rgba(248, 113, 113, 0.14);
+
+    --success: #4ADE80;
+    --success-light: rgba(74, 222, 128, 0.14);
+
+    --bg: #0B1220;
+    --card: #131C2E;
+    --surface: #0F1729;
+    --surface-2: #1C2740;
+    --control: #1B2740;
+    --waveform-bg: #0F1729;
+    --overlay-bg: rgba(9, 14, 24, 0.82);
+    --checker-a: #1C2740;
+    --checker-b: #131C2E;
+    --canvas-bg: #0B1220;
+
+    --text: #E8EDF5;
+    --text-secondary: #9FB0C7;
+    --text-hint: #64748B;
+
+    --border: #26334C;
+    --border-hover: #3A4A68;
+    --ring: rgba(96, 165, 250, 0.55);
+
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.40), 0 1px 2px rgba(0,0,0,0.30);
+    --shadow-md: 0 6px 20px rgba(0,0,0,0.45), 0 2px 6px rgba(0,0,0,0.35);
+    --shadow-lg: 0 18px 50px rgba(0,0,0,0.55), 0 6px 16px rgba(0,0,0,0.40);
+    --shadow-blue: 0 6px 20px rgba(59, 130, 246, 0.38);
+    --shadow-cta: 0 6px 20px rgba(251, 146, 60, 0.34);
+
+    color-scheme: dark;
+}
+
+/* ═══════════════════════════════════════
+   GLOBAL POLISH — a11y, focus, motion
+   ═══════════════════════════════════════ */
+
+/* Smooth, non-janky theme cross-fade on the big surfaces only */
+body, header, .card, .ve-panel, .ie-panel, .ie-toolbar,
+.transport-bar, .region-manager, .ai-tools-panel,
+.ve-timeline-area, .ve-stage-col {
+    transition: background-color 0.3s var(--ease), border-color 0.3s var(--ease);
+}
+
+/* Keyboard-visible focus ring on every interactive element */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible,
+.effect-option input:focus-visible + .effect-card,
+.format-option input:focus-visible + .format-card {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+    border-radius: var(--radius-xs);
+}
+
+/* Never leave users without a focus indicator */
+:focus-visible { outline-color: var(--primary); }
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.001ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.001ms !important;
+        scroll-behavior: auto !important;
+    }
+    .pro-badge { animation: none !important; }
 }
 
 *, *::before, *::after {
@@ -86,7 +189,7 @@ body {
    HEADER
    ═══════════════════════════════════════ */
 header {
-    background: #FFFFFF;
+    background: var(--card);
     padding: 0 40px;
     height: 64px;
     border-bottom: 1px solid var(--border);
@@ -141,6 +244,42 @@ header {
 .header-actions {
     display: flex;
     gap: 8px;
+}
+
+/* ── Cross-page nav (shared with video editor) ── */
+.page-nav {
+    display: flex;
+    gap: 6px;
+    background: var(--surface-2);
+    padding: 4px;
+    border-radius: var(--radius-pill);
+    border: 1px solid var(--border);
+}
+
+.page-nav-link {
+    padding: 7px 18px;
+    border-radius: var(--radius-pill);
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    transition: all var(--speed) var(--ease);
+}
+
+.page-nav-link:hover { color: var(--primary); }
+
+.page-nav-link.active {
+    background: var(--card);
+    color: var(--primary);
+    box-shadow: var(--shadow-sm);
+    font-weight: 700;
+}
+
+@media (max-width: 720px) {
+    .page-nav { display: none; }
 }
 
 .header-btn {
@@ -247,7 +386,7 @@ header {
 }
 
 .tab-btn.active {
-    background: #FFFFFF;
+    background: var(--card);
     color: var(--primary);
     box-shadow: var(--shadow-sm);
     font-weight: 700;
@@ -439,7 +578,7 @@ header {
     position: relative;
     margin: 0 0 16px;
     padding: 24px 20px 14px;
-    background: #FAFBFC;
+    background: var(--waveform-bg);
     border-radius: var(--radius-sm);
     border: 1px solid var(--border);
     box-shadow: inset 0 2px 6px rgba(0,0,0,0.03);
@@ -589,7 +728,7 @@ header {
     font-size: 0.85rem;
     font-weight: 600;
     cursor: pointer;
-    background: white;
+    background: var(--control);
     color: var(--text);
     font-family: inherit;
     transition: border-color var(--speed);
@@ -718,7 +857,7 @@ header {
 }
 
 .region-item {
-    background: white;
+    background: var(--control);
     padding: 13px 18px;
     border-radius: var(--radius-sm);
     border: 1.5px solid var(--border);
@@ -807,7 +946,7 @@ header {
     font-family: inherit;
     outline: none;
     width: 160px;
-    background: white;
+    background: var(--control);
     color: var(--text);
     box-shadow: 0 0 0 3px var(--primary-light);
 }
@@ -836,7 +975,7 @@ header {
     color: var(--text-secondary);
     font-size: 0.88rem;
     line-height: 1.6;
-    background: white;
+    background: var(--control);
     border-radius: var(--radius-sm);
     border: 1.5px dashed var(--border);
 }
@@ -847,7 +986,7 @@ header {
    AI TOOLS PANEL — Teal Theme
    ═══════════════════════════════════════ */
 .ai-tools-panel {
-    background: linear-gradient(135deg, #F8FAFC 0%, #F1F5F9 100%);
+    background: linear-gradient(135deg, var(--surface) 0%, var(--surface-2) 100%);
     padding: 28px;
     border-radius: var(--radius);
     border: 1px solid var(--border);
@@ -937,7 +1076,7 @@ header {
 }
 
 .ai-tool-card {
-    background: white;
+    background: var(--control);
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
     padding: 20px;
@@ -1032,7 +1171,7 @@ header {
 
 .ai-tool-btn:hover {
     border-color: var(--border-hover);
-    background: white;
+    background: var(--card);
     box-shadow: var(--shadow-sm);
 }
 
@@ -1048,7 +1187,7 @@ header {
     display: flex;
     align-items: center;
     justify-content: center;
-    background: white;
+    background: var(--card);
     border: 1px solid var(--border);
     flex-shrink: 0;
     color: var(--text-secondary);
@@ -1086,7 +1225,7 @@ header {
 /* AI RESULTS PANEL */
 .ai-results-panel {
     margin-top: 16px;
-    background: white;
+    background: var(--card);
     border: 1.5px solid var(--border);
     border-radius: var(--radius-sm);
     padding: 18px;
@@ -1356,7 +1495,7 @@ header {
     border-radius: var(--radius-sm);
     cursor: pointer;
     transition: all var(--speed) var(--ease);
-    background: white;
+    background: var(--control);
     text-align: center;
 }
 
@@ -1394,7 +1533,7 @@ header {
     border-radius: var(--radius-sm);
     cursor: pointer;
     transition: all var(--speed) var(--ease);
-    background: white;
+    background: var(--control);
     text-align: center;
 }
 
@@ -1496,7 +1635,7 @@ header {
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
 .shortcuts-panel {
-    background: white;
+    background: var(--card);
     border-radius: var(--radius);
     padding: 32px;
     max-width: 480px;
@@ -1575,7 +1714,7 @@ kbd {
     position: fixed;
     top: 0; left: 0;
     width: 100%; height: 100%;
-    background: rgba(255, 255, 255, 0.88);
+    background: var(--overlay-bg);
     backdrop-filter: blur(6px);
     z-index: 9998;
     display: flex;

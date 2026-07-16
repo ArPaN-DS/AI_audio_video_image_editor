@@ -2,11 +2,11 @@
   <img src="static/logo.png" alt="Audio Cutter Pro Logo" width="80">
 </p>
 
-<h1 align="center">🎵 Audio Cutter Pro</h1>
+<h1 align="center">🎵 Audio Cutter Pro <span>+ 🎬 Video + 🖼️ Image Editor</span></h1>
 
 <p align="center">
-  <strong>A professional-grade, browser-based audio editor built with Flask &amp; WaveSurfer.js</strong><br>
-  Cut • Trim • Fade • Normalize • Reverse • Export — all from your browser. No signup. No cloud.
+  <strong>A professional-grade, browser-based audio, video &amp; image studio built with Flask, WaveSurfer.js &amp; FFmpeg</strong><br>
+  Cut audio • Edit video • Retouch images • Add text &amp; music • Extract audio • Export — all from your browser. No signup. No cloud.
 </p>
 
 <p align="center">
@@ -46,6 +46,73 @@
 | 📱 **Fully Responsive** | Works on mobile, tablet, and desktop |
 | 🎨 **Premium Design** | Glassmorphism UI — clean, modern, professional |
 | 🤖 **AI-Powered Analysis** | Local silence detection, auto-trim, beat tracking (BPM), voice activity detection (VAD), **speech-to-text transcription** (requires `openai-whisper`), and local noise reduction — runs 100% on CPU |
+
+---
+
+## 🎬 Video Editor
+
+A full **audio + video combo editor** lives at **`/video`** — powered entirely by your local FFmpeg install. Built to be a *one-person studio* that's still simple enough for a complete beginner.
+
+**Multi-clip timeline (for full control):**
+
+| Feature | Description |
+|---------|-------------|
+| 🎞️ **Multi-Clip Timeline** | Import multiple videos/audio, drag to reorder, trim clip edges, and split at the playhead |
+| ⏩ **Speed Control** | 0.25× – 4× per clip (video *and* audio stay in sync) |
+| 🔊 **Per-Clip Audio** | Volume, mute, fade in/out — mix video sound with a background music track |
+| 🎨 **Filters & Transforms** | Brightness, contrast, saturation, B&W, sepia, rotate 90° |
+| 🔤 **Text Overlays** | Add captions with custom size, color, 9-point positioning, and timing |
+| 🔀 **Transitions** | Fade-through-black between clips |
+| 📐 **Canvas Presets** | Original, 16:9, 9:16 (Shorts/Reels), 1:1 (square), 720p |
+| 📤 **Flexible Export** | Render to **MP4**, or export the timeline's sound as **MP3/WAV** (audio-only) |
+
+**One-click Quick Tools (no timeline needed — perfect for laymen):**
+
+| Tool | What it does |
+|------|--------------|
+| 🎵 **Extract Audio** | Pull the MP3/WAV soundtrack out of any video |
+| 🖼️ **Make a GIF** | Turn a clip into an optimized animated GIF |
+| 🗜️ **Shrink File Size** | Compress video for easy sharing (light / balanced / strong) |
+| 🔄 **Convert / Resize** | Change format (MP4 / WebM / MKV) and resolution |
+| 📸 **Grab a Frame** | Save any moment as a snapshot image |
+| 🔇 **Mute Video** | Strip the audio track in one click |
+
+> Everything runs locally through FFmpeg — your files never leave your machine.
+
+---
+
+## 🖼️ Image Editor
+
+A full image editor lives at **`/image`** — and it's **100% client-side** (HTML Canvas), so your images are *never even uploaded*. Nothing touches the server.
+
+| Feature | Description |
+|---------|-------------|
+| ✂️ **Crop & Transform** | Free crop + ratio presets (1:1, 16:9, 9:16, 4:3, 2:3), rotate, flip H/V |
+| 🎚️ **Adjustments** | Brightness, contrast, saturation, warmth, blur — live sliders |
+| 🎨 **Filter Presets** | B&W, Sepia, Vintage, Cool, Warm, Vivid, Invert — one click |
+| 🔤 **Text & Memes** | Multiple draggable text layers; Impact + outline for classic meme text |
+| ✏️ **Draw & Annotate** | Freehand brush, rectangle, ellipse, line, arrow — any color/size |
+| ↩️ **Undo / Redo** | Full non-destructive history (`Ctrl+Z` / `Ctrl+Y`) |
+| 📋 **Paste Support** | Paste an image straight from your clipboard (`Ctrl+V`) |
+| 🔍 **Increase Quality (Local AI)** | **Real super-resolution** — genuinely upscales 2×/4× and reconstructs pixels, text & edges instead of stretching. The thing other platforms charge a subscription for, running free on your own CPU |
+| 📤 **Export** | PNG, JPG or WEBP with a quality slider |
+
+> Editing runs entirely in your browser (zero upload, complete privacy). The optional **Increase Quality** upscale sends the image only to *your own local server* — never the cloud.
+
+### 🔍 About "Increase Quality" (super-resolution)
+
+Unlike free tools that just bilinear-stretch an image (making text and edges blocky), this uses **learned super-resolution models** via OpenCV's `dnn_superres`:
+
+- **Fast (FSRCNN)** — near-instant, great for most images
+- **Best (EDSR)** — sharpest text & edges, slower on CPU (best for smaller images)
+
+The models download automatically the first time, or you can pre-fetch them:
+
+```bash
+python download_models.py
+```
+
+If the models or OpenCV aren't available, the app **automatically falls back** to high-quality Lanczos + sharpening — so the feature always works.
 
 ---
 

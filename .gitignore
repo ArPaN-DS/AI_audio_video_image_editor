@@ -38,5 +38,8 @@ desktop.ini
 github_profile/
 github_profile_repo/
 
+# ─── Super-resolution models (fetch via download_models.py) ───
+models/*.pb
+
 # ─── Misc ───
 *.log

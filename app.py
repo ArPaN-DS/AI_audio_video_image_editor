@@ -2,8 +2,13 @@ import os
 import uuid
 import json
 import zipfile
-from flask import Flask, render_template, request, send_file, jsonify
+import re
+import shutil
+import tempfile
+from flask import Flask, render_template, request, send_file, jsonify, abort
 import ai_processor
+import video_processor
+import image_processor
 from pydub import AudioSegment
 from logger import log_upload_details
 from io import BytesIO
@@ -284,6 +289,244 @@ def ai_noise_reduce():
     finally:
         if os.path.exists(temp_path):
             os.remove(temp_path)
+
+# ═══════════════════════════════════════════
+#  VIDEO EDITOR (audio + video combo editor)
+# ═══════════════════════════════════════════
+
+THUMBS_FOLDER = os.path.join(PROCESSED_FOLDER, 'thumbs')
+os.makedirs(THUMBS_FOLDER, exist_ok=True)
+
+MEDIA_ID_RE = re.compile(r'^[A-Za-z0-9_-]+\.[A-Za-z0-9]+$')
+
+
+def _media_path(media_id):
+    """Resolve an uploaded media id to a safe absolute path (or None)."""
+    if not media_id or not MEDIA_ID_RE.match(media_id):
+        return None
+    path = os.path.join(app.config['UPLOAD_FOLDER'], media_id)
+    return path if os.path.exists(path) else None
+
+
+@app.route('/video')
+def video_editor():
+    return render_template('video.html')
+
+
+@app.route('/image')
+def image_editor():
+    # Editing is client-side (HTML Canvas). Only the optional AI upscale
+    # sends the image to this local server — never to any cloud.
+    return render_template('image.html')
+
+
+@app.route('/image/enhance', methods=['POST'])
+def image_enhance():
+    """Real local super-resolution ('Increase Quality') via OpenCV dnn_superres."""
+    if 'file' not in request.files:
+        return jsonify({"error": "No image"}), 400
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({"error": "No image"}), 400
+
+    try:
+        scale = int(request.form.get('scale', 2))
+    except (TypeError, ValueError):
+        scale = 2
+    if scale not in (2, 4):
+        scale = 2
+    model_key = request.form.get('model', 'fast')
+    if model_key not in ('fast', 'best'):
+        model_key = 'fast'
+
+    uid = uuid.uuid4()
+    in_path = os.path.join(app.config['UPLOAD_FOLDER'], f"enh_in_{uid}.png")
+    out_path = os.path.join(app.config['PROCESSED_FOLDER'], f"enh_out_{uid}.png")
+    file.save(in_path)
+
+    try:
+        info = image_processor.upscale(in_path, out_path, scale=scale, model_key=model_key)
+        resp = send_file(out_path, mimetype='image/png')
+        resp.headers['X-Enhance-Engine'] = str(info.get('engine', 'lanczos'))
+        resp.headers['X-Enhance-Scale'] = str(info.get('scale', scale))
+        resp.headers['X-Enhance-Downgraded'] = '1' if info.get('downgraded') else '0'
+        return resp
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if os.path.exists(in_path):
+            os.remove(in_path)
+
+
+@app.route('/video/upload', methods=['POST'])
+def video_upload():
+    if 'file' not in request.files: return jsonify({"error": "No file"}), 400
+    file = request.files['file']
+    if file.filename == '': return jsonify({"error": "No file"}), 400
+
+    unique_id = str(uuid.uuid4())
+    ext = (os.path.splitext(file.filename)[1] or '.mp4').lower()
+    if not re.match(r'^\.[A-Za-z0-9]+$', ext):
+        ext = '.mp4'
+    media_id = f"{unique_id}{ext}"
+    path = os.path.join(app.config['UPLOAD_FOLDER'], media_id)
+    file.save(path)
+
+    try:
+        log_upload_details(
+            request=request,
+            filename=file.filename,
+            file_size_bytes=os.path.getsize(path),
+            target_format='video-editor-upload'
+        )
+    except Exception:
+        pass  # logging must never block an upload
+
+    try:
+        info = video_processor.probe_media(path)
+    except Exception as e:
+        os.remove(path)
+        return jsonify({"error": f"Could not read media file: {e}"}), 400
+
+    thumbs = []
+    if info['has_video']:
+        thumb_dir = os.path.join(THUMBS_FOLDER, unique_id)
+        made = video_processor.generate_filmstrip(path, thumb_dir, info['duration'])
+        thumbs = [f"/video/thumb/{unique_id}/{i}" for i in range(len(made))]
+
+    return jsonify({
+        "id": media_id,
+        "name": file.filename,
+        "url": f"/media/{media_id}",
+        "size": os.path.getsize(path),
+        "thumbs": thumbs,
+        **info,
+    })
+
+
+@app.route('/media/<media_id>')
+def serve_media(media_id):
+    path = _media_path(media_id)
+    if not path: abort(404)
+    return send_file(path, conditional=True)  # range requests for <video> seek
+
+
+@app.route('/video/thumb/<uid>/<int:n>')
+def serve_thumb(uid, n):
+    if not re.match(r'^[A-Za-z0-9-]+$', uid) or n < 0 or n > 50: abort(404)
+    path = os.path.join(THUMBS_FOLDER, uid, f"thumb_{n}.jpg")
+    if not os.path.exists(path): abort(404)
+    return send_file(path, max_age=86400)
+
+
+@app.route('/video/extract-audio', methods=['POST'])
+def video_extract_audio():
+    """Quick tool: extract the audio track from an uploaded video."""
+    media_id = request.form.get('media_id', '')
+    path = _media_path(media_id)
+    if not path:
+        return jsonify({"error": "Media not found — upload it first."}), 404
+
+    fmt = request.form.get('format', 'mp3')
+    if fmt not in ('mp3', 'wav'): fmt = 'mp3'
+    bitrate = request.form.get('bitrate', '192k')
+    if bitrate not in ('128k', '192k', '256k', '320k'): bitrate = '192k'
+
+    out_name = f"extracted_{uuid.uuid4()}.{fmt}"
+    out_path = os.path.join(app.config['PROCESSED_FOLDER'], out_name)
+    try:
+        video_processor.extract_audio(path, out_path, fmt=fmt, bitrate=bitrate)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+    base = os.path.splitext(request.form.get('name', 'video'))[0] or 'video'
+    return send_file(out_path, as_attachment=True,
+                     download_name=f"{base}_audio.{fmt}")
+
+
+@app.route('/video/quick', methods=['POST'])
+def video_quick():
+    """One-click beginner tools: gif / compress / convert / frame / mute."""
+    media_id = request.form.get('media_id', '')
+    path = _media_path(media_id)
+    if not path:
+        return jsonify({"error": "Media not found — upload it first."}), 404
+
+    op = request.form.get('op', '')
+    base = os.path.splitext(request.form.get('name', 'video'))[0] or 'video'
+    uid = uuid.uuid4()
+
+    def _num(key, default):
+        try:
+            return float(request.form.get(key, default))
+        except (TypeError, ValueError):
+            return default
+
+    try:
+        if op == 'gif':
+            out = os.path.join(PROCESSED_FOLDER, f"gif_{uid}.gif")
+            video_processor.quick_to_gif(
+                path, out, start=_num('start', 0), duration=_num('duration', 5))
+            return send_file(out, as_attachment=True, download_name=f"{base}.gif")
+
+        if op == 'compress':
+            level = request.form.get('level', 'balanced')
+            out = os.path.join(PROCESSED_FOLDER, f"compressed_{uid}.mp4")
+            video_processor.quick_compress(path, out, level=level)
+            return send_file(out, as_attachment=True,
+                             download_name=f"{base}_compressed.mp4")
+
+        if op == 'convert':
+            container = request.form.get('container', 'mp4')
+            if container not in ('mp4', 'webm', 'mkv'): container = 'mp4'
+            quality = request.form.get('quality', '720p')
+            out = os.path.join(PROCESSED_FOLDER, f"converted_{uid}.{container}")
+            video_processor.quick_convert(path, out, container=container, quality=quality)
+            return send_file(out, as_attachment=True,
+                             download_name=f"{base}.{container}")
+
+        if op == 'frame':
+            out = os.path.join(PROCESSED_FOLDER, f"frame_{uid}.jpg")
+            video_processor.quick_extract_frame(path, out, t=_num('t', 0))
+            return send_file(out, as_attachment=True, download_name=f"{base}_frame.jpg")
+
+        if op == 'mute':
+            out = os.path.join(PROCESSED_FOLDER, f"muted_{uid}.mp4")
+            video_processor.quick_mute(path, out)
+            return send_file(out, as_attachment=True, download_name=f"{base}_muted.mp4")
+
+        return jsonify({"error": f"Unknown operation: {op}"}), 400
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/video/export', methods=['POST'])
+def video_export():
+    """Render the full timeline (clips + text + music) via FFmpeg."""
+    spec = request.get_json(silent=True)
+    if not spec:
+        return jsonify({"error": "Invalid export request."}), 400
+
+    fmt = spec.get('format', 'mp4')
+    if fmt not in ('mp4', 'mp3', 'wav'): fmt = 'mp4'
+    spec['format'] = fmt
+
+    work_dir = tempfile.mkdtemp(prefix='vexport_', dir=app.config['PROCESSED_FOLDER'])
+    out_name = f"video_export_{uuid.uuid4()}.{fmt}"
+    out_path = os.path.join(app.config['PROCESSED_FOLDER'], out_name)
+
+    try:
+        video_processor.export_project(spec, _media_path, work_dir, out_path)
+        return send_file(out_path, as_attachment=True,
+                         download_name=f"edited_video.{fmt}")
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        print(f"Export error: {e}")
+        return jsonify({"error": str(e)}), 500
+    finally:
+        shutil.rmtree(work_dir, ignore_errors=True)
+
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)

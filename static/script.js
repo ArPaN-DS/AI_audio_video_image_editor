@@ -30,6 +30,18 @@ function updateUndoBtn() {
         : 'Nothing to undo';
 }
 
+// Theme-aware waveform colors — read live design tokens so the
+// waveform matches whichever theme (light / dark) is active.
+function themeWaveColors() {
+    const cs = getComputedStyle(document.documentElement);
+    const dark = document.documentElement.getAttribute('data-theme') === 'dark';
+    return {
+        waveColor: dark ? '#3A4A68' : '#CBD5E1',
+        progressColor: (cs.getPropertyValue('--primary').trim() || '#2563EB'),
+        cursorColor: (cs.getPropertyValue('--text').trim() || '#1E293B'),
+    };
+}
+
 document.addEventListener('DOMContentLoaded', () => {
 
     // ─── 1. WAVESURFER SETUP ───
@@ -37,9 +49,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     wavesurfer = WaveSurfer.create({
         container: '#waveform',
-        waveColor: '#CBD5E1',
-        progressColor: '#2563EB',
-        cursorColor: '#1E293B',
+        ...themeWaveColors(),
         cursorWidth: 2,
         height: 140,
         barWidth: 2,
@@ -51,6 +61,12 @@ document.addEventListener('DOMContentLoaded', () => {
             WaveSurfer.Timeline.create({ container: '#wave-timeline' }),
             wsRegions
         ]
+    });
+
+    // Recolor the waveform instantly when the user toggles light / dark.
+    window.addEventListener('themechange', () => {
+        if (!wavesurfer) return;
+        try { wavesurfer.setOptions(themeWaveColors()); } catch (e) { /* older build */ }
     });
 
     // ─── 2. TABS ───

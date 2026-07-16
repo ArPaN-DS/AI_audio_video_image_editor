@@ -4,6 +4,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="light dark">
+    <!-- No-FOUC theme: apply saved / preferred theme before first paint -->
+    <script>
+        (function () {
+            try {
+                var t = localStorage.getItem('theme');
+                if (!t) t = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+                document.documentElement.setAttribute('data-theme', t);
+            } catch (e) { document.documentElement.setAttribute('data-theme', 'light'); }
+        })();
+    </script>
     <title>Audio Cutter Pro — Professional Audio Editor</title>
     <meta name="description"
         content="Free online audio cutter. Cut, trim, fade, normalize and export audio instantly. No signup required.">
@@ -13,6 +24,7 @@
     <script src="https://unpkg.com/wavesurfer.js@7/dist/plugins/regions.min.js"></script>
     <script src="https://unpkg.com/wavesurfer.js@7/dist/plugins/timeline.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="{{ url_for('static', filename='theme.js') }}" defer></script>
 </head>
 
 <body>
@@ -23,9 +35,17 @@
             <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo">
             <h1>Audio Cutter <span class="pro-badge">PRO</span></h1>
         </div>
+        <nav class="page-nav">
+            <a href="/" class="page-nav-link active"><i class="fas fa-music"></i> Audio</a>
+            <a href="/video" class="page-nav-link"><i class="fas fa-film"></i> Video</a>
+            <a href="/image" class="page-nav-link"><i class="fas fa-image"></i> Image</a>
+        </nav>
         <div class="header-actions">
             <button id="newFileBtn" class="header-btn hidden" title="Load a different file">
                 <i class="fas fa-folder-open"></i>
+            </button>
+            <button id="themeToggle" class="header-btn" title="Switch to dark theme" aria-label="Switch to dark theme">
+                <i class="fas fa-moon"></i>
             </button>
             <button id="helpBtn" class="header-btn" title="Show all keyboard shortcuts">
                 <i class="fas fa-keyboard"></i>

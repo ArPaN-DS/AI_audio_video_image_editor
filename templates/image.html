@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="light dark">
+    <!-- No-FOUC theme: apply saved / preferred theme before first paint -->
+    <script>
+        (function () {
+            try {
+                var t = localStorage.getItem('theme');
+                if (!t) t = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+                document.documentElement.setAttribute('data-theme', t);
+            } catch (e) { document.documentElement.setAttribute('data-theme', 'light'); }
+        })();
+    </script>
+    <title>Image Editor — Audio Cutter Pro</title>
+    <meta name="description"
+        content="Free online image editor. Crop, rotate, adjust, filter, add text and draw — 100% in your browser. Nothing uploaded.">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='image.css') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="{{ url_for('static', filename='theme.js') }}" defer></script>
+</head>
+
+<body class="ie-body">
+
+    <!-- ─── HEADER ─── -->
+    <header>
+        <div class="logo-container">
+            <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo">
+            <h1>Image Editor <span class="pro-badge">PRO</span></h1>
+        </div>
+        <nav class="page-nav">
+            <a href="/" class="page-nav-link"><i class="fas fa-music"></i> Audio</a>
+            <a href="/video" class="page-nav-link"><i class="fas fa-film"></i> Video</a>
+            <a href="/image" class="page-nav-link active"><i class="fas fa-image"></i> Image</a>
+        </nav>
+        <div class="header-actions">
+            <button id="themeToggle" class="header-btn" title="Switch to dark theme" aria-label="Switch to dark theme">
+                <i class="fas fa-moon"></i>
+            </button>
+            <button id="ieHelpBtn" class="header-btn" title="Keyboard shortcuts">
+                <i class="fas fa-keyboard"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- ─── UPLOAD HERO ─── -->
+    <div class="ie-hero" id="ieHero">
+        <div class="card ie-hero-card">
+            <div class="upload-area" id="ieUploadArea">
+                <div class="upload-icon"><i class="fas fa-image"></i></div>
+                <p class="upload-title">Drop an image here, or paste from clipboard</p>
+                <p class="upload-subtitle">JPG, PNG, WEBP, GIF, BMP · Everything happens in your browser —
+                    nothing is ever uploaded</p>
+                <input type="file" id="ieFileInput" accept="image/*">
+            </div>
+            <div class="ie-hero-features">
+                <div class="ie-hero-feature"><i class="fas fa-crop"></i>
+                    <div><strong>Crop & Transform</strong><span>Crop to any ratio, rotate, flip, resize</span></div>
+                </div>
+                <div class="ie-hero-feature"><i class="fas fa-sliders"></i>
+                    <div><strong>Adjust & Filter</strong><span>Brightness, contrast, warmth + one-click presets</span>
+                    </div>
+                </div>
+                <div class="ie-hero-feature"><i class="fas fa-font"></i>
+                    <div><strong>Text & Draw</strong><span>Add captions, meme text, freehand pen &amp; shapes</span>
+                    </div>
+                </div>
+                <div class="ie-hero-feature"><i class="fas fa-download"></i>
+                    <div><strong>Export Anywhere</strong><span>PNG, JPG or WEBP with quality control</span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ─── EDITOR ─── -->
+    <div class="ie-editor hidden" id="ieEditor">
+
+        <!-- LEFT TOOLBAR -->
+        <aside class="ie-toolbar" id="ieToolbar">
+            <button class="ie-tool active" data-tool="move" title="Move / select (V)"><i class="fas fa-arrow-pointer"></i><span>Move</span></button>
+            <button class="ie-tool" data-tool="crop" title="Crop (C)"><i class="fas fa-crop-simple"></i><span>Crop</span></button>
+            <button class="ie-tool" data-tool="text" title="Add text (T)"><i class="fas fa-font"></i><span>Text</span></button>
+            <button class="ie-tool" data-tool="draw" title="Draw / pen (B)"><i class="fas fa-pen"></i><span>Draw</span></button>
+            <button class="ie-tool" data-tool="shape" title="Rectangle / ellipse"><i class="fas fa-shapes"></i><span>Shape</span></button>
+        </aside>
+
+        <!-- CANVAS STAGE -->
+        <section class="ie-stage" id="ieStage">
+            <div class="ie-canvas-wrap" id="ieCanvasWrap">
+                <canvas id="ieCanvas"></canvas>
+                <div class="ie-overlay" id="ieOverlay"></div>
+            </div>
+        </section>
+
+        <!-- RIGHT INSPECTOR -->
+        <aside class="ie-panel" id="iePanel">
+
+            <!-- TOP ACTION BAR -->
+            <div class="ie-action-bar">
+                <button id="ieUndoBtn" class="mini-btn" title="Undo (Ctrl+Z)" disabled><i class="fas fa-undo"></i></button>
+                <button id="ieRedoBtn" class="mini-btn" title="Redo (Ctrl+Y)" disabled><i class="fas fa-redo"></i></button>
+                <button id="ieResetBtn" class="btn-outline" title="Revert all edits"><i class="fas fa-rotate-left"></i> Reset</button>
+                <button id="ieNewBtn" class="btn-outline" title="Open a different image"><i class="fas fa-folder-open"></i></button>
+            </div>
+
+            <!-- TRANSFORM -->
+            <div class="ie-section">
+                <h5><i class="fas fa-crop-simple"></i> Transform</h5>
+                <div class="ve-chip-row">
+                    <button class="ve-chip" id="ieRotateL" title="Rotate left"><i class="fas fa-rotate-left"></i></button>
+                    <button class="ve-chip" id="ieRotateR" title="Rotate right"><i class="fas fa-rotate-right"></i></button>
+                    <button class="ve-chip" id="ieFlipH" title="Flip horizontal"><i class="fas fa-arrows-left-right"></i></button>
+                    <button class="ve-chip" id="ieFlipV" title="Flip vertical"><i class="fas fa-arrows-up-down"></i></button>
+                </div>
+            </div>
+
+            <!-- CROP OPTIONS (only when crop tool active) -->
+            <div class="ie-section hidden" id="ieCropSection">
+                <h5><i class="fas fa-crop"></i> Crop Ratio</h5>
+                <div class="ve-chip-row" id="ieCropRatios">
+                    <button class="ve-chip active" data-ratio="free">Free</button>
+                    <button class="ve-chip" data-ratio="1">1:1</button>
+                    <button class="ve-chip" data-ratio="1.7778">16:9</button>
+                    <button class="ve-chip" data-ratio="0.5625">9:16</button>
+                    <button class="ve-chip" data-ratio="1.3333">4:3</button>
+                    <button class="ve-chip" data-ratio="0.6667">2:3</button>
+                </div>
+                <div class="ve-chip-row" style="margin-top:8px;">
+                    <button class="btn-small" id="ieApplyCrop"><i class="fas fa-check"></i> Apply Crop</button>
+                    <button class="ve-chip" id="ieCancelCrop">Cancel</button>
+                </div>
+            </div>
+
+            <!-- ADJUSTMENTS -->
+            <div class="ie-section" id="ieAdjustSection">
+                <h5><i class="fas fa-sliders"></i> Adjust</h5>
+                <div class="ie-slider" data-adj="brightness">
+                    <label>Brightness <span class="ve-value">0</span></label>
+                    <input type="range" class="styled-range" min="0" max="200" value="100">
+                </div>
+                <div class="ie-slider" data-adj="contrast">
+                    <label>Contrast <span class="ve-value">0</span></label>
+                    <input type="range" class="styled-range" min="0" max="200" value="100">
+                </div>
+                <div class="ie-slider" data-adj="saturate">
+                    <label>Saturation <span class="ve-value">0</span></label>
+                    <input type="range" class="styled-range" min="0" max="200" value="100">
+                </div>
+                <div class="ie-slider" data-adj="warmth">
+                    <label>Warmth <span class="ve-value">0</span></label>
+                    <input type="range" class="styled-range" min="-100" max="100" value="0">
+                </div>
+                <div class="ie-slider" data-adj="blur">
+                    <label>Blur <span class="ve-value">0</span></label>
+                    <input type="range" class="styled-range" min="0" max="20" value="0">
+                </div>
+                <button class="ve-chip" id="ieResetAdjust" style="margin-top:6px;"><i class="fas fa-rotate-left"></i> Reset adjustments</button>
+            </div>
+
+            <!-- FILTER PRESETS -->
+            <div class="ie-section">
+                <h5><i class="fas fa-wand-magic-sparkles"></i> Filters</h5>
+                <div class="ie-filter-grid" id="ieFilterGrid">
+                    <button class="ie-filter active" data-filter="none">None</button>
+                    <button class="ie-filter" data-filter="grayscale">B&amp;W</button>
+                    <button class="ie-filter" data-filter="sepia">Sepia</button>
+                    <button class="ie-filter" data-filter="vintage">Vintage</button>
+                    <button class="ie-filter" data-filter="cool">Cool</button>
+                    <button class="ie-filter" data-filter="warm">Warm</button>
+                    <button class="ie-filter" data-filter="vivid">Vivid</button>
+                    <button class="ie-filter" data-filter="invert">Invert</button>
+                </div>
+            </div>
+
+            <!-- CONTEXTUAL: TEXT -->
+            <div class="ie-section hidden" id="ieTextSection">
+                <h5><i class="fas fa-font"></i> Text</h5>
+                <textarea id="ieTextContent" class="ve-textarea" rows="2" placeholder="Type text, then click the canvas"></textarea>
+                <div class="ie-slider">
+                    <label>Size <span class="ve-value" id="ieTextSizeVal">48</span></label>
+                    <input type="range" id="ieTextSize" class="styled-range" min="10" max="300" value="48">
+                </div>
+                <div class="ve-slider-row">
+                    <input type="color" id="ieTextColor" class="ve-color-input" value="#FFFFFF">
+                    <select id="ieTextFont" class="styled-select">
+                        <option value="Inter, sans-serif">Inter</option>
+                        <option value="Impact, sans-serif">Impact (meme)</option>
+                        <option value="Georgia, serif">Georgia</option>
+                        <option value="'Courier New', monospace">Courier</option>
+                        <option value="'Comic Sans MS', cursive">Comic Sans</option>
+                    </select>
+                </div>
+                <div class="ve-chip-row" style="margin-top:8px;">
+                    <button class="ve-chip active" id="ieTextStroke" title="Outline (great for memes)"><i class="fas fa-border-style"></i> Outline</button>
+                    <button class="ve-chip" id="ieTextBold"><i class="fas fa-bold"></i></button>
+                </div>
+                <small class="ve-hint">Tip: choose <strong>Impact + Outline</strong> for classic meme text. Drag placed
+                    text to reposition; double-click it to edit.</small>
+            </div>
+
+            <!-- CONTEXTUAL: DRAW / SHAPE -->
+            <div class="ie-section hidden" id="ieDrawSection">
+                <h5><i class="fas fa-pen"></i> Brush</h5>
+                <div class="ie-slider">
+                    <label>Size <span class="ve-value" id="ieBrushSizeVal">8</span></label>
+                    <input type="range" id="ieBrushSize" class="styled-range" min="1" max="80" value="8">
+                </div>
+                <div class="ve-slider-row">
+                    <input type="color" id="ieBrushColor" class="ve-color-input" value="#EF4444">
+                    <span class="ve-hint" style="margin:0;">Draw directly on the image</span>
+                </div>
+                <div class="ve-chip-row" style="margin-top:8px;" id="ieShapeRow">
+                    <button class="ve-chip active" data-shape="rect">Rectangle</button>
+                    <button class="ve-chip" data-shape="ellipse">Ellipse</button>
+                    <button class="ve-chip" data-shape="line">Line</button>
+                    <button class="ve-chip" data-shape="arrow">Arrow</button>
+                </div>
+                <div class="ve-chip-row" style="margin-top:8px;">
+                    <button class="ve-chip active" id="ieShapeFill">Filled</button>
+                </div>
+            </div>
+
+            <!-- AI ENHANCE / UPSCALE -->
+            <div class="ie-section ie-enhance-section">
+                <h5><i class="fas fa-wand-magic-sparkles"></i> Increase Quality
+                    <span class="ie-local-badge"><i class="fas fa-shield-halved"></i> Local AI</span>
+                </h5>
+                <p class="ve-hint" style="margin-top:0;margin-bottom:12px;">Real super-resolution — reconstructs pixels,
+                    text &amp; edges (not a blurry stretch). Runs on your CPU; the image is processed on your own
+                    server, never the cloud.</p>
+                <label class="ie-mini-label">Upscale</label>
+                <div class="ve-chip-row" id="ieUpscaleAmount">
+                    <button class="ve-chip active" data-scale="2">2× bigger</button>
+                    <button class="ve-chip" data-scale="4">4× bigger</button>
+                </div>
+                <label class="ie-mini-label" style="margin-top:10px;">Model</label>
+                <div class="ve-chip-row" id="ieUpscaleModel">
+                    <button class="ve-chip active" data-model="fast">Fast</button>
+                    <button class="ve-chip" data-model="best">Best (sharpest text)</button>
+                </div>
+                <small class="ve-hint" id="ieEnhanceNote">Fast is near-instant. Best gives the crispest text &amp; edges
+                    but is slower on CPU (best for smaller images).</small>
+                <button id="ieEnhanceBtn" class="ve-enhance-btn">
+                    <i class="fas fa-wand-magic-sparkles"></i> Enhance &amp; Upscale
+                </button>
+            </div>
+
+            <!-- EXPORT -->
+            <div class="ie-section ie-export-section">
+                <h5><i class="fas fa-download"></i> Export</h5>
+                <div class="ve-chip-row" id="ieExportFormat">
+                    <button class="ve-chip active" data-fmt="png">PNG</button>
+                    <button class="ve-chip" data-fmt="jpeg">JPG</button>
+                    <button class="ve-chip" data-fmt="webp">WEBP</button>
+                </div>
+                <div class="ie-slider hidden" id="ieQualityRow">
+                    <label>Quality <span class="ve-value" id="ieQualityVal">92</span></label>
+                    <input type="range" id="ieQuality" class="styled-range" min="10" max="100" value="92">
+                </div>
+                <div class="ie-dims" id="ieDims">—</div>
+                <button id="ieDownloadBtn" class="ve-export-btn ve-export-btn-big">
+                    <i class="fas fa-download"></i> Download Image
+                </button>
+            </div>
+        </aside>
+    </div>
+
+    <!-- BEFORE / AFTER COMPARE (Remini-style reveal) -->
+    <div id="ieCompareOverlay" class="ie-compare-overlay hidden">
+        <div class="ie-compare-head">
+            <h3><i class="fas fa-wand-magic-sparkles"></i> Before &amp; After</h3>
+            <button id="ieCompareClose" class="close-btn" title="Close">&times;</button>
+        </div>
+        <div class="ie-compare-stage">
+            <div class="ie-compare-frame" id="ieCompareFrame">
+                <img id="ieCompareAfter" class="ie-cmp-img" alt="Enhanced">
+                <img id="ieCompareBefore" class="ie-cmp-img" alt="Original">
+                <span class="ie-cmp-label ie-cmp-label-before">Before</span>
+                <span class="ie-cmp-label ie-cmp-label-after">After</span>
+                <div class="ie-cmp-divider" id="ieCompareDivider">
+                    <div class="ie-cmp-handle"><i class="fas fa-arrows-left-right"></i></div>
+                </div>
+            </div>
+        </div>
+        <div class="ie-compare-actions">
+            <span id="ieCompareInfo" class="ie-cmp-info"></span>
+            <div class="ie-compare-btns">
+                <button id="ieCompareDiscard" class="btn-outline"><i class="fas fa-xmark"></i> Discard</button>
+                <button id="ieCompareKeep" class="ve-enhance-btn ie-cmp-keep"><i class="fas fa-check"></i> Keep Result</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- SPINNER -->
+    <div id="ieLoadingOverlay" class="ie-loading hidden">
+        <div class="spinner-container">
+            <div class="spinner"></div>
+            <p id="ieLoadingText">Enhancing...</p>
+        </div>
+    </div>
+
+    <!-- SHORTCUTS -->
+    <div id="ieShortcutsOverlay" class="shortcuts-overlay hidden">
+        <div class="shortcuts-panel">
+            <div class="shortcuts-header">
+                <h3><i class="fas fa-keyboard"></i> Keyboard Shortcuts</h3>
+                <button id="ieCloseShortcuts" class="close-btn">&times;</button>
+            </div>
+            <div class="shortcuts-list">
+                <div class="shortcut-item"><kbd>V</kbd><span>Move / select tool</span></div>
+                <div class="shortcut-item"><kbd>C</kbd><span>Crop tool</span></div>
+                <div class="shortcut-item"><kbd>T</kbd><span>Text tool</span></div>
+                <div class="shortcut-item"><kbd>B</kbd><span>Brush / draw tool</span></div>
+                <div class="shortcut-item"><kbd>Ctrl + Z</kbd><span>Undo</span></div>
+                <div class="shortcut-item"><kbd>Ctrl + Y</kbd><span>Redo</span></div>
+                <div class="shortcut-item"><kbd>Ctrl + V</kbd><span>Paste image from clipboard</span></div>
+                <div class="shortcut-item"><kbd>Delete</kbd><span>Delete selected text</span></div>
+                <div class="shortcut-item"><kbd>Enter</kbd><span>Apply crop</span></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='image.js') }}"></script>
+</body>
+
+</html>
