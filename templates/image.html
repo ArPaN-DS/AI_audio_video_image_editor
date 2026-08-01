@@ -249,6 +249,9 @@
                 <button id="ieEnhanceBtn" class="ve-enhance-btn">
                     <i class="fas fa-wand-magic-sparkles"></i> Enhance &amp; Upscale
                 </button>
+                <button id="ieClarityBtn" class="btn-outline" style="width:100%; margin-top:8px; padding:10px;">
+                    <i class="fas fa-sparkles"></i> Photo Clarity &amp; Denoise Polish
+                </button>
             </div>
 
             <!-- AI REMOVE BACKGROUND -->
@@ -259,7 +262,8 @@
                 <p class="ve-hint" style="margin-top:0;margin-bottom:10px;">One-click studio cutout of person, product, or subject with refined hair &amp; edge matting.</p>
                 <label class="ie-mini-label">Accuracy &amp; Model</label>
                 <div class="ve-chip-row" id="ieRemoveBgModel">
-                    <button class="ve-chip active" data-model="u2net">Studio (Best)</button>
+                    <button class="ve-chip active" data-model="isnet-general-use">Ultra HD (IS-Net)</button>
+                    <button class="ve-chip" data-model="u2net">Studio (U2Net)</button>
                     <button class="ve-chip" data-model="u2net_human_seg">Portrait (People)</button>
                     <button class="ve-chip" data-model="u2netp">Fast</button>
                 </div>

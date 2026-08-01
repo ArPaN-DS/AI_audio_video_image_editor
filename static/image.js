@@ -723,7 +723,7 @@
         if (!base) { toast('Please load an image first.', 'warning'); return; }
 
         const activeModelBtn = document.querySelector('#ieRemoveBgModel .ve-chip.active');
-        const modelName = activeModelBtn ? activeModelBtn.dataset.model : 'u2net';
+        const modelName = activeModelBtn ? activeModelBtn.dataset.model : 'isnet-general-use';
         const alphaMatting = $('ieAlphaMattingBtn') ? $('ieAlphaMattingBtn').classList.contains('active') : true;
 
         if (window.ProcessingOverlay) {
@@ -767,6 +767,57 @@
             afterImg.src = afterURL;
         } catch (e) {
             toast('Background removal failed: ' + e.message, 'error');
+        } finally {
+            if (window.ProcessingOverlay) {
+                window.ProcessingOverlay.hide();
+            } else {
+                hideLoading();
+            }
+        }
+    }
+
+    async function enhanceClarity() {
+        if (!base) { toast('Please load an image first.', 'warning'); return; }
+
+        if (window.ProcessingOverlay) {
+            window.ProcessingOverlay.show({
+                title: 'Photo Clarity & Denoise',
+                message: 'Polishing micro-contrast & removing compression noise...'
+            });
+        } else {
+            showLoading('Polishing clarity...');
+        }
+
+        try {
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = base.width; tempCanvas.height = base.height;
+            const tctx = tempCanvas.getContext('2d');
+            tctx.filter = buildFilter();
+            tctx.drawImage(base, 0, 0);
+            tctx.filter = 'none';
+
+            const beforeBlob = await new Promise(r => tempCanvas.toBlob(r, 'image/png'));
+            const fd = new FormData();
+            fd.append('file', beforeBlob, 'image.png');
+
+            const res = await fetch('/image/clarity', { method: 'POST', body: fd });
+            if (!res.ok) {
+                const e = await res.json().catch(() => ({})); toast(e.error || 'Clarity polish failed', 'error'); return;
+            }
+
+            const afterBlob = await res.blob();
+            const afterURL = URL.createObjectURL(afterBlob);
+            const afterImg = new Image();
+            afterImg.onload = () => {
+                snapshot();
+                setBaseFromImage(afterImg);
+                renderCanvas();
+                URL.revokeObjectURL(afterURL);
+                toast('✨ Photo Clarity Polish complete!', 'success');
+            };
+            afterImg.src = afterURL;
+        } catch (e) {
+            toast('Clarity polish failed: ' + e.message, 'error');
         } finally {
             if (window.ProcessingOverlay) {
                 window.ProcessingOverlay.hide();
@@ -883,16 +934,8 @@
         $('ieShapeRow').addEventListener('click', e => { const b = e.target.closest('.ve-chip'); if (!b) return; document.querySelectorAll('#ieShapeRow .ve-chip').forEach(c => c.classList.toggle('active', c === b)); });
         $('ieShapeFill').onclick = () => $('ieShapeFill').classList.toggle('active');
 
-        // AI Remove Background
-        if ($('ieRemoveBgModel')) {
-            $('ieRemoveBgModel').addEventListener('click', e => {
-                const b = e.target.closest('.ve-chip'); if (!b) return;
-                document.querySelectorAll('#ieRemoveBgModel .ve-chip').forEach(c => c.classList.toggle('active', c === b));
-            });
-        }
-        if ($('ieAlphaMattingBtn')) {
-            $('ieAlphaMattingBtn').onclick = () => $('ieAlphaMattingBtn').classList.toggle('active');
-        }
+        if ($('ieEnhanceBtn')) $('ieEnhanceBtn').onclick = enhance;
+        if ($('ieClarityBtn')) $('ieClarityBtn').onclick = enhanceClarity;
         if ($('ieRemoveBgBtn')) $('ieRemoveBgBtn').onclick = removeBg;
         initCompare();
 

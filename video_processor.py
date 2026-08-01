@@ -515,14 +515,20 @@ def export_project(spec, resolve_source, work_dir, output_path):
     return output_path
 
 
-def detect_scenes(video_path, threshold=27.0):
+def detect_scenes(video_path, threshold=3.0, mode="adaptive"):
     """
     Detects scene cut boundaries in video using scenedetect (PySceneDetect).
+    mode: 'adaptive' (AdaptiveDetector - best for dynamic shots & camera motion) or 'content' (ContentDetector).
     Returns list of cut intervals: [{'start': sec, 'end': sec, 'duration': sec}]
     """
     try:
-        from scenedetect import detect, ContentDetector
-        scene_list = detect(video_path, ContentDetector(threshold=threshold))
+        from scenedetect import detect, AdaptiveDetector, ContentDetector
+        if mode == "adaptive":
+            detector = AdaptiveDetector(adaptive_threshold=float(threshold))
+        else:
+            detector = ContentDetector(threshold=float(threshold))
+
+        scene_list = detect(video_path, detector)
         scenes = []
         for i, scene in enumerate(scene_list):
             start_sec = round(scene[0].get_seconds(), 3)
@@ -534,8 +540,11 @@ def detect_scenes(video_path, threshold=27.0):
                 "duration": round(end_sec - start_sec, 3)
             })
         return scenes
-    except ImportError:
-        # Fallback if scenedetect is not installed
-        raise RuntimeError("PySceneDetect package not installed. Run: pip install scenedetect[opencv]")
     except Exception as e:
-        raise RuntimeError(f"Scene detection failed: {str(e)}")
+        # Fallback to ContentDetector
+        try:
+            from scenedetect import detect, ContentDetector
+            scene_list = detect(video_path, ContentDetector(threshold=27.0))
+            return [{"scene_num": i + 1, "start": round(s[0].get_seconds(), 3), "end": round(s[1].get_seconds(), 3), "duration": round(s[1].get_seconds() - s[0].get_seconds(), 3)} for i, s in enumerate(scene_list)]
+        except Exception as err:
+            raise RuntimeError(f"Scene detection failed: {str(e)}")

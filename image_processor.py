@@ -140,20 +140,64 @@ def available_engines():
     return engines
 
 
-def remove_bg(src_path, out_path, model_name="u2net", alpha_matting=True):
+def enhance_photo_clarity(src, out_path, denoise_strength=5, sharpen_strength=1.2):
+    """
+    Applies real-time AI-style photo clarity enhancement:
+    - Removes JPEG compression noise & grain (Bilateral Filtering)
+    - Enhances micro-contrast & edge sharpness (Unsharp Masking)
+    - Auto-corrects dynamic range and histogram contrast (CLAHE)
+    """
+    try:
+        import cv2
+        import numpy as np
+
+        img = cv2.imread(src, cv2.IMREAD_COLOR)
+        if img is None:
+            img_pil = Image.open(src).convert("RGB")
+            img = cv2.cvtColor(np.array(img_pil), cv2.COLOR_RGB2BGR)
+
+        # 1. Bilateral Denoise (preserves sharp edges while smoothing flat noise/grain)
+        if denoise_strength > 0:
+            denoised = cv2.bilateralFilter(img, d=5, sigmaColor=denoise_strength * 10, sigmaSpace=5)
+        else:
+            denoised = img
+
+        # 2. Detail Sharpening & Micro-contrast
+        gaussian = cv2.GaussianBlur(denoised, (0, 0), 3)
+        sharpened = cv2.addWeighted(denoised, 1.0 + sharpen_strength, gaussian, -sharpen_strength, 0)
+
+        # 3. Dynamic Range & Contrast Polish (CLAHE on L-channel of LAB color space)
+        lab = cv2.cvtColor(sharpened, cv2.COLOR_BGR2LAB)
+        l, a, b = cv2.split(lab)
+        clahe = cv2.createCLAHE(clipLimit=1.5, tileGridSize=(8, 8))
+        l_opt = clahe.apply(l)
+        enhanced_lab = cv2.merge((l_opt, a, b))
+        final_img = cv2.cvtColor(enhanced_lab, cv2.COLOR_LAB2BGR)
+
+        cv2.imwrite(out_path, final_img)
+        return {"status": "success", "engine": "clarity_enhancer"}
+    except Exception as e:
+        # Fallback using PIL
+        pil_img = Image.open(src).convert("RGB")
+        pil_img = pil_img.filter(ImageFilter.UnsharpMask(radius=2, percent=120, threshold=3))
+        pil_img.save(out_path, quality=95)
+        return {"status": "success", "engine": "pil_fallback"}
+
+
+def remove_bg(src_path, out_path, model_name="isnet-general-use", alpha_matting=True):
     """
     Strips background from image using rembg (ONNX model).
     Wrapped in global_model_manager for zero-idle memory lifecycle.
-    model_name: 'u2net' (studio quality), 'u2net_human_seg' (portrait), 'u2netp' (fast), 'isnet-general-use'
+    model_name: 'isnet-general-use' (Ultra/HD Detail), 'u2net' (Studio), 'u2net_human_seg' (Portrait), 'u2netp' (Fast)
     """
     try:
         from rembg import remove, new_session
-        from PIL import Image
+        from PIL import Image, ImageFilter
         from model_manager import global_model_manager
 
-        valid_models = ("u2net", "u2net_human_seg", "u2netp", "isnet-general-use")
+        valid_models = ("isnet-general-use", "u2net", "u2net_human_seg", "u2netp")
         if model_name not in valid_models:
-            model_name = "u2net"
+            model_name = "isnet-general-use"
 
         def _load_rembg():
             session = new_session(model_name)
@@ -181,6 +225,19 @@ def remove_bg(src_path, out_path, model_name="u2net", alpha_matting=True):
                     output_img = remove(input_img, session=session, post_process_mask=True)
             else:
                 output_img = remove(input_img, session=session, post_process_mask=True)
+
+            # ── ALPHA EDGE ANTI-ALIASING PASS ──
+            if output_img.mode == "RGBA":
+                r, g, b, a = output_img.split()
+                a_blurred = a.filter(ImageFilter.GaussianBlur(radius=0.6))
+                import numpy as np
+                a_arr = np.array(a, dtype=np.uint8)
+                ab_arr = np.array(a_blurred, dtype=np.uint8)
+                # Anti-alias boundary pixels to eliminate jagged stair-stepping
+                edge_mask = (a_arr > 0) & (a_arr < 255)
+                a_arr[edge_mask] = ab_arr[edge_mask]
+                smooth_a = Image.fromarray(a_arr)
+                output_img = Image.merge("RGBA", (r, g, b, smooth_a))
 
             output_img.save(out_path, format="PNG")
             return {"engine": f"rembg_{model_name}", "status": "success"}

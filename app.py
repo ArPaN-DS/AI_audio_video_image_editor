@@ -480,6 +480,30 @@ def image_remove_bg():
             os.remove(in_path)
 
 
+@app.route('/image/clarity', methods=['POST'])
+def image_clarity():
+    """Real-time AI Photo Clarity, Denoise & Dynamic Range Polish."""
+    if 'file' not in request.files:
+        return jsonify({"error": "No image"}), 400
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({"error": "No image"}), 400
+
+    uid = uuid.uuid4()
+    in_path = os.path.join(app.config['UPLOAD_FOLDER'], f"clarity_in_{uid}.png")
+    out_path = os.path.join(app.config['PROCESSED_FOLDER'], f"clarity_out_{uid}.png")
+    file.save(in_path)
+
+    try:
+        image_processor.enhance_photo_clarity(in_path, out_path)
+        return send_file(out_path, mimetype='image/png')
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if os.path.exists(in_path):
+            os.remove(in_path)
+
+
 @app.route('/image/enhance', methods=['POST'])
 def image_enhance():
     """Real local super-resolution ('Increase Quality') via OpenCV dnn_superres."""

@@ -894,10 +894,10 @@ def enhance_speech_studio(input_path, output_path):
         return {"engine": "noisereduce_fallback", "status": "success", "note": str(e)}
 
 
-def separate_stems(input_path, output_dir):
+def separate_stems(input_path, output_dir, stems_mode="2"):
     """
-    Splits audio into Vocals and Instrumental stems using Demucs.
-    Outputs: vocals.wav and no_vocals.wav in output_dir.
+    Splits audio into Vocals and Instrumental stems (or 4 stems) using Demucs.
+    stems_mode: '2' (Vocals & Instrumental) or '4' (Vocals, Drums, Bass, Other)
     """
     from model_manager import global_model_manager
     import subprocess
@@ -905,45 +905,39 @@ def separate_stems(input_path, output_dir):
 
     try:
         def _load_demucs():
-            # Dummy load function for model manager locking
             return "demucs_cli", {"engine": "demucs_htdemucs"}
 
         def _unload_demucs(instance):
             gc.collect()
 
         with global_model_manager.session("demucs_stem_separator", _load_demucs, _unload_demucs):
-            # Run demucs separation via python CLI or module
             cmd = [
                 sys.executable, "-m", "demucs.separate",
                 "-n", "htdemucs",
-                "--two-stems", "vocals",
                 "-o", output_dir,
                 input_path
             ]
+            if stems_mode == "2":
+                cmd.insert(4, "--two-stems")
+                cmd.insert(5, "vocals")
+
             proc = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
             if proc.returncode != 0:
                 raise RuntimeError(f"Demucs separation error: {proc.stderr[-500:]}")
 
-            # Locate the generated files in output_dir/htdemucs/<track_name>/
             track_name = os.path.splitext(os.path.basename(input_path))[0]
             separated_folder = os.path.join(output_dir, "htdemucs", track_name)
 
-            vocals_src = os.path.join(separated_folder, "vocals.wav")
-            no_vocals_src = os.path.join(separated_folder, "no_vocals.wav")
+            results = {"status": "success", "mode": stems_mode}
+            stems = ["vocals", "no_vocals", "drums", "bass", "other"]
+            for stem in stems:
+                src = os.path.join(separated_folder, f"{stem}.wav")
+                dst = os.path.join(output_dir, f"{stem}.wav")
+                if os.path.exists(src):
+                    shutil.move(src, dst)
+                    results[stem] = f"/processed/{os.path.basename(output_dir)}/{stem}.wav"
 
-            vocals_dst = os.path.join(output_dir, "vocals.wav")
-            no_vocals_dst = os.path.join(output_dir, "no_vocals.wav")
-
-            if os.path.exists(vocals_src):
-                shutil.move(vocals_src, vocals_dst)
-            if os.path.exists(no_vocals_src):
-                shutil.move(no_vocals_src, no_vocals_dst)
-
-            return {
-                "status": "success",
-                "vocals": vocals_dst if os.path.exists(vocals_dst) else None,
-                "no_vocals": no_vocals_dst if os.path.exists(no_vocals_dst) else None
-            }
+            return results
 
     except Exception as e:
         raise RuntimeError(f"Stem separation failed: {str(e)}")
