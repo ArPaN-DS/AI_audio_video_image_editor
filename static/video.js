@@ -837,6 +837,50 @@
         });
     }
 
+    async function burnSubtitles() {
+        const videoClips = clips.filter(c => c.hasVideo);
+        if (videoClips.length === 0) {
+            toast('Please add a video clip first.', 'warning'); return;
+        }
+        const firstClip = videoClips[0];
+        const mediaObj = media[firstClip.source];
+        if (!mediaObj || !mediaObj.file) {
+            toast('Please load a valid video file.', 'warning'); return;
+        }
+
+        if (window.ProcessingOverlay) {
+            window.ProcessingOverlay.show({
+                title: 'AI Subtitle Burner (CapCut Style)',
+                message: 'Transcribing speech & rendering hardcoded subtitles...'
+            });
+        } else {
+            showLoading('Burning subtitles...');
+        }
+
+        try {
+            const fd = new FormData();
+            fd.append('file', mediaObj.file);
+            fd.append('style', 'yellow_box');
+
+            const res = await fetch('/video/burn-subtitles', { method: 'POST', body: fd });
+            if (!res.ok) {
+                const e = await res.json().catch(() => ({})); toast(e.error || 'Subtitle burning failed', 'error'); return;
+            }
+
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = 'subtitled_video.mp4'; a.click();
+            URL.revokeObjectURL(url);
+            toast('💬 Subtitled video downloaded successfully!', 'success');
+        } catch (e) {
+            toast('Subtitle burning failed: ' + e.message, 'error');
+        } finally {
+            if (window.ProcessingOverlay) window.ProcessingOverlay.hide();
+            else hideLoading();
+        }
+    }
+
     // ═══════════════════════════════════════
     //  WIRING
     // ═══════════════════════════════════════
@@ -859,6 +903,7 @@
         $('veUndoBtn').onclick = undo;
         $('veSplitBtn').onclick = splitAtPlayhead;
         if ($('veDetectScenesBtn')) $('veDetectScenesBtn').onclick = detectScenes;
+        if ($('veBurnSubtitlesBtn')) $('veBurnSubtitlesBtn').onclick = burnSubtitles;
         $('veAddTextBtn').onclick = addText;
 
         // Zoom
@@ -936,7 +981,8 @@
             doExport(fmt);
         };
 
-        // Help
+        if ($('veDetectScenesBtn')) $('veDetectScenesBtn').onclick = detectScenes;
+        if ($('veBurnSubtitlesBtn')) $('veBurnSubtitlesBtn').onclick = burnSubtitles;
         $('veHelpBtn').onclick = () => $('veShortcutsOverlay').classList.remove('hidden');
         $('veCloseShortcuts').onclick = () => $('veShortcutsOverlay').classList.add('hidden');
 

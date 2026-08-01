@@ -827,6 +827,57 @@
         }
     }
 
+    async function restoreFaces() {
+        if (!base) { toast('Please load an image first.', 'warning'); return; }
+
+        if (window.ProcessingOverlay) {
+            window.ProcessingOverlay.show({
+                title: 'AI Face & Portrait Restorer',
+                message: 'Detecting faces & sharpening facial details...'
+            });
+        } else {
+            showLoading('Restoring faces...');
+        }
+
+        try {
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = base.width; tempCanvas.height = base.height;
+            const tctx = tempCanvas.getContext('2d');
+            tctx.filter = buildFilter();
+            tctx.drawImage(base, 0, 0);
+            tctx.filter = 'none';
+
+            const beforeBlob = await new Promise(r => tempCanvas.toBlob(r, 'image/png'));
+            const fd = new FormData();
+            fd.append('file', beforeBlob, 'image.png');
+
+            const res = await fetch('/image/restore-faces', { method: 'POST', body: fd });
+            if (!res.ok) {
+                const e = await res.json().catch(() => ({})); toast(e.error || 'Face restoration failed', 'error'); return;
+            }
+
+            const afterBlob = await res.blob();
+            const afterURL = URL.createObjectURL(afterBlob);
+            const afterImg = new Image();
+            afterImg.onload = () => {
+                snapshot();
+                setBaseFromImage(afterImg);
+                renderCanvas();
+                URL.revokeObjectURL(afterURL);
+                toast('👤 AI Face Restoration complete!', 'success');
+            };
+            afterImg.src = afterURL;
+        } catch (e) {
+            toast('Face restoration failed: ' + e.message, 'error');
+        } finally {
+            if (window.ProcessingOverlay) {
+                window.ProcessingOverlay.hide();
+            } else {
+                hideLoading();
+            }
+        }
+    }
+
     function showLoading(txt) { $('ieLoadingText').textContent = txt || 'Working...'; $('ieLoadingOverlay').classList.remove('hidden'); }
     function hideLoading() { $('ieLoadingOverlay').classList.add('hidden'); }
 
@@ -961,6 +1012,7 @@
         // Action Buttons
         safeClick('ieEnhanceBtn', enhance);
         safeClick('ieClarityBtn', enhanceClarity);
+        safeClick('ieRestoreFaceBtn', restoreFaces);
         safeClick('ieRemoveBgBtn', removeBg);
         initCompare();
 

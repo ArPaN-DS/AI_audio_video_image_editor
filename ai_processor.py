@@ -943,3 +943,67 @@ def separate_stems(input_path, output_dir, stems_mode="2"):
         raise RuntimeError(f"Stem separation failed: {str(e)}")
 
 
+def trim_silence_gaps(input_path, output_path, min_silence_len=1.0, silence_thresh=-40):
+    """
+    Auto-detects and trims silence gaps longer than `min_silence_len` seconds.
+    Uses FFmpeg silencedetect and filter complex to extract non-silent audio segments.
+    """
+    import subprocess
+    import re
+
+    cmd = [
+        "ffmpeg", "-y", "-i", input_path,
+        "-af", f"silencedetect=noise={silence_thresh}dB:d={min_silence_len}",
+        "-f", "null", "-"
+    ]
+    proc = subprocess.run(cmd, capture_output=True, text=True)
+    stderr = proc.stderr
+
+    starts = [float(x) for x in re.findall(r"silence_start: ([\d\.]+)", stderr)]
+    ends = [float(x) for x in re.findall(r"silence_end: ([\d\.]+)", stderr)]
+
+    if not starts or len(starts) != len(ends):
+        shutil.copyfile(input_path, output_path)
+        return {"status": "success", "silences_removed": 0}
+
+    dur_cmd = ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", input_path]
+    dur_res = subprocess.run(dur_cmd, capture_output=True, text=True)
+    try:
+        total_dur = float(dur_res.stdout.strip() or "0")
+    except ValueError:
+        total_dur = 0.0
+
+    non_silent = []
+    curr = 0.0
+    for s, e in zip(starts, ends):
+        if s - curr >= 0.1:
+            non_silent.append((curr, s))
+        curr = e
+    if total_dur > 0 and total_dur - curr >= 0.1:
+        non_silent.append((curr, total_dur))
+
+    if not non_silent:
+        shutil.copyfile(input_path, output_path)
+        return {"status": "success", "silences_removed": 0}
+
+    filter_parts = []
+    concat_parts = []
+    for idx, (seg_start, seg_end) in enumerate(non_silent):
+        filter_parts.append(f"[0:a]atrim=start={seg_start}:end={seg_end},asetpts=PTS-STARTPTS[a{idx}];")
+        concat_parts.append(f"[a{idx}]")
+
+    fc = "".join(filter_parts) + "".join(concat_parts) + f"concat=n={len(non_silent)}:v=0:a=1[outa]"
+
+    trim_cmd = [
+        "ffmpeg", "-y", "-i", input_path,
+        "-filter_complex", fc,
+        "-map", "[outa]",
+        output_path
+    ]
+    tproc = subprocess.run(trim_cmd, capture_output=True, text=True)
+    if tproc.returncode != 0:
+        shutil.copyfile(input_path, output_path)
+
+    return {"status": "success", "silences_removed": len(starts)}
+
+

@@ -1477,6 +1477,55 @@ document.addEventListener('DOMContentLoaded', () => {
     wavesurfer.on('audioprocess', syncTranscriptPlayhead);
     wavesurfer.on('seeking', syncTranscriptPlayhead);
 
+    const autoTrimSilenceBtn = document.getElementById('aiAutoTrimSilenceBtn');
+    if (autoTrimSilenceBtn) {
+        autoTrimSilenceBtn.onclick = async () => {
+            if (!fileInput.files[0] && !recordedBlob) {
+                showToast('Please upload or record audio first.', 'warning');
+                return;
+            }
+
+            if (window.ProcessingOverlay) {
+                window.ProcessingOverlay.show({
+                    title: 'AI Audio Silence Trimmer',
+                    message: 'Detecting dead silence gaps (>1s) & jump-cutting audio...'
+                });
+            } else {
+                showToast('Auto-trimming silence gaps...', 'info');
+            }
+
+            try {
+                const fd = new FormData();
+                if (recordedBlob && !fileInput.files[0]) {
+                    fd.append('file', recordedBlob, 'audio.webm');
+                } else {
+                    fd.append('file', fileInput.files[0]);
+                }
+                fd.append('min_silence_len', '1.0');
+
+                const res = await fetch('/ai/trim-silence', { method: 'POST', body: fd });
+                if (!res.ok) {
+                    const e = await res.json().catch(() => ({}));
+                    showToast(e.error || 'Silence trimming failed', 'error');
+                    return;
+                }
+
+                const blob = await res.blob();
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'silence_trimmed_audio.wav';
+                a.click();
+                URL.revokeObjectURL(url);
+                showToast('⚡ Silence gaps trimmed and audio downloaded!', 'success');
+            } catch (e) {
+                showToast('Silence trimming failed: ' + e.message, 'error');
+            } finally {
+                if (window.ProcessingOverlay) window.ProcessingOverlay.hide();
+            }
+        };
+    }
+
     // Initialize undo button state
     updateUndoBtn();
 });

@@ -548,3 +548,72 @@ def detect_scenes(video_path, threshold=3.0, mode="adaptive"):
             return [{"scene_num": i + 1, "start": round(s[0].get_seconds(), 3), "end": round(s[1].get_seconds(), 3), "duration": round(s[1].get_seconds() - s[0].get_seconds(), 3)} for i, s in enumerate(scene_list)]
         except Exception as err:
             raise RuntimeError(f"Scene detection failed: {str(e)}")
+
+
+def burn_subtitles(video_path, output_path, style="yellow_box"):
+    """
+    Transcribes audio via Whisper and burns stylized hardcoded subtitles onto the video via FFmpeg.
+    style: 'yellow_box' (CapCut modern yellow text with dark box), 'classic_white', 'neon_cyan'
+    """
+    import tempfile
+    from ai_processor import transcribe_audio
+
+    result = transcribe_audio(video_path)
+    if not result.get("available") or not result.get("segments"):
+        raise RuntimeError("Speech transcription failed or no spoken text found.")
+
+    segments = result["segments"]
+
+    def sec_to_srt_time(sec):
+        hrs = int(sec // 3600)
+        mins = int((sec % 3600) // 60)
+        secs = int(sec % 60)
+        millis = int(round((sec - int(sec)) * 1000))
+        return f"{hrs:02d}:{mins:02d}:{secs:02d},{millis:03d}"
+
+    srt_lines = []
+    for idx, seg in enumerate(segments, start=1):
+        start_t = sec_to_srt_time(seg["start"])
+        end_t = sec_to_srt_time(seg["end"])
+        text = seg["text"].strip()
+        if text:
+            srt_lines.append(f"{idx}\n{start_t} --> {end_t}\n{text}\n")
+
+    if not srt_lines:
+        raise RuntimeError("No spoken subtitle text found in video.")
+
+    srt_content = "\n".join(srt_lines)
+
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".srt", delete=False, encoding="utf-8") as srt_file:
+        srt_file.write(srt_content)
+        srt_path = srt_file.name
+
+    escaped_srt = srt_path.replace("\\", "/").replace(":", "\\:")
+
+    if style == "yellow_box":
+        force_style = "Fontname=Arial,Fontsize=22,PrimaryColour=&H0000FFFF,BackColour=&H80000000,BorderStyle=3,Outline=1,Shadow=0,MarginV=30,Bold=1"
+    elif style == "neon_cyan":
+        force_style = "Fontname=Arial,Fontsize=22,PrimaryColour=&H00FFFF00,OutlineColour=&H00000000,BorderStyle=1,Outline=2,Shadow=1,MarginV=30,Bold=1"
+    else:
+        force_style = "Fontname=Arial,Fontsize=20,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,BorderStyle=1,Outline=2,Shadow=1,MarginV=30,Bold=1"
+
+    vf_arg = f"subtitles='{escaped_srt}':force_style='{force_style}'"
+
+    cmd = [
+        FFMPEG_BINARY, "-y",
+        "-i", video_path,
+        "-vf", vf_arg,
+        "-c:a", "copy",
+        "-preset", "fast",
+        output_path
+    ]
+
+    try:
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+        if proc.returncode != 0:
+            raise RuntimeError(f"FFmpeg subtitle burn failed: {proc.stderr[-500:]}")
+        return {"status": "success", "subtitles_burned": len(segments)}
+    finally:
+        if os.path.exists(srt_path):
+            try: os.remove(srt_path)
+            except Exception: pass

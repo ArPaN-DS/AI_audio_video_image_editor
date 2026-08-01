@@ -241,3 +241,81 @@ def remove_bg(src_path, out_path, model_name="isnet-general-use", alpha_matting=
             return {"engine": f"rembg_{model_name}", "status": "success"}
     except Exception as e:
         raise RuntimeError(f"AI Background Removal failed: {str(e)}")
+
+
+def inpaint_object(src_path, mask_path, out_path, radius=3, method="telea"):
+    """
+    AI Magic Eraser / Object Inpainting: Replaces brushed mask regions with background textures.
+    """
+    try:
+        import cv2
+        import numpy as np
+
+        img = cv2.imread(src_path, cv2.IMREAD_COLOR)
+        mask = cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE)
+
+        if img is None or mask is None:
+            raise ValueError("Could not load image or mask file.")
+
+        if mask.shape[:2] != img.shape[:2]:
+            mask = cv2.resize(mask, (img.shape[1], img.shape[0]), interpolation=cv2.INTER_NEAREST)
+
+        _, bin_mask = cv2.threshold(mask, 10, 255, cv2.THRESH_BINARY)
+
+        inpaint_flag = cv2.INPAINT_TELEA if method == "telea" else cv2.INPAINT_NS
+        result = cv2.inpaint(img, bin_mask, inpaintRadius=radius, flags=inpaint_flag)
+
+        cv2.imwrite(out_path, result)
+        return {"status": "success", "engine": f"opencv_inpaint_{method}"}
+    except Exception as e:
+        raise RuntimeError(f"Magic Eraser Inpainting failed: {str(e)}")
+
+
+def restore_faces(src_path, out_path):
+    """
+    AI Portrait & Face Detail Restorer: Detects faces and applies high-frequency detail restoration,
+    skin bilateral smoothing, and eye contrast sharpening.
+    """
+    try:
+        import cv2
+        import numpy as np
+
+        img = cv2.imread(src_path, cv2.IMREAD_COLOR)
+        if img is None:
+            raise ValueError("Could not read image file.")
+
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+        faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=4, minSize=(30, 30))
+
+        result = img.copy()
+
+        if len(faces) > 0:
+            for (x, y, w, h) in faces:
+                pad_w, pad_h = int(w * 0.1), int(h * 0.1)
+                x1 = max(0, x - pad_w)
+                y1 = max(0, y - pad_h)
+                x2 = min(img.shape[1], x + w + pad_w)
+                y2 = min(img.shape[0], y + h + pad_h)
+
+                face_roi = result[y1:y2, x1:x2]
+                smooth_face = cv2.bilateralFilter(face_roi, d=7, sigmaColor=35, sigmaSpace=7)
+                blur = cv2.GaussianBlur(smooth_face, (0, 0), 2.5)
+                sharp_face = cv2.addWeighted(smooth_face, 1.4, blur, -0.4, 0)
+                
+                lab = cv2.cvtColor(sharp_face, cv2.COLOR_BGR2LAB)
+                l, a, b = cv2.split(lab)
+                clahe = cv2.createCLAHE(clipLimit=1.8, tileGridSize=(4, 4))
+                l_opt = clahe.apply(l)
+                enhanced_face = cv2.cvtColor(cv2.merge((l_opt, a, b)), cv2.COLOR_LAB2BGR)
+
+                result[y1:y2, x1:x2] = enhanced_face
+        else:
+            smooth = cv2.bilateralFilter(img, d=5, sigmaColor=25, sigmaSpace=5)
+            blur = cv2.GaussianBlur(smooth, (0, 0), 2)
+            result = cv2.addWeighted(smooth, 1.3, blur, -0.3, 0)
+
+        cv2.imwrite(out_path, result)
+        return {"status": "success", "faces_found": len(faces), "engine": "opencv_face_restorer"}
+    except Exception as e:
+        raise RuntimeError(f"Face Restoration failed: {str(e)}")

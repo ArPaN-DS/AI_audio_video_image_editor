@@ -504,6 +504,87 @@ def image_clarity():
             os.remove(in_path)
 
 
+@app.route('/image/inpaint', methods=['POST'])
+def image_inpaint():
+    if 'file' not in request.files or 'mask' not in request.files:
+        return jsonify({"error": "Missing image or mask file"}), 400
+    file = request.files['file']
+    mask = request.files['mask']
+
+    uid = uuid.uuid4()
+    in_path = os.path.join(app.config['UPLOAD_FOLDER'], f"inp_in_{uid}.png")
+    mask_path = os.path.join(app.config['UPLOAD_FOLDER'], f"inp_mask_{uid}.png")
+    out_path = os.path.join(app.config['PROCESSED_FOLDER'], f"inp_out_{uid}.png")
+    file.save(in_path)
+    mask.save(mask_path)
+
+    try:
+        method = request.form.get('method', 'telea')
+        image_processor.inpaint_object(in_path, mask_path, out_path, method=method)
+        return send_file(out_path, mimetype='image/png')
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        for p in (in_path, mask_path):
+            if os.path.exists(p): os.remove(p)
+
+
+@app.route('/image/restore-faces', methods=['POST'])
+def image_restore_faces():
+    if 'file' not in request.files:
+        return jsonify({"error": "No image file"}), 400
+    file = request.files['file']
+
+    uid = uuid.uuid4()
+    in_path = os.path.join(app.config['UPLOAD_FOLDER'], f"face_in_{uid}.png")
+    out_path = os.path.join(app.config['PROCESSED_FOLDER'], f"face_out_{uid}.png")
+    file.save(in_path)
+
+    try:
+        image_processor.restore_faces(in_path, out_path)
+        return send_file(out_path, mimetype='image/png')
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if os.path.exists(in_path): os.remove(in_path)
+
+
+@app.route('/video/burn-subtitles', methods=['POST'])
+def video_burn_subtitles():
+    if 'file' not in request.files:
+        return jsonify({"error": "No video file"}), 400
+    file = request.files['file']
+
+    temp_path = save_temp_upload(file)
+    out_path = os.path.join(app.config['PROCESSED_FOLDER'], f"subbed_{uuid.uuid4()}.mp4")
+    try:
+        style = request.form.get('style', 'yellow_box')
+        video_processor.burn_subtitles(temp_path, out_path, style=style)
+        return send_file(out_path, mimetype='video/mp4', as_attachment=True, download_name="subtitled_video.mp4")
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if os.path.exists(temp_path): os.remove(temp_path)
+
+
+@app.route('/ai/trim-silence', methods=['POST'])
+def ai_trim_silence():
+    if 'file' not in request.files:
+        return jsonify({"error": "No audio file"}), 400
+    file = request.files['file']
+
+    temp_path = save_temp_upload(file)
+    out_path = os.path.join(app.config['PROCESSED_FOLDER'], f"trimmed_{uuid.uuid4()}.wav")
+    try:
+        min_silence_len = float(request.form.get('min_silence_len', 1.0))
+        ai_processor.trim_silence_gaps(temp_path, out_path, min_silence_len=min_silence_len)
+        return send_file(out_path, mimetype='audio/wav', as_attachment=True, download_name="trimmed_audio.wav")
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if os.path.exists(temp_path): os.remove(temp_path)
+
+
 @app.route('/image/enhance', methods=['POST'])
 def image_enhance():
     """Real local super-resolution ('Increase Quality') via OpenCV dnn_superres."""
