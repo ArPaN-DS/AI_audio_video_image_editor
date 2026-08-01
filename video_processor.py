@@ -513,3 +513,29 @@ def export_project(spec, resolve_source, work_dir, output_path):
     cmd.append(output_path)
     _run(cmd)
     return output_path
+
+
+def detect_scenes(video_path, threshold=27.0):
+    """
+    Detects scene cut boundaries in video using scenedetect (PySceneDetect).
+    Returns list of cut intervals: [{'start': sec, 'end': sec, 'duration': sec}]
+    """
+    try:
+        from scenedetect import detect, ContentDetector
+        scene_list = detect(video_path, ContentDetector(threshold=threshold))
+        scenes = []
+        for i, scene in enumerate(scene_list):
+            start_sec = round(scene[0].get_seconds(), 3)
+            end_sec = round(scene[1].get_seconds(), 3)
+            scenes.append({
+                "scene_num": i + 1,
+                "start": start_sec,
+                "end": end_sec,
+                "duration": round(end_sec - start_sec, 3)
+            })
+        return scenes
+    except ImportError:
+        # Fallback if scenedetect is not installed
+        raise RuntimeError("PySceneDetect package not installed. Run: pip install scenedetect[opencv]")
+    except Exception as e:
+        raise RuntimeError(f"Scene detection failed: {str(e)}")

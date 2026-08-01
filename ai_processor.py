@@ -826,3 +826,126 @@ def transcribe_audio(path):
         gc.collect()
 
 
+def detect_filler_words(path, custom_words=None):
+    """
+    Analyzes audio transcript for filler words ('um', 'uh', 'like', 'you know', 'er', 'ah').
+    Returns a list of region cut intervals with word timestamps.
+    """
+    default_fillers = {"um", "uh", "er", "ah", "like", "you know", "hmm"}
+    target_words = set(custom_words) if custom_words else default_fillers
+
+    # Use transcribe_audio to get word-level timing
+    res = transcribe_audio(path)
+    if not res.get("available"):
+        raise RuntimeError(res.get("error", "Transcription failed"))
+
+    detected_fillers = []
+    segments = res.get("segments", [])
+    for seg in segments:
+        words = seg.get("words", [])
+        for w in words:
+            clean_w = w.get("word", "").strip().lower().strip(".,!?")
+            if clean_w in target_words:
+                start_t = round(w.get("start", 0.0), 3)
+                end_t = round(w.get("end", 0.0), 3)
+                detected_fillers.append({
+                    "word": w.get("word", "").strip(),
+                    "start": start_t,
+                    "end": end_t,
+                    "duration": round(end_t - start_t, 3),
+                    "confidence": w.get("confidence", 1.0)
+                })
+
+    return {
+        "total_fillers": len(detected_fillers),
+        "fillers": detected_fillers
+    }
+
+
+def enhance_speech_studio(input_path, output_path):
+    """
+    Applies AI speech enhancement and de-reverb (DeepFilterNet).
+    Falls back to high-grade spectral noise reduction if DeepFilterNet is not present.
+    """
+    from model_manager import global_model_manager
+    try:
+        from df.enhance import enhance, init_df, load_audio, save_audio
+
+        def _load_df():
+            model, df_state, _ = init_df()
+            return (model, df_state), {"engine": "deepfilternet"}
+
+        def _unload_df(instance):
+            del instance
+
+        with global_model_manager.session("deepfilternet", _load_df, _unload_df) as ((model, df_state), meta):
+            audio, _ = load_audio(input_path, sr=df_state.sr())
+            enhanced = enhance(model, df_state, audio)
+            save_audio(output_path, enhanced, sr=df_state.sr())
+            return {"engine": "deepfilternet", "status": "success"}
+
+    except ImportError:
+        # Fallback to enhanced spectral noise reduction via noisereduce
+        reduce_noise(input_path, output_path)
+        return {"engine": "noisereduce_fallback", "status": "success"}
+    except Exception as e:
+        # If any runtime error occurs, attempt fallback noise reduction
+        reduce_noise(input_path, output_path)
+        return {"engine": "noisereduce_fallback", "status": "success", "note": str(e)}
+
+
+def separate_stems(input_path, output_dir):
+    """
+    Splits audio into Vocals and Instrumental stems using Demucs.
+    Outputs: vocals.wav and no_vocals.wav in output_dir.
+    """
+    from model_manager import global_model_manager
+    import subprocess
+    os.makedirs(output_dir, exist_ok=True)
+
+    try:
+        def _load_demucs():
+            # Dummy load function for model manager locking
+            return "demucs_cli", {"engine": "demucs_htdemucs"}
+
+        def _unload_demucs(instance):
+            gc.collect()
+
+        with global_model_manager.session("demucs_stem_separator", _load_demucs, _unload_demucs):
+            # Run demucs separation via python CLI or module
+            cmd = [
+                sys.executable, "-m", "demucs.separate",
+                "-n", "htdemucs",
+                "--two-stems", "vocals",
+                "-o", output_dir,
+                input_path
+            ]
+            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+            if proc.returncode != 0:
+                raise RuntimeError(f"Demucs separation error: {proc.stderr[-500:]}")
+
+            # Locate the generated files in output_dir/htdemucs/<track_name>/
+            track_name = os.path.splitext(os.path.basename(input_path))[0]
+            separated_folder = os.path.join(output_dir, "htdemucs", track_name)
+
+            vocals_src = os.path.join(separated_folder, "vocals.wav")
+            no_vocals_src = os.path.join(separated_folder, "no_vocals.wav")
+
+            vocals_dst = os.path.join(output_dir, "vocals.wav")
+            no_vocals_dst = os.path.join(output_dir, "no_vocals.wav")
+
+            if os.path.exists(vocals_src):
+                shutil.move(vocals_src, vocals_dst)
+            if os.path.exists(no_vocals_src):
+                shutil.move(no_vocals_src, no_vocals_dst)
+
+            return {
+                "status": "success",
+                "vocals": vocals_dst if os.path.exists(vocals_dst) else None,
+                "no_vocals": no_vocals_dst if os.path.exists(no_vocals_dst) else None
+            }
+
+    except Exception as e:
+        raise RuntimeError(f"Stem separation failed: {str(e)}")
+
+

@@ -1185,6 +1185,117 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     };
 
+    // AI Filler Word Detection
+    if (document.getElementById('aiFillerWordsBtn')) {
+        document.getElementById('aiFillerWordsBtn').onclick = () => {
+            runAIFeature('aiFillerWordsBtn', '/ai/filler-words', {}, (data) => {
+                clearAiMarkers();
+                const resultsPanel = document.getElementById('aiResultsPanel');
+                const resultsContent = document.getElementById('aiResultsContent');
+                resultsPanel.classList.remove('hidden');
+
+                const fillers = data.fillers || [];
+                if (fillers.length === 0) {
+                    resultsContent.innerHTML = `<p style="padding:10px;">Clean speech! No filler words ("um", "uh", "like") found.</p>`;
+                    showToast('No filler words found!', 'info');
+                    return;
+                }
+
+                fillers.forEach(f => {
+                    addAiMarker(f.start, f.end, 'rgba(239, 68, 68, 0.35)', f.word);
+                });
+
+                resultsContent.innerHTML = `
+                    <div class="transcript-container">
+                        <p style="margin-bottom:8px; font-weight:500;">Found <strong>${fillers.length}</strong> filler word(s) ('um', 'uh', 'like'):</p>
+                        <div style="display:flex; gap:10px; margin-top:8px;">
+                            <button type="button" class="ai-action-btn" id="aiCutFillersBtn">
+                                <i class="fas fa-cut"></i> Auto-Cut Filler Words
+                            </button>
+                            <button type="button" class="ai-action-btn-outline" id="aiClearFillersBtn">
+                                <i class="fas fa-eraser"></i> Clear Markers
+                            </button>
+                        </div>
+                    </div>`;
+
+                document.getElementById('aiClearFillersBtn').onclick = () => {
+                    clearAiMarkers();
+                    resultsPanel.classList.add('hidden');
+                };
+
+                document.getElementById('aiCutFillersBtn').onclick = () => {
+                    allRegions.forEach(r => r.region.remove());
+                    allRegions = [];
+                    fillers.forEach(f => addRegion(f.start, f.end, `Cut: ${f.word}`));
+                    resultsPanel.classList.add('hidden');
+                    showToast(`Marked ${fillers.length} filler words for removal!`, 'success');
+                };
+            });
+        };
+    }
+
+    // AI Speech Studio Enhancement
+    if (document.getElementById('aiEnhanceSpeechBtn')) {
+        document.getElementById('aiEnhanceSpeechBtn').onclick = () => {
+            runAIFeature('aiEnhanceSpeechBtn', '/ai/enhance-speech', {}, (blob) => {
+                loadAudio(blob);
+                recordedBlob = blob;
+                fileInput.value = '';
+
+                const resultsPanel = document.getElementById('aiResultsPanel');
+                const resultsContent = document.getElementById('aiResultsContent');
+                resultsPanel.classList.remove('hidden');
+
+                resultsContent.innerHTML = `
+                    <div class="transcript-container">
+                        <p style="color:#27ae60; font-weight:600;"><i class="fas fa-magic"></i> AI Speech Studio Enhancement Complete!</p>
+                        <p style="margin-top:6px;">Room echo and acoustic reverberation removed. Enhanced voice loaded into timeline.</p>
+                        <div style="display:flex; gap:10px; margin-top:12px;">
+                            <button type="button" class="ai-action-btn" id="aiSaveEnhancedBtn">
+                                <i class="fas fa-download"></i> Save Enhanced Speech
+                            </button>
+                        </div>
+                    </div>`;
+
+                document.getElementById('aiSaveEnhancedBtn').onclick = () => {
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'enhanced_speech.wav';
+                    a.click();
+                    a.remove();
+                };
+                showToast('✨ AI Speech Enhancement complete!', 'success');
+            });
+        };
+    }
+
+    // AI Vocal / Stem Separator
+    if (document.getElementById('aiSeparateStemsBtn')) {
+        document.getElementById('aiSeparateStemsBtn').onclick = () => {
+            runAIFeature('aiSeparateStemsBtn', '/ai/separate-stems', {}, (data) => {
+                const resultsPanel = document.getElementById('aiResultsPanel');
+                const resultsContent = document.getElementById('aiResultsContent');
+                resultsPanel.classList.remove('hidden');
+
+                resultsContent.innerHTML = `
+                    <div class="transcript-container">
+                        <p style="color:#8b5cf6; font-weight:600;"><i class="fas fa-sliders"></i> Stem Separation Complete!</p>
+                        <p style="margin-top:6px;">Separated vocals and instrumental tracks into high quality stems.</p>
+                        <div style="display:flex; gap:10px; margin-top:12px;">
+                            <a href="${data.vocals || '#'}" download="vocals.wav" class="ai-action-btn" style="text-decoration:none;">
+                                <i class="fas fa-microphone"></i> Download Vocals
+                            </a>
+                            <a href="${data.no_vocals || '#'}" download="instrumental.wav" class="ai-action-btn-outline" style="text-decoration:none;">
+                                <i class="fas fa-music"></i> Download Music
+                            </a>
+                        </div>
+                    </div>`;
+                showToast('🎤 Stems separated successfully!', 'success');
+            });
+        };
+    }
+
     // AI Voice Activity Detection (VAD)
     document.getElementById('aiVadBtn').onclick = () => {
         runAIFeature('aiVadBtn', '/ai/detect-vad', { threshold_db: -35.0 }, (data) => {

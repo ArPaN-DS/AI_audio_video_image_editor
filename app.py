@@ -342,6 +342,71 @@ def ai_noise_reduce():
         if os.path.exists(temp_path):
             os.remove(temp_path)
 
+
+@app.route('/ai/filler-words', methods=['POST'])
+def ai_filler_words():
+    if 'file' not in request.files: return "No file", 400
+    file = request.files['file']
+    if file.filename == '': return "No file", 400
+
+    temp_path = save_temp_upload(file)
+    try:
+        results = ai_processor.detect_filler_words(temp_path)
+        return jsonify(results)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+
+
+@app.route('/ai/enhance-speech', methods=['POST'])
+def ai_enhance_speech():
+    if 'file' not in request.files: return "No file", 400
+    file = request.files['file']
+    if file.filename == '': return "No file", 400
+
+    temp_path = save_temp_upload(file)
+    try:
+        unique_id = str(uuid.uuid4())
+        output_filename = f"enhanced_speech_{unique_id}.wav"
+        output_path = os.path.join(app.config['PROCESSED_FOLDER'], output_filename)
+
+        res = ai_processor.enhance_speech_studio(temp_path, output_path)
+
+        base_name = os.path.splitext(file.filename)[0]
+        resp = send_file(
+            output_path,
+            as_attachment=True,
+            download_name=f"enhanced_{base_name}.wav"
+        )
+        resp.headers['X-Enhance-Engine'] = res.get('engine', 'unknown')
+        return resp
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+
+
+@app.route('/ai/separate-stems', methods=['POST'])
+def ai_separate_stems():
+    if 'file' not in request.files: return "No file", 400
+    file = request.files['file']
+    if file.filename == '': return "No file", 400
+
+    temp_path = save_temp_upload(file)
+    out_dir = os.path.join(app.config['PROCESSED_FOLDER'], f"stems_{uuid.uuid4()}")
+    try:
+        res = ai_processor.separate_stems(temp_path, out_dir)
+        return jsonify(res)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+
+
 # ═══════════════════════════════════════════
 #  VIDEO EDITOR (audio + video combo editor)
 # ═══════════════════════════════════════════
@@ -365,11 +430,54 @@ def video_editor():
     return render_template('video.html')
 
 
+@app.route('/video/detect-scenes', methods=['POST'])
+def video_detect_scenes():
+    if 'file' not in request.files: return jsonify({"error": "No video file"}), 400
+    file = request.files['file']
+    if file.filename == '': return jsonify({"error": "No file"}), 400
+
+    temp_path = save_temp_upload(file)
+    try:
+        threshold = float(request.form.get('threshold', 27.0))
+        scenes = video_processor.detect_scenes(temp_path, threshold=threshold)
+        return jsonify({"status": "success", "scenes": scenes})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+
+
 @app.route('/image')
 def image_editor():
-    # Editing is client-side (HTML Canvas). Only the optional AI upscale
-    # sends the image to this local server — never to any cloud.
+    # Editing is client-side (HTML Canvas). Only optional AI calls reach backend.
     return render_template('image.html')
+
+
+@app.route('/image/remove-bg', methods=['POST'])
+def image_remove_bg():
+    if 'file' not in request.files:
+        return jsonify({"error": "No image"}), 400
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({"error": "No image"}), 400
+
+    model_name = request.form.get('model', 'u2net')
+    alpha_matting = request.form.get('alpha_matting', 'true').lower() == 'true'
+
+    uid = uuid.uuid4()
+    in_path = os.path.join(app.config['UPLOAD_FOLDER'], f"bg_in_{uid}.png")
+    out_path = os.path.join(app.config['PROCESSED_FOLDER'], f"bg_out_{uid}.png")
+    file.save(in_path)
+
+    try:
+        image_processor.remove_bg(in_path, out_path, model_name=model_name, alpha_matting=alpha_matting)
+        return send_file(out_path, mimetype='image/png')
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if os.path.exists(in_path):
+            os.remove(in_path)
 
 
 @app.route('/image/enhance', methods=['POST'])

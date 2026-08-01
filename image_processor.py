@@ -138,3 +138,51 @@ def available_engines():
     engines["fast_model"] = os.path.exists(os.path.join(MODELS_DIR, "FSRCNN_x4.pb"))
     engines["best_model"] = os.path.exists(os.path.join(MODELS_DIR, "EDSR_x4.pb"))
     return engines
+
+
+def remove_bg(src_path, out_path, model_name="u2net", alpha_matting=True):
+    """
+    Strips background from image using rembg (ONNX model).
+    Wrapped in global_model_manager for zero-idle memory lifecycle.
+    model_name: 'u2net' (studio quality), 'u2net_human_seg' (portrait), 'u2netp' (fast), 'isnet-general-use'
+    """
+    try:
+        from rembg import remove, new_session
+        from PIL import Image
+        from model_manager import global_model_manager
+
+        valid_models = ("u2net", "u2net_human_seg", "u2netp", "isnet-general-use")
+        if model_name not in valid_models:
+            model_name = "u2net"
+
+        def _load_rembg():
+            session = new_session(model_name)
+            return session, {"engine": f"rembg_{model_name}"}
+
+        def _unload_rembg(session):
+            del session
+
+        model_id = f"rembg_session_{model_name}"
+        with global_model_manager.session(model_id, _load_rembg, _unload_rembg) as (session, meta):
+            input_img = Image.open(src_path)
+            
+            if alpha_matting:
+                try:
+                    output_img = remove(
+                        input_img,
+                        session=session,
+                        alpha_matting=True,
+                        alpha_matting_foreground_threshold=240,
+                        alpha_matting_background_threshold=10,
+                        alpha_matting_erode_size=10,
+                        post_process_mask=True
+                    )
+                except Exception:
+                    output_img = remove(input_img, session=session, post_process_mask=True)
+            else:
+                output_img = remove(input_img, session=session, post_process_mask=True)
+
+            output_img.save(out_path, format="PNG")
+            return {"engine": f"rembg_{model_name}", "status": "success"}
+    except Exception as e:
+        raise RuntimeError(f"AI Background Removal failed: {str(e)}")

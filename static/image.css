@@ -554,24 +554,39 @@
 .btn-small:hover { background: var(--primary-hover); }
 
 .ve-export-btn {
-    background: var(--cta);
-    color: #fff;
+    background: linear-gradient(135deg, #059669, #047857);
+    color: #FFFFFF;
     border: none;
-    padding: 10px 22px;
-    border-radius: var(--radius-sm);
-    font-weight: 700;
-    font-size: 0.9rem;
+    padding: 12px 24px;
+    border-radius: var(--radius-pill);
+    font-weight: 800;
+    font-size: 0.95rem;
     cursor: pointer;
     display: flex;
     align-items: center;
     gap: 8px;
-    box-shadow: var(--shadow-cta);
+    box-shadow: 0 6px 20px rgba(5, 150, 105, 0.35);
     transition: all var(--speed) var(--ease);
     font-family: inherit;
     justify-content: center;
 }
-.ve-export-btn:hover { background: var(--cta-hover); transform: translateY(-1px); }
+.ve-export-btn:hover { background: linear-gradient(135deg, #047857, #065f46); transform: translateY(-2px); box-shadow: 0 10px 30px rgba(5, 150, 105, 0.45); }
 .ve-export-btn-big { width: 100%; padding: 14px; font-size: 1rem; }
+
+#ieEnhanceBtn {
+    background: linear-gradient(135deg, #D97706, #B45309);
+    color: #FFFFFF;
+    border: none;
+    border-radius: var(--radius-pill);
+    padding: 12px 24px;
+    font-weight: 800;
+    box-shadow: 0 4px 14px rgba(217, 119, 6, 0.35);
+}
+#ieEnhanceBtn:hover {
+    background: linear-gradient(135deg, #B45309, #92400E);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(217, 119, 6, 0.45);
+}
 
 /* ── RESPONSIVE ── */
 @media (max-width: 900px) {

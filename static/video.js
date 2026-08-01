@@ -205,6 +205,42 @@
         toast('Clip split', 'success');
     }
 
+    async function detectScenes() {
+        if (!clips.length) { toast('Please add video clips to the timeline first.', 'warning'); return; }
+        const sel = (selected && selected.type === 'clip' ? clips.find(x => x.id === selected.id) : null) || clips[0];
+        const m = media[sel.source];
+        if (!m) { toast('No valid media selected for scene detection.', 'warning'); return; }
+
+        showLoading('AI Scene Detection analyzing video cuts...', 40);
+        try {
+            const fd = new FormData();
+            fd.append('media_id', m.id);
+            fd.append('file', new Blob([]), m.name);
+
+            const apiRes = await fetch('/video/detect-scenes', { method: 'POST', body: fd });
+            const data = await apiRes.json();
+            if (!apiRes.ok || data.error) { toast(data.error || 'Scene detection failed', 'error'); return; }
+
+            const scenes = data.scenes || [];
+            if (!scenes.length) { toast('No distinct scene cuts detected.', 'info'); return; }
+
+            snapshot();
+            scenes.forEach(sc => {
+                const cutTime = sc.start;
+                if (cutTime > sel.in + 0.5 && cutTime < sel.out - 0.5) {
+                    playhead = cutTime;
+                    splitAtPlayhead();
+                }
+            });
+            toast(`Detected ${scenes.length} scene cuts!`, 'success');
+            renderAll();
+        } catch (e) {
+            toast('Scene detection failed: ' + e.message, 'error');
+        } finally {
+            hideLoading();
+        }
+    }
+
     // Which clip covers a given timeline time? Returns {clip, startTime, localOffset}
     function clipAtTime(t) {
         let acc = 0;
@@ -822,6 +858,7 @@
         $('veSkipEndBtn').onclick = () => seekTo(totalDur());
         $('veUndoBtn').onclick = undo;
         $('veSplitBtn').onclick = splitAtPlayhead;
+        if ($('veDetectScenesBtn')) $('veDetectScenesBtn').onclick = detectScenes;
         $('veAddTextBtn').onclick = addText;
 
         // Zoom

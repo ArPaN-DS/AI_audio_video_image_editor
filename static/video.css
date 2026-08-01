@@ -753,7 +753,26 @@
     border-radius: var(--radius-sm);
     border: 1px solid var(--border);
 }
-.ve-export-btn-big { width: 100%; justify-content: center; padding: 14px; font-size: 1rem; margin-top: 8px; }
+.ve-export-btn-big {
+    width: 100%;
+    justify-content: center;
+    padding: 14px 24px;
+    font-size: 1rem;
+    font-weight: 800;
+    margin-top: 8px;
+    background: linear-gradient(135deg, #059669, #047857);
+    color: #FFFFFF;
+    border: none;
+    border-radius: var(--radius-pill);
+    box-shadow: 0 6px 20px rgba(5, 150, 105, 0.35);
+    cursor: pointer;
+    transition: all var(--speed) var(--ease);
+}
+.ve-export-btn-big:hover {
+    background: linear-gradient(135deg, #047857, #065f46);
+    transform: translateY(-2px);
+    box-shadow: 0 10px 30px rgba(5, 150, 105, 0.45);
+}
 
 /* ── QUICK TOOLS ── */
 .ve-quick-panel { max-width: 560px; }

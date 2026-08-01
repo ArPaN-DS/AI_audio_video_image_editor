@@ -251,6 +251,26 @@
                 </button>
             </div>
 
+            <!-- AI REMOVE BACKGROUND -->
+            <div class="ie-section ie-enhance-section" style="margin-top:12px;">
+                <h5><i class="fas fa-scissors"></i> Remove Background
+                    <span class="ie-local-badge"><i class="fas fa-shield-halved"></i> Local AI</span>
+                </h5>
+                <p class="ve-hint" style="margin-top:0;margin-bottom:10px;">One-click studio cutout of person, product, or subject with refined hair &amp; edge matting.</p>
+                <label class="ie-mini-label">Accuracy &amp; Model</label>
+                <div class="ve-chip-row" id="ieRemoveBgModel">
+                    <button class="ve-chip active" data-model="u2net">Studio (Best)</button>
+                    <button class="ve-chip" data-model="u2net_human_seg">Portrait (People)</button>
+                    <button class="ve-chip" data-model="u2netp">Fast</button>
+                </div>
+                <div class="ve-chip-row" style="margin-top:8px;">
+                    <button class="ve-chip active" id="ieAlphaMattingBtn" title="Refines fine hair strands &amp; cloth edges"><i class="fas fa-magic"></i> Fine Hair Matting</button>
+                </div>
+                <button id="ieRemoveBgBtn" class="ve-enhance-btn" style="background: linear-gradient(135deg, #ec4899, #8b5cf6); margin-top:12px;">
+                    <i class="fas fa-scissors"></i> Remove Background
+                </button>
+            </div>
+
             <!-- EXPORT -->
             <div class="ie-section ie-export-section">
                 <h5><i class="fas fa-download"></i> Export</h5>

@@ -5,60 +5,60 @@
    Clean · Friendly · Approachable
    ═══════════════════════════════════════ */
 :root {
-    /* ── Primary (Royal Blue Theme) ── */
-    --primary: #2563EB;
-    --primary-hover: #1D4ED8;
-    --primary-light: rgba(37, 99, 235, 0.08);
-    --primary-glow: rgba(37, 99, 235, 0.22);
+    /* ── Primary (Vibrant Indigo Theme) ── */
+    --primary: #4F46E5;
+    --primary-hover: #4338CA;
+    --primary-light: rgba(79, 70, 229, 0.10);
+    --primary-glow: rgba(79, 70, 229, 0.28);
 
-    /* ── AI Accent (Teal) ── */
-    --ai-accent: #0D9488;
-    --ai-accent-hover: #0F766E;
-    --ai-accent-light: rgba(13, 148, 136, 0.08);
-    --ai-accent-glow: rgba(13, 148, 136, 0.22);
+    /* ── AI Accent (Violet Theme) ── */
+    --ai-accent: #7C3AED;
+    --ai-accent-hover: #6D28D9;
+    --ai-accent-light: rgba(124, 58, 237, 0.10);
+    --ai-accent-glow: rgba(124, 58, 237, 0.28);
 
-    /* ── Download CTA (Warm Orange) ── */
-    --cta: #F97316;
-    --cta-hover: #EA6C0A;
-    --cta-glow: rgba(249, 115, 22, 0.28);
+    /* ── Download & Export CTA (Vibrant Emerald) ── */
+    --cta: #059669;
+    --cta-hover: #047857;
+    --cta-glow: rgba(5, 150, 105, 0.32);
 
     /* ── Danger ── */
-    --danger: #EF4444;
-    --danger-light: rgba(239, 68, 68, 0.08);
+    --danger: #E11D48;
+    --danger-light: rgba(225, 29, 72, 0.10);
 
     /* ── Success ── */
-    --success: #22C55E;
-    --success-light: rgba(34, 197, 94, 0.08);
+    --success: #16A34A;
+    --success-light: rgba(22, 163, 74, 0.10);
 
-    /* ── Backgrounds ── */
-    --bg: #F0F4F8;
+    /* ── Backgrounds & Surfaces (High Contrast Slate) ── */
+    --bg: #F1F5F9;
     --card: #FFFFFF;
     --surface: #F8FAFC;
-    --surface-2: #EEF2F7;
-    --control: #FFFFFF;          /* interactive control surface (chips, inputs, buttons) */
-    --waveform-bg: #FAFBFC;
-    --overlay-bg: rgba(255, 255, 255, 0.88);
-    --checker-a: #E9EEF4;
-    --checker-b: #F6F9FC;
+    --surface-2: #E2E8F0;
+    --control: #FFFFFF;
+    --waveform-bg: #F8FAFC;
+    --overlay-bg: rgba(15, 23, 42, 0.75);
+    --checker-a: #E2E8F0;
+    --checker-b: #F1F5F9;
     --canvas-bg: #FFFFFF;
 
-    /* ── Text (High-contrast, no low-contrast grays) ── */
+    /* ── Text (High-contrast pitch dark, no faint grays) ── */
     --text: #0F172A;
     --text-secondary: #1E293B;
     --text-hint: #334155;
 
-    /* ── Borders ── */
-    --border: #E2E8F0;
-    --border-hover: #CBD5E1;
+    /* ── Component Boundaries ── */
+    --border: #CBD5E1;
+    --border-hover: #94A3B8;
     --border-focus: var(--primary);
-    --ring: rgba(37, 99, 235, 0.45);
+    --ring: rgba(79, 70, 229, 0.45);
 
     /* ── Shadows ── */
-    --shadow-sm: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
-    --shadow-md: 0 4px 16px rgba(0,0,0,0.07), 0 2px 6px rgba(0,0,0,0.04);
-    --shadow-lg: 0 12px 40px rgba(0,0,0,0.10), 0 4px 12px rgba(0,0,0,0.05);
-    --shadow-blue: 0 6px 20px rgba(37, 99, 235, 0.28);
-    --shadow-cta: 0 6px 20px rgba(249, 115, 22, 0.32);
+    --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.08), 0 1px 2px rgba(15, 23, 42, 0.04);
+    --shadow-md: 0 4px 18px rgba(15, 23, 42, 0.10), 0 2px 6px rgba(15, 23, 42, 0.06);
+    --shadow-lg: 0 12px 36px rgba(15, 23, 42, 0.14), 0 4px 12px rgba(15, 23, 42, 0.08);
+    --shadow-blue: 0 6px 20px rgba(79, 70, 229, 0.32);
+    --shadow-cta: 0 6px 20px rgba(5, 150, 105, 0.35);
 
     /* ── Shapes ── */
     --radius: 16px;
@@ -66,65 +66,58 @@
     --radius-xs: 6px;
     --radius-pill: 50px;
 
-    /* ── Motion (60fps Spring Easing) ── */
+    /* ── Motion ── */
     --speed: 0.25s;
     --ease: cubic-bezier(0.16, 1, 0.3, 1);
 
     color-scheme: light;
 }
 
-/* ═══════════════════════════════════════
-   DARK THEME — Studio Slate
-   Premium dark surface for a pro media suite.
-   Only tokens are overridden; every component
-   that uses the tokens re-themes automatically.
-   ═══════════════════════════════════════ */
 :root[data-theme="dark"] {
-    /* Primary lifts slightly for contrast on dark */
-    --primary: #3B82F6;
-    --primary-hover: #60A5FA;
-    --primary-light: rgba(59, 130, 246, 0.14);
-    --primary-glow: rgba(59, 130, 246, 0.30);
+    --primary: #6366F1;
+    --primary-hover: #818CF8;
+    --primary-light: rgba(99, 102, 241, 0.16);
+    --primary-glow: rgba(99, 102, 241, 0.35);
 
-    --ai-accent: #2DD4BF;
-    --ai-accent-hover: #5EEAD4;
-    --ai-accent-light: rgba(45, 212, 191, 0.14);
-    --ai-accent-glow: rgba(45, 212, 191, 0.28);
+    --ai-accent: #A855F7;
+    --ai-accent-hover: #C084FC;
+    --ai-accent-light: rgba(168, 85, 247, 0.16);
+    --ai-accent-glow: rgba(168, 85, 247, 0.32);
 
-    --cta: #FB923C;
-    --cta-hover: #FDBA74;
-    --cta-glow: rgba(251, 146, 60, 0.34);
+    --cta: #10B981;
+    --cta-hover: #34D399;
+    --cta-glow: rgba(16, 185, 129, 0.38);
 
-    --danger: #F87171;
-    --danger-light: rgba(248, 113, 113, 0.14);
+    --danger: #FB7185;
+    --danger-light: rgba(251, 113, 133, 0.16);
 
-    --success: #4ADE80;
-    --success-light: rgba(74, 222, 128, 0.14);
+    --success: #34D399;
+    --success-light: rgba(52, 211, 153, 0.16);
 
-    --bg: #0B1220;
-    --card: #131C2E;
-    --surface: #0F1729;
-    --surface-2: #1C2740;
-    --control: #1B2740;
-    --waveform-bg: #0F1729;
-    --overlay-bg: rgba(9, 14, 24, 0.82);
-    --checker-a: #1C2740;
-    --checker-b: #131C2E;
-    --canvas-bg: #0B1220;
+    --bg: #0B0F19;
+    --card: #151C2C;
+    --surface: #1E293B;
+    --surface-2: #27354A;
+    --control: #1E293B;
+    --waveform-bg: #151C2C;
+    --overlay-bg: rgba(11, 15, 25, 0.85);
+    --checker-a: #1E293B;
+    --checker-b: #151C2C;
+    --canvas-bg: #0B0F19;
 
-    --text: #FFFFFF;
-    --text-secondary: #F1F5F9;
+    --text: #F8FAFC;
+    --text-secondary: #E2E8F0;
     --text-hint: #CBD5E1;
 
-    --border: #26334C;
-    --border-hover: #3A4A68;
-    --ring: rgba(96, 165, 250, 0.55);
+    --border: #334155;
+    --border-hover: #475569;
+    --ring: rgba(99, 102, 241, 0.55);
 
     --shadow-sm: 0 1px 3px rgba(0,0,0,0.40), 0 1px 2px rgba(0,0,0,0.30);
     --shadow-md: 0 6px 20px rgba(0,0,0,0.45), 0 2px 6px rgba(0,0,0,0.35);
     --shadow-lg: 0 18px 50px rgba(0,0,0,0.55), 0 6px 16px rgba(0,0,0,0.40);
-    --shadow-blue: 0 6px 20px rgba(59, 130, 246, 0.38);
-    --shadow-cta: 0 6px 20px rgba(251, 146, 60, 0.34);
+    --shadow-blue: 0 6px 20px rgba(99, 102, 241, 0.40);
+    --shadow-cta: 0 6px 20px rgba(16, 185, 129, 0.40);
 
     color-scheme: dark;
 }
@@ -1160,10 +1153,10 @@ header {
 }
 
 .ai-tool-btn {
-    background: var(--surface);
-    border: 1px solid var(--border);
+    background: var(--card);
+    border: 1.5px solid var(--border);
     border-radius: var(--radius-sm);
-    padding: 10px 12px;
+    padding: 12px 14px;
     display: flex;
     align-items: center;
     gap: 12px;
@@ -1173,12 +1166,13 @@ header {
     font-family: inherit;
     color: var(--text);
     width: 100%;
+    box-shadow: var(--shadow-sm);
 }
 
 .ai-tool-btn:hover {
-    border-color: var(--border-hover);
-    background: var(--card);
-    box-shadow: var(--shadow-sm);
+    border-color: var(--primary);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
 }
 
 .ai-tool-btn.loading {
@@ -1187,30 +1181,63 @@ header {
 }
 
 .ai-btn-icon {
-    width: 28px;
-    height: 28px;
-    border-radius: 6px;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
     display: flex;
     align-items: center;
     justify-content: center;
-    background: var(--card);
+    background: var(--surface-2);
     border: 1px solid var(--border);
     flex-shrink: 0;
-    color: var(--text-secondary);
+    color: var(--text);
+    font-size: 0.95rem;
 }
 
-.ai-tool-btn:hover .ai-btn-icon {
-    color: var(--primary);
-    border-color: var(--primary-glow);
+#aiTranscribeBtn {
+    background: linear-gradient(135deg, #7C3AED, #6D28D9);
+    color: #FFFFFF;
+    border: none;
+    box-shadow: 0 4px 14px rgba(124, 58, 237, 0.32);
 }
+#aiTranscribeBtn .ai-btn-icon { background: rgba(255, 255, 255, 0.2); color: #FFFFFF; border: none; }
+#aiTranscribeBtn .ai-btn-texts strong, #aiTranscribeBtn .ai-btn-texts .ai-btn-desc { color: #FFFFFF; }
 
-/* Customize icon colors on hover */
-#aiDenoiseBtn:hover .ai-btn-icon { color: #2563EB; background: rgba(37, 99, 235, 0.08); }
-#aiTrimBtn:hover .ai-btn-icon    { color: #10B981; background: rgba(16, 185, 129, 0.08); }
-#aiSilenceBtn:hover .ai-btn-icon { color: #3B82F6; background: rgba(59, 130, 246, 0.08); }
-#aiVadBtn:hover .ai-btn-icon     { color: #0D9488; background: rgba(13, 148, 136, 0.08); }
-#aiBeatBtn:hover .ai-btn-icon    { color: #F97316; background: rgba(249, 115, 22, 0.08); }
-#aiTranscribeBtn:hover .ai-btn-icon { color: #8B5CF6; background: rgba(139, 92, 246, 0.08); }
+#aiSilenceBtn {
+    background: linear-gradient(135deg, #4F46E5, #4338CA);
+    color: #FFFFFF;
+    border: none;
+    box-shadow: 0 4px 14px rgba(79, 70, 229, 0.32);
+}
+#aiSilenceBtn .ai-btn-icon { background: rgba(255, 255, 255, 0.2); color: #FFFFFF; border: none; }
+#aiSilenceBtn .ai-btn-texts strong, #aiSilenceBtn .ai-btn-texts .ai-btn-desc { color: #FFFFFF; }
+
+#aiTrimBtn {
+    background: linear-gradient(135deg, #059669, #047857);
+    color: #FFFFFF;
+    border: none;
+    box-shadow: 0 4px 14px rgba(5, 150, 105, 0.32);
+}
+#aiTrimBtn .ai-btn-icon { background: rgba(255, 255, 255, 0.2); color: #FFFFFF; border: none; }
+#aiTrimBtn .ai-btn-texts strong, #aiTrimBtn .ai-btn-texts .ai-btn-desc { color: #FFFFFF; }
+
+#aiDenoiseBtn {
+    background: linear-gradient(135deg, #2563EB, #1D4ED8);
+    color: #FFFFFF;
+    border: none;
+    box-shadow: 0 4px 14px rgba(37, 99, 235, 0.32);
+}
+#aiDenoiseBtn .ai-btn-icon { background: rgba(255, 255, 255, 0.2); color: #FFFFFF; border: none; }
+#aiDenoiseBtn .ai-btn-texts strong, #aiDenoiseBtn .ai-btn-texts .ai-btn-desc { color: #FFFFFF; }
+
+#aiBeatBtn {
+    background: linear-gradient(135deg, #D97706, #B45309);
+    color: #FFFFFF;
+    border: none;
+    box-shadow: 0 4px 14px rgba(217, 119, 6, 0.32);
+}
+#aiBeatBtn .ai-btn-icon { background: rgba(255, 255, 255, 0.2); color: #FFFFFF; border: none; }
+#aiBeatBtn .ai-btn-texts strong, #aiBeatBtn .ai-btn-texts .ai-btn-desc { color: #FFFFFF; }
 
 .ai-btn-texts {
     display: flex;
@@ -1218,14 +1245,15 @@ header {
 }
 
 .ai-btn-texts strong {
-    font-size: 0.84rem;
-    font-weight: 600;
+    font-size: 0.88rem;
+    font-weight: 700;
     color: var(--text);
 }
 
 .ai-btn-texts .ai-btn-desc {
-    font-size: 0.7rem;
+    font-size: 0.75rem;
     color: var(--text-secondary);
+    opacity: 0.9;
 }
 
 /* AI RESULTS PANEL */
@@ -1539,12 +1567,12 @@ header {
     border-radius: var(--radius-sm);
     cursor: pointer;
     transition: all var(--speed) var(--ease);
-    background: var(--control);
+    background: var(--card);
     text-align: center;
 }
 
-.format-card strong { font-size: 0.95rem; color: var(--text); }
-.format-card span   { font-size: 0.8rem; color: var(--text-secondary); }
+.format-card strong { font-size: 1rem; color: var(--text); font-weight: 700; }
+.format-card span   { font-size: 0.82rem; color: var(--text-secondary); }
 
 .format-option input:checked + .format-card {
     border-color: var(--primary);
@@ -1553,33 +1581,33 @@ header {
     transform: translateY(-2px);
 }
 
-.format-card:hover { border-color: var(--border-hover); transform: translateY(-1px); }
+.format-card:hover { border-color: var(--primary); transform: translateY(-1px); }
 
-/* DOWNLOAD BUTTON — orange CTA */
+/* DOWNLOAD BUTTON — Emerald CTA */
 #submitBtn {
-    background: linear-gradient(135deg, var(--cta), #FB923C);
-    color: white;
+    background: linear-gradient(135deg, #059669, #047857);
+    color: #FFFFFF;
     padding: 16px 44px;
     border: none;
     border-radius: var(--radius-pill);
-    font-size: 1.05rem;
+    font-size: 1.08rem;
     font-weight: 800;
     cursor: pointer;
     font-family: inherit;
-    box-shadow: var(--shadow-cta);
+    box-shadow: 0 6px 20px rgba(5, 150, 105, 0.38);
     transition: all var(--speed) var(--ease);
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 10px;
     align-self: flex-end;
-    letter-spacing: 0.2px;
+    letter-spacing: 0.3px;
 }
 
 #submitBtn:hover {
-    background: linear-gradient(135deg, var(--cta-hover), #F97316);
+    background: linear-gradient(135deg, #047857, #065f46);
     transform: translateY(-2px);
-    box-shadow: 0 10px 30px rgba(249, 115, 22, 0.42);
+    box-shadow: 0 10px 30px rgba(5, 150, 105, 0.48);
 }
 
 /* ═══════════════════════════════════════
