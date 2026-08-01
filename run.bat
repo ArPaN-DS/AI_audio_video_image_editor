@@ -1,8 +1,8 @@
 @echo off
-title Audio Cutter Pro + Video & Image Studio
+title Audio Cutter Pro + Video ^& Image Studio
 color 0A
 echo ======================================================================
-echo             🎵 Audio Cutter Pro + Video & Image Studio 🚀
+echo             🎵 Audio Cutter Pro + Video ^& Image Studio 🚀
 echo ======================================================================
 echo.
 
