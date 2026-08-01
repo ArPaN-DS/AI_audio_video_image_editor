@@ -36,7 +36,11 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(PROCESSED_FOLDER, exist_ok=True)
 
 @app.route('/')
-def index():
+def studio_landing():
+    return render_template('landing.html')
+
+@app.route('/audio')
+def audio_editor():
     return render_template('index.html')
 
 @app.route('/cut', methods=['POST'])

@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="light dark">
+    <!-- No-FOUC theme: apply saved / preferred theme before first paint -->
+    <script>
+        (function () {
+            try {
+                var t = localStorage.getItem('theme');
+                if (!t) t = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+                document.documentElement.setAttribute('data-theme', t);
+            } catch (e) { document.documentElement.setAttribute('data-theme', 'light'); }
+        })();
+    </script>
+    <title>Studio Hub — Audio Cutter Pro + Video & Image Studio</title>
+    <meta name="description"
+        content="All-in-one local audio, video & image studio. Cut audio, edit videos, retouch photos & upscale images 100% locally.">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='landing.css') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="{{ url_for('static', filename='theme.js') }}" defer></script>
+</head>
+
+<body class="landing-body">
+
+    <!-- ─── HEADER ─── -->
+    <header>
+        <div class="logo-container">
+            <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo">
+            <h1>Studio <span class="pro-badge">HUB</span></h1>
+        </div>
+        <nav class="page-nav">
+            <a href="/" class="page-nav-link active"><i class="fas fa-th-large"></i> Hub</a>
+            <a href="/audio" class="page-nav-link"><i class="fas fa-music"></i> Audio</a>
+            <a href="/video" class="page-nav-link"><i class="fas fa-film"></i> Video</a>
+            <a href="/image" class="page-nav-link"><i class="fas fa-image"></i> Image</a>
+        </nav>
+        <div class="header-actions">
+            <button id="themeToggle" class="header-btn" title="Switch to dark theme" aria-label="Switch to dark theme">
+                <i class="fas fa-moon"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- ─── HERO SECTION ─── -->
+    <section class="landing-hero">
+        <div class="hero-badge">
+            <i class="fas fa-shield-halved"></i> 100% Local • Privacy First • No Limits
+        </div>
+        <h1 class="hero-title">Your All-in-One Local Media Studio</h1>
+        <p class="hero-subtitle">
+            Professional browser-based suite for Audio, Video, and Image processing. Power-packed tools running 100% on your device through local Flask &amp; FFmpeg engines.
+        </p>
+        <div class="hero-cta-group">
+            <a href="/audio" class="cta-btn-primary">
+                <i class="fas fa-play"></i> Launch Studio
+            </a>
+        </div>
+    </section>
+
+    <!-- ─── STUDIO CARDS GRID ─── -->
+    <section class="studio-grid-section">
+        <div class="section-label">SELECT YOUR STUDIO TOOL</div>
+        <h2 class="section-heading">Integrated Editing Suite</h2>
+
+        <div class="studio-cards-container">
+            <!-- 🎵 AUDIO STUDIO CARD -->
+            <div class="studio-card card-audio">
+                <div>
+                    <div class="card-icon-header">
+                        <div class="card-icon">
+                            <i class="fas fa-music"></i>
+                        </div>
+                        <span class="route-pill">/audio</span>
+                    </div>
+                    <h3 class="card-title">Audio Studio Pro</h3>
+                    <p class="card-desc">
+                        Multi-region cutter with WaveSurfer.js waveform display, local AI silence detection, beat tracking, and speech transcription.
+                    </p>
+                    <ul class="card-features">
+                        <li><i class="fas fa-check-circle"></i> Multi-region cutting &amp; waveform trim</li>
+                        <li><i class="fas fa-check-circle"></i> Fade in/out, normalize &amp; audio reversal</li>
+                        <li><i class="fas fa-check-circle"></i> Local AI silence detection &amp; Speech-to-Text</li>
+                        <li><i class="fas fa-check-circle"></i> Export MP3 / WAV (Merged or ZIP)</li>
+                    </ul>
+                </div>
+                <a href="/audio" class="card-action-btn">
+                    <span>Open Audio Editor</span> <i class="fas fa-arrow-right"></i>
+                </a>
+            </div>
+
+            <!-- 🎬 VIDEO STUDIO CARD -->
+            <div class="studio-card card-video">
+                <div>
+                    <div class="card-icon-header">
+                        <div class="card-icon">
+                            <i class="fas fa-film"></i>
+                        </div>
+                        <span class="route-pill">/video</span>
+                    </div>
+                    <h3 class="card-title">Video Studio Pro</h3>
+                    <p class="card-desc">
+                        FFmpeg-powered timeline video editor. Combine clips, adjust speed, add text overlays, background music, and extract audio.
+                    </p>
+                    <ul class="card-features">
+                        <li><i class="fas fa-check-circle"></i> Multi-clip timeline &amp; trim/split controls</li>
+                        <li><i class="fas fa-check-circle"></i> Text overlays, custom colors &amp; 9-point positions</li>
+                        <li><i class="fas fa-check-circle"></i> Speed control (0.25x – 4x) &amp; sound mixing</li>
+                        <li><i class="fas fa-check-circle"></i> One-click GIF maker, compressor &amp; converter</li>
+                    </ul>
+                </div>
+                <a href="/video" class="card-action-btn">
+                    <span>Open Video Editor</span> <i class="fas fa-arrow-right"></i>
+                </a>
+            </div>
+
+            <!-- 🖼️ IMAGE STUDIO CARD -->
+            <div class="studio-card card-image">
+                <div>
+                    <div class="card-icon-header">
+                        <div class="card-icon">
+                            <i class="fas fa-image"></i>
+                        </div>
+                        <span class="route-pill">/image</span>
+                    </div>
+                    <h3 class="card-title">Image Studio Pro</h3>
+                    <p class="card-desc">
+                        100% client-side HTML canvas image editor with local AI Super-Resolution upscaling (2x/4x) using OpenCV dnn_superres.
+                    </p>
+                    <ul class="card-features">
+                        <li><i class="fas fa-check-circle"></i> Aspect crop presets, rotate &amp; flip</li>
+                        <li><i class="fas fa-check-circle"></i> Brightness, contrast, saturation &amp; filters</li>
+                        <li><i class="fas fa-check-circle"></i> Meme text overlays &amp; freehand drawing</li>
+                        <li><i class="fas fa-check-circle"></i> Local AI 2x / 4x Quality Upscaler</li>
+                    </ul>
+                </div>
+                <a href="/image" class="card-action-btn">
+                    <span>Open Image Editor</span> <i class="fas fa-arrow-right"></i>
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- ─── HIGHLIGHTS SECTION ─── -->
+    <section class="highlights-section">
+        <div class="highlights-container">
+            <div class="highlight-box">
+                <div class="highlight-icon"><i class="fas fa-user-shield"></i></div>
+                <div class="highlight-title">Zero Data Uploads</div>
+                <div class="highlight-desc">Your files never hit cloud servers. Everything is processed 100% locally on your own machine.</div>
+            </div>
+            <div class="highlight-box">
+                <div class="highlight-icon"><i class="fas fa-bolt"></i></div>
+                <div class="highlight-title">Instant Performance</div>
+                <div class="highlight-desc">No network bottleneck, no file size upload wait times. Instant processing via local Python &amp; FFmpeg.</div>
+            </div>
+            <div class="highlight-box">
+                <div class="highlight-icon"><i class="fas fa-robot"></i></div>
+                <div class="highlight-title">Local AI Models</div>
+                <div class="highlight-desc">Built-in local models for silence detection, noise reduction, and super-resolution image upscale.</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ─── FOOTER ─── -->
+    <footer class="landing-footer">
+        <p>🎵 Audio Cutter Pro + Video &amp; Image Studio • Running locally on <code>http://127.0.0.1:5000</code></p>
+    </footer>
+
+</body>
+
+</html>
