@@ -5,7 +5,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="color-scheme" content="light dark">
-    <!-- No-FOUC theme: apply saved / preferred theme before first paint -->
     <script>
         (function () {
             try {
@@ -15,9 +14,9 @@
             } catch (e) { document.documentElement.setAttribute('data-theme', 'light'); }
         })();
     </script>
-    <title>Studio Hub — Audio Cutter Pro + Video & Image Studio</title>
+    <title>Studio Hub — Audio, Video & Image Studio</title>
     <meta name="description"
-        content="All-in-one local audio, video & image studio. Cut audio, edit videos, retouch photos & upscale images 100% locally.">
+        content="Simple, privacy-first local media studio. Cut audio, edit videos, retouch photos and upscale quality 100% locally.">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='landing.css') }}">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
@@ -39,7 +38,7 @@
             <a href="/image" class="page-nav-link"><i class="fas fa-image"></i> Image</a>
         </nav>
         <div class="header-actions">
-            <button id="themeToggle" class="header-btn" title="Switch to dark theme" aria-label="Switch to dark theme">
+            <button id="themeToggle" class="header-btn" title="Switch theme" aria-label="Switch theme">
                 <i class="fas fa-moon"></i>
             </button>
         </div>
@@ -47,24 +46,63 @@
 
     <!-- ─── HERO SECTION ─── -->
     <section class="landing-hero">
-        <div class="hero-badge">
-            <i class="fas fa-shield-halved"></i> 100% Local • Privacy First • No Limits
+        <div class="hero-pill-badge">
+            <i class="fas fa-shield-heart"></i> 100% Local • Private • Easy for Everyone
         </div>
-        <h1 class="hero-title">Your All-in-One Local Media Studio</h1>
+        <h1 class="hero-title">Your Friendly Media Studio</h1>
         <p class="hero-subtitle">
-            Professional browser-based suite for Audio, Video, and Image processing. Power-packed tools running 100% on your device through local Flask &amp; FFmpeg engines.
+            Edit your audio clips, video recordings, and photos easily right inside your browser. No file size limits, no waiting for cloud uploads, and total privacy.
         </p>
-        <div class="hero-cta-group">
-            <a href="/audio" class="cta-btn-primary">
-                <i class="fas fa-play"></i> Launch Studio
-            </a>
+
+        <!-- ─── SMART AUTO-DETECT DROPZONE ─── -->
+        <div class="smart-dropzone-container">
+            <div id="smartDropzone" class="smart-dropzone">
+                <input type="file" id="smartFileInput" style="display: none;" accept="audio/*,video/*,image/*">
+                <div class="dropzone-icons">
+                    <div class="dropzone-icon-badge badge-audio" title="Audio Files"><i class="fas fa-music"></i></div>
+                    <div class="dropzone-icon-badge badge-video" title="Video Files"><i class="fas fa-film"></i></div>
+                    <div class="dropzone-icon-badge badge-image" title="Image Files"><i class="fas fa-image"></i></div>
+                </div>
+                <div class="dropzone-title">Drop Any File Here to Start Instantly</div>
+                <div class="dropzone-desc">Audio (.mp3, .wav), Video (.mp4, .mov, .mkv) or Image (.jpg, .png, .webp)</div>
+                <div class="dropzone-browse-btn">
+                    <i class="fas fa-folder-open"></i> Browse Files on Computer
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ─── 3-STEP BEGINNER GUIDE ─── -->
+    <section class="how-it-works-section">
+        <div class="steps-grid">
+            <div class="step-card">
+                <div class="step-num">1</div>
+                <div class="step-content">
+                    <h4>Choose or Drop a File</h4>
+                    <p>Select your audio, video, or image file above or click a studio tool below.</p>
+                </div>
+            </div>
+            <div class="step-card">
+                <div class="step-num">2</div>
+                <div class="step-content">
+                    <h4>Easy Visual Editing</h4>
+                    <p>Use visual sliders, one-click tools, meme text, and AI tools with live preview.</p>
+                </div>
+            </div>
+            <div class="step-card">
+                <div class="step-num">3</div>
+                <div class="step-content">
+                    <h4>Save &amp; Export</h4>
+                    <p>Download your finished file immediately — saved directly to your computer.</p>
+                </div>
+            </div>
         </div>
     </section>
 
     <!-- ─── STUDIO CARDS GRID ─── -->
     <section class="studio-grid-section">
-        <div class="section-label">SELECT YOUR STUDIO TOOL</div>
-        <h2 class="section-heading">Integrated Editing Suite</h2>
+        <div class="section-label">STUDIO TOOLS</div>
+        <h2 class="section-heading">What would you like to edit today?</h2>
 
         <div class="studio-cards-container">
             <!-- 🎵 AUDIO STUDIO CARD -->
@@ -76,15 +114,16 @@
                         </div>
                         <span class="route-pill">/audio</span>
                     </div>
-                    <h3 class="card-title">Audio Studio Pro</h3>
+                    <h3 class="card-title">Audio Studio</h3>
+                    <div class="card-subtitle">Cut, Trim &amp; Clean Audio Clips</div>
                     <p class="card-desc">
-                        Multi-region cutter with WaveSurfer.js waveform display, local AI silence detection, beat tracking, and speech transcription.
+                        Drag sliders to cut unwanted audio parts, smooth out fade-ins, remove quiet silences automatically, or record voice from your microphone.
                     </p>
                     <ul class="card-features">
-                        <li><i class="fas fa-check-circle"></i> Multi-region cutting &amp; waveform trim</li>
-                        <li><i class="fas fa-check-circle"></i> Fade in/out, normalize &amp; audio reversal</li>
-                        <li><i class="fas fa-check-circle"></i> Local AI silence detection &amp; Speech-to-Text</li>
-                        <li><i class="fas fa-check-circle"></i> Export MP3 / WAV (Merged or ZIP)</li>
+                        <li><i class="fas fa-check-circle"></i> Visual waveform trimming &amp; multi-cut</li>
+                        <li><i class="fas fa-check-circle"></i> Smooth Fade In / Fade Out effects</li>
+                        <li><i class="fas fa-check-circle"></i> Auto silence removal &amp; speech transcription</li>
+                        <li><i class="fas fa-check-circle"></i> Export clean MP3 or WAV audio</li>
                     </ul>
                 </div>
                 <a href="/audio" class="card-action-btn">
@@ -101,15 +140,16 @@
                         </div>
                         <span class="route-pill">/video</span>
                     </div>
-                    <h3 class="card-title">Video Studio Pro</h3>
+                    <h3 class="card-title">Video Studio</h3>
+                    <div class="card-subtitle">Combine Clips, Add Music &amp; Text</div>
                     <p class="card-desc">
-                        FFmpeg-powered timeline video editor. Combine clips, adjust speed, add text overlays, background music, and extract audio.
+                        Join videos together, trim unwanted moments, change playback speed, add custom subtitles or background music, and make quick GIFs.
                     </p>
                     <ul class="card-features">
-                        <li><i class="fas fa-check-circle"></i> Multi-clip timeline &amp; trim/split controls</li>
-                        <li><i class="fas fa-check-circle"></i> Text overlays, custom colors &amp; 9-point positions</li>
-                        <li><i class="fas fa-check-circle"></i> Speed control (0.25x – 4x) &amp; sound mixing</li>
-                        <li><i class="fas fa-check-circle"></i> One-click GIF maker, compressor &amp; converter</li>
+                        <li><i class="fas fa-check-circle"></i> Easy clip timeline &amp; video trimmer</li>
+                        <li><i class="fas fa-check-circle"></i> Add text captions &amp; background music</li>
+                        <li><i class="fas fa-check-circle"></i> Speed control (slow motion or fast forward)</li>
+                        <li><i class="fas fa-check-circle"></i> Extract MP3 sound &amp; make animated GIFs</li>
                     </ul>
                 </div>
                 <a href="/video" class="card-action-btn">
@@ -126,15 +166,16 @@
                         </div>
                         <span class="route-pill">/image</span>
                     </div>
-                    <h3 class="card-title">Image Studio Pro</h3>
+                    <h3 class="card-title">Image Studio</h3>
+                    <div class="card-subtitle">Crop, Retouch &amp; AI Quality Boost</div>
                     <p class="card-desc">
-                        100% client-side HTML canvas image editor with local AI Super-Resolution upscaling (2x/4x) using OpenCV dnn_superres.
+                        Crop photos for Instagram or Shorts, adjust brightness, apply photo filters, add funny meme text, draw, and enhance blurry photos with AI.
                     </p>
                     <ul class="card-features">
-                        <li><i class="fas fa-check-circle"></i> Aspect crop presets, rotate &amp; flip</li>
-                        <li><i class="fas fa-check-circle"></i> Brightness, contrast, saturation &amp; filters</li>
-                        <li><i class="fas fa-check-circle"></i> Meme text overlays &amp; freehand drawing</li>
-                        <li><i class="fas fa-check-circle"></i> Local AI 2x / 4x Quality Upscaler</li>
+                        <li><i class="fas fa-check-circle"></i> Preset crops (1:1 Square, 16:9, Shorts/Reels)</li>
+                        <li><i class="fas fa-check-circle"></i> Easy brightness, contrast &amp; color sliders</li>
+                        <li><i class="fas fa-check-circle"></i> Meme text overlays &amp; drawing brush</li>
+                        <li><i class="fas fa-check-circle"></i> AI Quality Upscale (Fix blurry photos)</li>
                     </ul>
                 </div>
                 <a href="/image" class="card-action-btn">
@@ -149,18 +190,18 @@
         <div class="highlights-container">
             <div class="highlight-box">
                 <div class="highlight-icon"><i class="fas fa-user-shield"></i></div>
-                <div class="highlight-title">Zero Data Uploads</div>
-                <div class="highlight-desc">Your files never hit cloud servers. Everything is processed 100% locally on your own machine.</div>
+                <div class="highlight-title">100% Private &amp; Offline</div>
+                <div class="highlight-desc">Your media never leaves your computer. No third-party servers, no logins required.</div>
             </div>
             <div class="highlight-box">
                 <div class="highlight-icon"><i class="fas fa-bolt"></i></div>
-                <div class="highlight-title">Instant Performance</div>
-                <div class="highlight-desc">No network bottleneck, no file size upload wait times. Instant processing via local Python &amp; FFmpeg.</div>
+                <div class="highlight-title">Super Fast</div>
+                <div class="highlight-desc">Zero waiting time for uploading large files over the internet. Everything processes instantly.</div>
             </div>
             <div class="highlight-box">
-                <div class="highlight-icon"><i class="fas fa-robot"></i></div>
-                <div class="highlight-title">Local AI Models</div>
-                <div class="highlight-desc">Built-in local models for silence detection, noise reduction, and super-resolution image upscale.</div>
+                <div class="highlight-icon"><i class="fas fa-smile"></i></div>
+                <div class="highlight-title">Beginner Friendly</div>
+                <div class="highlight-desc">Designed with simple controls and clear visual previews so anyone can edit like a pro.</div>
             </div>
         </div>
     </section>
@@ -170,6 +211,59 @@
         <p>🎵 Audio Cutter Pro + Video &amp; Image Studio • Running locally on <code>http://127.0.0.1:5000</code></p>
     </footer>
 
+    <!-- ─── SMART AUTO-DETECT SCRIPT ─── -->
+    <script>
+        (function() {
+            var dropzone = document.getElementById('smartDropzone');
+            var fileInput = document.getElementById('smartFileInput');
+
+            if (!dropzone || !fileInput) return;
+
+            dropzone.addEventListener('click', function() { fileInput.click(); });
+
+            ['dragenter', 'dragover'].forEach(function(evt) {
+                dropzone.addEventListener(evt, function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    dropzone.classList.add('dragover');
+                });
+            });
+
+            ['dragleave', 'drop'].forEach(function(evt) {
+                dropzone.addEventListener(evt, function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    dropzone.classList.remove('dragover');
+                });
+            });
+
+            dropzone.addEventListener('drop', function(e) {
+                var files = e.dataTransfer.files;
+                if (files && files.length > 0) handleSelectedFile(files[0]);
+            });
+
+            fileInput.addEventListener('change', function() {
+                if (fileInput.files && fileInput.files.length > 0) {
+                    handleSelectedFile(fileInput.files[0]);
+                }
+            });
+
+            function handleSelectedFile(file) {
+                var type = file.type || '';
+                var name = file.name.toLowerCase();
+
+                if (type.startsWith('audio/') || name.endsWith('.mp3') || name.endsWith('.wav') || name.endsWith('.m4a') || name.endsWith('.ogg')) {
+                    window.location.href = '/audio';
+                } else if (type.startsWith('video/') || name.endsWith('.mp4') || name.endsWith('.webm') || name.endsWith('.mkv') || name.endsWith('.mov')) {
+                    window.location.href = '/video';
+                } else if (type.startsWith('image/') || name.endsWith('.jpg') || name.endsWith('.jpeg') || name.endsWith('.png') || name.endsWith('.webp')) {
+                    window.location.href = '/image';
+                } else {
+                    window.location.href = '/audio';
+                }
+            }
+        })();
+    </script>
 </body>
 
 </html>
