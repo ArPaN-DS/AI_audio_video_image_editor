@@ -20,10 +20,8 @@ MODELS = {
     "best": ("edsr", {2: "EDSR_x2.pb", 4: "EDSR_x4.pb"}),
 }
 
-# EDSR is a deep net and slow on CPU (~12s for a tiny 320x240 image), so cap
-# the input size: above this we transparently downgrade to the fast model.
-EDSR_MAX_INPUT_PIXELS = 250_000         # ~500x500
-MAX_OUTPUT_PIXELS = 40_000_000          # safety ceiling on the result
+EDSR_MAX_INPUT_PIXELS = 1_500_000       # ~1224x1224
+MAX_OUTPUT_PIXELS = 64_000_000          # safety ceiling on the result
 
 
 def _model_path(model_key, scale):

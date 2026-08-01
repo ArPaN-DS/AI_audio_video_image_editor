@@ -934,6 +934,20 @@
         $('ieShapeRow').addEventListener('click', e => { const b = e.target.closest('.ve-chip'); if (!b) return; document.querySelectorAll('#ieShapeRow .ve-chip').forEach(c => c.classList.toggle('active', c === b)); });
         $('ieShapeFill').onclick = () => $('ieShapeFill').classList.toggle('active');
 
+        // AI Enhance / Upscale chips
+        if ($('ieUpscaleAmount')) {
+            $('ieUpscaleAmount').addEventListener('click', e => {
+                const b = e.target.closest('.ve-chip'); if (!b) return;
+                document.querySelectorAll('#ieUpscaleAmount .ve-chip').forEach(c => c.classList.toggle('active', c === b));
+            });
+        }
+        if ($('ieUpscaleModel')) {
+            $('ieUpscaleModel').addEventListener('click', e => {
+                const b = e.target.closest('.ve-chip'); if (!b) return;
+                document.querySelectorAll('#ieUpscaleModel .ve-chip').forEach(c => c.classList.toggle('active', c === b));
+            });
+        }
+
         if ($('ieEnhanceBtn')) $('ieEnhanceBtn').onclick = enhance;
         if ($('ieClarityBtn')) $('ieClarityBtn').onclick = enhanceClarity;
         if ($('ieRemoveBgBtn')) $('ieRemoveBgBtn').onclick = removeBg;
