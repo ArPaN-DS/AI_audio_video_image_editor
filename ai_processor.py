@@ -308,7 +308,7 @@ def _get_optimal_cpu_threads():
 def _probe_gpu():
     """
     Deep GPU probe — checks CUDA health, free VRAM, device name.
-    Returns a dict; safe to call even without torch installed.
+    Works via PyTorch, or falls back to ctranslate2 + nvidia-smi.
     """
     info = {
         "available": False,
@@ -317,31 +317,53 @@ def _probe_gpu():
         "vram_total_gb": 0.0,
         "vram_free_gb": 0.0,
     }
+    # 1. Try PyTorch if installed
     try:
         import torch
-        if not torch.cuda.is_available():
+        if torch.cuda.is_available():
+            try:
+                _test = torch.zeros(1, device="cuda")
+                del _test
+                info["cuda_working"] = True
+            except Exception as e:
+                _log.warning(f"CUDA is_available=True but allocation failed: {e}")
+                return info
+
+            props = torch.cuda.get_device_properties(0)
+            info["available"] = True
+            info["name"] = props.name
+            info["vram_total_gb"] = props.total_mem / (1024 ** 3)
+            free_bytes, _ = torch.cuda.mem_get_info(0)
+            info["vram_free_gb"] = free_bytes / (1024 ** 3)
             return info
-
-        # Smoke test: actually allocate on GPU to verify CUDA works
-        try:
-            _test = torch.zeros(1, device="cuda")
-            del _test
-            info["cuda_working"] = True
-        except Exception as e:
-            _log.warning(f"CUDA is_available=True but allocation failed: {e}")
-            return info
-
-        props = torch.cuda.get_device_properties(0)
-        info["available"] = True
-        info["name"] = props.name
-        info["vram_total_gb"] = props.total_mem / (1024 ** 3)
-
-        # Use FREE VRAM, not total (other processes may be using GPU)
-        free_bytes, _ = torch.cuda.mem_get_info(0)
-        info["vram_free_gb"] = free_bytes / (1024 ** 3)
-
-    except ImportError:
+    except Exception:
         pass
+
+    # 2. Fallback to ctranslate2 + nvidia-smi (works without PyTorch)
+    try:
+        import ctranslate2
+        if ctranslate2.get_cuda_device_count() > 0:
+            info["available"] = True
+            info["cuda_working"] = True
+            try:
+                import subprocess
+                out = subprocess.check_output(
+                    ['nvidia-smi', '--query-gpu=name,memory.total,memory.free', '--format=csv,noheader,nounits'],
+                    text=True, timeout=3
+                ).strip()
+                parts = [p.strip() for p in out.split(',')]
+                if len(parts) >= 3:
+                    info["name"] = parts[0]
+                    info["vram_total_gb"] = float(parts[1]) / 1024.0
+                    info["vram_free_gb"] = float(parts[2]) / 1024.0
+                else:
+                    info["name"] = "NVIDIA CUDA GPU"
+                    info["vram_total_gb"] = 8.0
+                    info["vram_free_gb"] = 6.0
+            except Exception:
+                info["name"] = "NVIDIA CUDA GPU"
+                info["vram_total_gb"] = 8.0
+                info["vram_free_gb"] = 6.0
     except Exception as e:
         _log.warning(f"GPU probe error: {e}")
 
