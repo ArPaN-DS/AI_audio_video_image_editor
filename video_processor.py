@@ -617,3 +617,59 @@ def burn_subtitles(video_path, output_path, style="yellow_box"):
         if os.path.exists(srt_path):
             try: os.remove(srt_path)
             except Exception: pass
+
+
+def enhance_video_quality(video_path, output_path, mode="1080p", denoise=True, sharpen=True):
+    """
+    Applies AI-style spatio-temporal video quality enhancement:
+    - hqdn3d (High Quality 3D Spatio-temporal Denoising for low-light/grain removal)
+    - unsharp (Micro-contrast & texture sharpening)
+    - eq/contrast (Dynamic range contrast enhancement)
+    - scale/upscale (Super-resolution pixel reconstruction)
+    """
+    vf_filters = []
+
+    if denoise:
+        vf_filters.append("hqdn3d=4:3:6:4.5")
+
+    if sharpen:
+        vf_filters.append("unsharp=5:5:1.2:5:5:0.0")
+
+    vf_filters.append("eq=contrast=1.08:brightness=0.01:saturation=1.1")
+
+    if mode == "4k":
+        vf_filters.append("scale=3840:2160:flags=lanczos+accurate_rnd")
+    elif mode == "1080p":
+        vf_filters.append("scale=1920:1080:flags=lanczos+accurate_rnd")
+
+    vf_chain = ",".join(vf_filters) if vf_filters else "null"
+
+    cmd = [
+        FFMPEG, "-y",
+        "-i", video_path,
+        "-vf", vf_chain,
+        "-c:v", "libx264",
+        "-crf", "18",
+        "-preset", "medium",
+        "-c:a", "copy",
+        output_path
+    ]
+
+    _run(cmd, timeout=1200)
+    return {"status": "success", "engine": "ffmpeg_video_enhancer"}
+
+
+def interpolate_video_fps(video_path, output_path, target_fps=60):
+    """
+    AI Video Frame Interpolation / Slow-Motion Smoother:
+    Converts 24/30 FPS video to 60 FPS ultra-smooth video via FFmpeg motion compensation.
+    """
+    cmd = [
+        FFMPEG, "-y", "-i", video_path,
+        "-filter:v", f"minterpolate=fps={target_fps}:mi_mode=mci:mc_mode=aobmc:me_mode=bidir:vsbmc=1",
+        "-c:v", "libx264", "-preset", "fast",
+        "-c:a", "copy",
+        output_path
+    ]
+    _run(cmd, timeout=1800)
+    return {"status": "success", "target_fps": target_fps, "engine": "ffmpeg_minterpolate"}

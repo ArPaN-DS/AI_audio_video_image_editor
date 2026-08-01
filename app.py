@@ -567,6 +567,119 @@ def video_burn_subtitles():
         if os.path.exists(temp_path): os.remove(temp_path)
 
 
+@app.route('/video/enhance-quality', methods=['POST'])
+def video_enhance_quality():
+    if 'file' not in request.files:
+        return jsonify({"error": "No video file"}), 400
+    file = request.files['file']
+
+    temp_path = save_temp_upload(file)
+    out_path = os.path.join(app.config['PROCESSED_FOLDER'], f"enhanced_{uuid.uuid4()}.mp4")
+    try:
+        mode = request.form.get('mode', '1080p')
+        video_processor.enhance_video_quality(temp_path, out_path, mode=mode)
+        return send_file(out_path, mimetype='video/mp4', as_attachment=True, download_name="enhanced_quality_video.mp4")
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if os.path.exists(temp_path): os.remove(temp_path)
+
+
+@app.route('/video/interpolate', methods=['POST'])
+def video_interpolate():
+    if 'file' not in request.files:
+        return jsonify({"error": "No video file"}), 400
+    file = request.files['file']
+
+    temp_path = save_temp_upload(file)
+    out_path = os.path.join(app.config['PROCESSED_FOLDER'], f"smooth60_{uuid.uuid4()}.mp4")
+    try:
+        target_fps = int(request.form.get('fps', 60))
+        video_processor.interpolate_video_fps(temp_path, out_path, target_fps=target_fps)
+        return send_file(out_path, mimetype='video/mp4', as_attachment=True, download_name="smooth_60fps_video.mp4")
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if os.path.exists(temp_path): os.remove(temp_path)
+
+
+@app.route('/image/color-match', methods=['POST'])
+def image_color_match():
+    if 'file' not in request.files:
+        return jsonify({"error": "No image file"}), 400
+    file = request.files['file']
+
+    uid = uuid.uuid4()
+    in_path = os.path.join(app.config['UPLOAD_FOLDER'], f"col_in_{uid}.png")
+    out_path = os.path.join(app.config['PROCESSED_FOLDER'], f"col_out_{uid}.png")
+    file.save(in_path)
+
+    try:
+        palette = request.form.get('palette', 'teal_orange')
+        image_processor.color_match_transfer(in_path, out_path, palette_mode=palette)
+        return send_file(out_path, mimetype='image/png')
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if os.path.exists(in_path): os.remove(in_path)
+
+
+@app.route('/ai/auto-duck', methods=['POST'])
+def ai_auto_duck():
+    if 'speech' not in request.files or 'music' not in request.files:
+        return jsonify({"error": "Missing speech or music audio file"}), 400
+    speech_file = request.files['speech']
+    music_file = request.files['music']
+
+    speech_path = save_temp_upload(speech_file)
+    music_path = save_temp_upload(music_file)
+    out_path = os.path.join(app.config['PROCESSED_FOLDER'], f"ducked_{uuid.uuid4()}.wav")
+
+    try:
+        ai_processor.auto_duck_music(speech_path, music_path, out_path)
+        return send_file(out_path, mimetype='audio/wav', as_attachment=True, download_name="auto_ducked_music.wav")
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        for p in (speech_path, music_path):
+            if os.path.exists(p): os.remove(p)
+
+
+@app.route('/ai/pitch-speed', methods=['POST'])
+def ai_pitch_speed():
+    if 'file' not in request.files:
+        return jsonify({"error": "No audio file"}), 400
+    file = request.files['file']
+
+    temp_path = save_temp_upload(file)
+    out_path = os.path.join(app.config['PROCESSED_FOLDER'], f"speed_{uuid.uuid4()}.wav")
+
+    try:
+        speed = float(request.form.get('speed', 1.25))
+        ai_processor.pitch_preserved_speed(temp_path, out_path, speed=speed)
+        return send_file(out_path, mimetype='audio/wav', as_attachment=True, download_name="pitch_preserved_speed.wav")
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if os.path.exists(temp_path): os.remove(temp_path)
+
+
+@app.route('/ai/youtube-chapters', methods=['POST'])
+def ai_youtube_chapters():
+    if 'file' not in request.files:
+        return jsonify({"error": "No media file"}), 400
+    file = request.files['file']
+
+    temp_path = save_temp_upload(file)
+    try:
+        res = ai_processor.generate_youtube_chapters(temp_path)
+        return jsonify(res)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if os.path.exists(temp_path): os.remove(temp_path)
+
+
 @app.route('/ai/trim-silence', methods=['POST'])
 def ai_trim_silence():
     if 'file' not in request.files:

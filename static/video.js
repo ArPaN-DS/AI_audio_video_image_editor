@@ -162,6 +162,7 @@
         const m = media[mediaId];
         if (!m) return;
         snapshot();
+        const startPos = totalDur();
         clips.push({
             id: 'c' + (clipSeq++),
             source: m.id, name: m.name,
@@ -173,6 +174,7 @@
         });
         rebuildStageVideos();
         renderAll();
+        seekTo(startPos);
         toast(`Added “${m.name}” to timeline`, 'success');
     }
 
@@ -483,7 +485,22 @@
     let activeClipId = null;
 
     function renderStageAt(t) {
-        const hit = clipAtTime(t);
+        let hit = null;
+        let acc = 0;
+        for (const c of clips) {
+            const d = (c.out - c.in) / (c.speed || 1);
+            if (t >= acc && t <= acc + d) {
+                hit = { clip: c, localOffset: t - acc };
+                break;
+            }
+            acc += d;
+        }
+        if (!hit && clips.length > 0 && t >= acc - 0.2) {
+            const lastClip = clips[clips.length - 1];
+            const d = (lastClip.out - lastClip.in) / (lastClip.speed || 1);
+            hit = { clip: lastClip, localOffset: d };
+        }
+
         // videos
         let showId = hit && hit.clip.hasVideo ? hit.clip.id : null;
         Object.entries(videoEls).forEach(([id, v]) => {

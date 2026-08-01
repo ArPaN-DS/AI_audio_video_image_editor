@@ -319,3 +319,41 @@ def restore_faces(src_path, out_path):
         return {"status": "success", "faces_found": len(faces), "engine": "opencv_face_restorer"}
     except Exception as e:
         raise RuntimeError(f"Face Restoration failed: {str(e)}")
+
+
+def color_match_transfer(src_path, out_path, palette_mode="teal_orange"):
+    """
+    AI Cinematic Color Match / LUT Transfer: Applies color histogram grading
+    (Teal & Orange, Warm Film, Cyberpunk) onto target photo.
+    """
+    try:
+        import cv2
+        import numpy as np
+
+        img = cv2.imread(src_path, cv2.IMREAD_COLOR)
+        if img is None:
+            raise ValueError("Could not read source image.")
+
+        img_float = img.astype(np.float32) / 255.0
+        b, g, r = cv2.split(img_float)
+
+        if palette_mode == "teal_orange":
+            b_opt = np.clip(b * 1.15 + (1.0 - r) * 0.1, 0, 1)
+            g_opt = np.clip(g * 1.05, 0, 1)
+            r_opt = np.clip(r * 1.25 + 0.05, 0, 1)
+        elif palette_mode == "cyberpunk":
+            b_opt = np.clip(b * 1.35, 0, 1)
+            g_opt = np.clip(g * 0.85, 0, 1)
+            r_opt = np.clip(r * 1.45, 0, 1)
+        else:
+            b_opt = np.clip(b * 0.85, 0, 1)
+            g_opt = np.clip(g * 1.05 + 0.02, 0, 1)
+            r_opt = np.clip(r * 1.20 + 0.05, 0, 1)
+
+        result_float = cv2.merge((b_opt, g_opt, r_opt))
+        result = (result_float * 255.0).astype(np.uint8)
+
+        cv2.imwrite(out_path, result)
+        return {"status": "success", "palette": palette_mode, "engine": "opencv_color_match"}
+    except Exception as e:
+        raise RuntimeError(f"Color match transfer failed: {str(e)}")
