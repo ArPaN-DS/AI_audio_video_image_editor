@@ -5,6 +5,11 @@
 
 .ie-body { background: var(--bg); height: 100vh; overflow: hidden; }
 
+.ie-num, .ie-val-badge, .ie-dim-readout {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+}
+
 .hidden { display: none !important; }
 
 /* ── HERO ── */

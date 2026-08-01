@@ -42,10 +42,10 @@
     --checker-b: #F6F9FC;
     --canvas-bg: #FFFFFF;
 
-    /* ── Text ── */
-    --text: #1E293B;
-    --text-secondary: #64748B;
-    --text-hint: #94A3B8;
+    /* ── Text (High-contrast, no low-contrast grays) ── */
+    --text: #0F172A;
+    --text-secondary: #1E293B;
+    --text-hint: #334155;
 
     /* ── Borders ── */
     --border: #E2E8F0;
@@ -112,9 +112,9 @@
     --checker-b: #131C2E;
     --canvas-bg: #0B1220;
 
-    --text: #E8EDF5;
-    --text-secondary: #9FB0C7;
-    --text-hint: #64748B;
+    --text: #FFFFFF;
+    --text-secondary: #F1F5F9;
+    --text-hint: #CBD5E1;
 
     --border: #26334C;
     --border-hover: #3A4A68;
@@ -171,6 +171,12 @@ textarea:focus-visible,
     box-sizing: border-box;
     margin: 0;
     padding: 0;
+}
+
+/* Tabular numbers for clean numeric layout (time displays & counters) */
+.time-display, .time-code, .timestamp, .file-detail, .region-time, .ve-time-readout {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
 }
 
 body {

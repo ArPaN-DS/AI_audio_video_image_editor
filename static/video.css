@@ -16,6 +16,11 @@
     height: 100vh;
 }
 
+.ve-time-readout, .ve-timecode, .ve-clip-time {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+}
+
 /* ── Nav in header ── */
 .page-nav {
     display: flex;
