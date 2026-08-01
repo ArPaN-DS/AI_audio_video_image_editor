@@ -867,12 +867,17 @@
     //  WIRING
     // ═══════════════════════════════════════
     function init() {
+        const safeBind = (id, ev, fn) => { const el = $(id); if (el) el.addEventListener(ev, fn); };
+        const safeClick = (id, fn) => { const el = $(id); if (el) el.onclick = fn; };
+
         // Upload
-        $('ieFileInput').addEventListener('change', e => e.target.files[0] && loadImageFile(e.target.files[0]));
+        safeBind('ieFileInput', 'change', e => e.target.files[0] && loadImageFile(e.target.files[0]));
         const ua = $('ieUploadArea');
-        ['dragover', 'dragenter'].forEach(ev => ua.addEventListener(ev, e => { e.preventDefault(); ua.classList.add('drag-active'); }));
-        ['dragleave', 'drop'].forEach(ev => ua.addEventListener(ev, () => ua.classList.remove('drag-active')));
-        ua.addEventListener('drop', e => { e.preventDefault(); loadImageFile(e.dataTransfer.files[0]); });
+        if (ua) {
+            ['dragover', 'dragenter'].forEach(ev => ua.addEventListener(ev, e => { e.preventDefault(); ua.classList.add('drag-active'); }));
+            ['dragleave', 'drop'].forEach(ev => ua.addEventListener(ev, () => ua.classList.remove('drag-active')));
+            ua.addEventListener('drop', e => { e.preventDefault(); loadImageFile(e.dataTransfer.files[0]); });
+        }
 
         // Paste from clipboard
         document.addEventListener('paste', e => {
@@ -884,36 +889,38 @@
         document.querySelectorAll('.ie-tool').forEach(b => b.onclick = () => setTool(b.dataset.tool));
 
         // Canvas interactions
-        canvas.addEventListener('mousedown', onCanvasMouseDown);
+        if (canvas) canvas.addEventListener('mousedown', onCanvasMouseDown);
         window.addEventListener('resize', () => { if (tool === 'crop') renderCropOverlay(); });
 
         // Transform
-        $('ieRotateL').onclick = () => rotate(-90);
-        $('ieRotateR').onclick = () => rotate(90);
-        $('ieFlipH').onclick = () => flip(true);
-        $('ieFlipV').onclick = () => flip(false);
+        safeClick('ieRotateL', () => rotate(-90));
+        safeClick('ieRotateR', () => rotate(90));
+        safeClick('ieFlipH', () => flip(true));
+        safeClick('ieFlipV', () => flip(false));
 
         // Crop
-        $('ieCropRatios').addEventListener('click', e => {
+        safeBind('ieCropRatios', 'click', e => {
             const b = e.target.closest('.ve-chip'); if (!b) return;
             cropRatio = b.dataset.ratio;
             document.querySelectorAll('#ieCropRatios .ve-chip').forEach(c => c.classList.toggle('active', c === b));
             if (cropRatio !== 'free' && cropBox) { cropBox.h = cropBox.w / parseFloat(cropRatio); renderCropOverlay(); }
         });
-        $('ieApplyCrop').onclick = applyCrop;
-        $('ieCancelCrop').onclick = cancelCrop;
+        safeClick('ieApplyCrop', applyCrop);
+        safeClick('ieCancelCrop', cancelCrop);
 
         // Adjust sliders
         document.querySelectorAll('.ie-slider[data-adj]').forEach(sl => {
             const key = sl.dataset.adj;
             const input = sl.querySelector('input');
-            input.addEventListener('input', () => { adjust[key] = +input.value; updateSliderLabel(sl, key); renderCanvas(); });
-            input.addEventListener('mousedown', () => snapshot());
+            if (input) {
+                input.addEventListener('input', () => { adjust[key] = +input.value; updateSliderLabel(sl, key); renderCanvas(); });
+                input.addEventListener('mousedown', () => snapshot());
+            }
         });
-        $('ieResetAdjust').onclick = () => { snapshot(); adjust = { brightness: 100, contrast: 100, saturate: 100, warmth: 0, blur: 0 }; syncControls(); renderCanvas(); };
+        safeClick('ieResetAdjust', () => { snapshot(); adjust = { brightness: 100, contrast: 100, saturate: 100, warmth: 0, blur: 0 }; syncControls(); renderCanvas(); });
 
         // Filters
-        $('ieFilterGrid').addEventListener('click', e => {
+        safeBind('ieFilterGrid', 'click', e => {
             const b = e.target.closest('.ie-filter'); if (!b) return;
             snapshot();
             filterName = b.dataset.filter;
@@ -921,58 +928,62 @@
             renderCanvas();
         });
 
-        // Text controls (live-edit the selected/active text)
-        $('ieTextContent').addEventListener('input', () => { const t = texts.find(x => x.id === editingText); if (t) { t.text = $('ieTextContent').value; renderCanvas(); } });
-        $('ieTextSize').addEventListener('input', () => { $('ieTextSizeVal').textContent = $('ieTextSize').value; const t = texts.find(x => x.id === editingText); if (t) { t.size = +$('ieTextSize').value; renderCanvas(); } });
-        $('ieTextColor').addEventListener('input', () => { const t = texts.find(x => x.id === editingText); if (t) { t.color = $('ieTextColor').value; renderCanvas(); } });
-        $('ieTextFont').addEventListener('change', () => { const t = texts.find(x => x.id === editingText); if (t) { t.font = $('ieTextFont').value; renderCanvas(); } });
-        $('ieTextStroke').onclick = () => { $('ieTextStroke').classList.toggle('active'); const t = texts.find(x => x.id === editingText); if (t) { t.stroke = $('ieTextStroke').classList.contains('active'); renderCanvas(); } };
-        $('ieTextBold').onclick = () => { $('ieTextBold').classList.toggle('active'); const t = texts.find(x => x.id === editingText); if (t) { t.bold = $('ieTextBold').classList.contains('active'); renderCanvas(); } };
+        // Text controls
+        safeBind('ieTextContent', 'input', () => { const t = texts.find(x => x.id === editingText); if (t) { t.text = $('ieTextContent').value; renderCanvas(); } });
+        safeBind('ieTextSize', 'input', () => { if ($('ieTextSizeVal')) $('ieTextSizeVal').textContent = $('ieTextSize').value; const t = texts.find(x => x.id === editingText); if (t) { t.size = +$('ieTextSize').value; renderCanvas(); } });
+        safeBind('ieTextColor', 'input', () => { const t = texts.find(x => x.id === editingText); if (t) { t.color = $('ieTextColor').value; renderCanvas(); } });
+        safeBind('ieTextFont', 'change', () => { const t = texts.find(x => x.id === editingText); if (t) { t.font = $('ieTextFont').value; renderCanvas(); } });
+        safeClick('ieTextStroke', () => { if ($('ieTextStroke')) $('ieTextStroke').classList.toggle('active'); const t = texts.find(x => x.id === editingText); if (t) { t.stroke = $('ieTextStroke').classList.contains('active'); renderCanvas(); } });
+        safeClick('ieTextBold', () => { if ($('ieTextBold')) $('ieTextBold').classList.toggle('active'); const t = texts.find(x => x.id === editingText); if (t) { t.bold = $('ieTextBold').classList.contains('active'); renderCanvas(); } });
 
         // Draw / shape controls
-        $('ieBrushSize').addEventListener('input', () => $('ieBrushSizeVal').textContent = $('ieBrushSize').value);
-        $('ieShapeRow').addEventListener('click', e => { const b = e.target.closest('.ve-chip'); if (!b) return; document.querySelectorAll('#ieShapeRow .ve-chip').forEach(c => c.classList.toggle('active', c === b)); });
-        $('ieShapeFill').onclick = () => $('ieShapeFill').classList.toggle('active');
+        safeBind('ieBrushSize', 'input', () => { if ($('ieBrushSizeVal')) $('ieBrushSizeVal').textContent = $('ieBrushSize').value; });
+        safeBind('ieShapeRow', 'click', e => { const b = e.target.closest('.ve-chip'); if (!b) return; document.querySelectorAll('#ieShapeRow .ve-chip').forEach(c => c.classList.toggle('active', c === b)); });
+        safeClick('ieShapeFill', () => { if ($('ieShapeFill')) $('ieShapeFill').classList.toggle('active'); });
 
-        // AI Enhance / Upscale chips
-        if ($('ieUpscaleAmount')) {
-            $('ieUpscaleAmount').addEventListener('click', e => {
-                const b = e.target.closest('.ve-chip'); if (!b) return;
-                document.querySelectorAll('#ieUpscaleAmount .ve-chip').forEach(c => c.classList.toggle('active', c === b));
-            });
-        }
-        if ($('ieUpscaleModel')) {
-            $('ieUpscaleModel').addEventListener('click', e => {
-                const b = e.target.closest('.ve-chip'); if (!b) return;
-                document.querySelectorAll('#ieUpscaleModel .ve-chip').forEach(c => c.classList.toggle('active', c === b));
-            });
-        }
+        // AI Upscale chips
+        safeBind('ieUpscaleAmount', 'click', e => {
+            const b = e.target.closest('.ve-chip'); if (!b) return;
+            document.querySelectorAll('#ieUpscaleAmount .ve-chip').forEach(c => c.classList.toggle('active', c === b));
+        });
+        safeBind('ieUpscaleModel', 'click', e => {
+            const b = e.target.closest('.ve-chip'); if (!b) return;
+            document.querySelectorAll('#ieUpscaleModel .ve-chip').forEach(c => c.classList.toggle('active', c === b));
+        });
 
-        if ($('ieEnhanceBtn')) $('ieEnhanceBtn').onclick = enhance;
-        if ($('ieClarityBtn')) $('ieClarityBtn').onclick = enhanceClarity;
-        if ($('ieRemoveBgBtn')) $('ieRemoveBgBtn').onclick = removeBg;
+        // AI Background Removal chips
+        safeBind('ieRemoveBgModel', 'click', e => {
+            const b = e.target.closest('.ve-chip'); if (!b) return;
+            document.querySelectorAll('#ieRemoveBgModel .ve-chip').forEach(c => c.classList.toggle('active', c === b));
+        });
+        safeClick('ieAlphaMattingBtn', () => { if ($('ieAlphaMattingBtn')) $('ieAlphaMattingBtn').classList.toggle('active'); });
+
+        // Action Buttons
+        safeClick('ieEnhanceBtn', enhance);
+        safeClick('ieClarityBtn', enhanceClarity);
+        safeClick('ieRemoveBgBtn', removeBg);
         initCompare();
 
         // Export
-        $('ieExportFormat').addEventListener('click', e => {
+        safeBind('ieExportFormat', 'click', e => {
             const b = e.target.closest('.ve-chip'); if (!b) return;
             document.querySelectorAll('#ieExportFormat .ve-chip').forEach(c => c.classList.toggle('active', c === b));
-            $('ieQualityRow').classList.toggle('hidden', b.dataset.fmt === 'png');
+            if ($('ieQualityRow')) $('ieQualityRow').classList.toggle('hidden', b.dataset.fmt === 'png');
         });
-        $('ieQuality').addEventListener('input', () => $('ieQualityVal').textContent = $('ieQuality').value);
-        $('ieDownloadBtn').onclick = download;
+        safeBind('ieQuality', 'input', () => { if ($('ieQualityVal')) $('ieQualityVal').textContent = $('ieQuality').value; });
+        safeClick('ieDownloadBtn', download);
 
         // Action bar
-        $('ieUndoBtn').onclick = undo;
-        $('ieRedoBtn').onclick = redo;
-        $('ieResetBtn').onclick = () => { if (base) { snapshot(); resetAll(); } };
-        $('ieNewBtn').onclick = () => $('ieFileInput').click();
+        safeClick('ieUndoBtn', undo);
+        safeClick('ieRedoBtn', redo);
+        safeClick('ieResetBtn', () => { if (base) { snapshot(); resetAll(); } });
+        safeClick('ieNewBtn', () => $('ieFileInput') && $('ieFileInput').click());
 
         // Help
-        $('ieHelpBtn').onclick = () => $('ieShortcutsOverlay').classList.remove('hidden');
-        $('ieCloseShortcuts').onclick = () => $('ieShortcutsOverlay').classList.add('hidden');
+        safeClick('ieHelpBtn', () => $('ieShortcutsOverlay') && $('ieShortcutsOverlay').classList.remove('hidden'));
+        safeClick('ieCloseShortcuts', () => $('ieShortcutsOverlay') && $('ieShortcutsOverlay').classList.add('hidden'));
 
-        // Keyboard
+        // Keyboard shortcuts
         document.addEventListener('keydown', onKey);
     }
 
