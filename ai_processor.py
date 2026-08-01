@@ -685,94 +685,107 @@ def transcribe_audio(path):
     temp_audio_path = None
 
     try:
+        from model_manager import global_model_manager
+
         # ── Step 1: Audio Preprocessing ───────────────────────────────
         audio_path, temp_audio_path = _preprocess_audio(path)
 
-        # ── Step 2: Load Model (one-time, cached) ────────────────────
-        if _whisper_model_cache is None:
-            _whisper_model_cache, _model_info = _load_best_model()
-
-        # ── Step 3: Transcribe ────────────────────────────────────────
-        try:
-            segments_iter, info = _whisper_model_cache.transcribe(
-                audio_path, **_TRANSCRIBE_PARAMS
-            )
-            segments, full_text = _collect_segments(segments_iter)
-
-        except (RuntimeError, MemoryError) as oom_err:
-            err_str = str(oom_err).lower()
-            is_oom = (
-                "out of memory" in err_str
-                or "oom" in err_str
-                or isinstance(oom_err, MemoryError)
-            )
-            if not is_oom:
-                raise
-
-            # ── OOM Recovery: drop model, cascade to smaller ─────────
-            _log.warning(f"OOM with {_model_info['model']}: {oom_err}")
+        def _unload_whisper(model_inst):
+            global _whisper_model_cache, _model_info
             _whisper_model_cache = None
+            _model_info = None
             _clear_gpu_memory()
 
-            current_name = _model_info["model"]
-            current_idx = next(
-                (i for i, t in enumerate(_MODEL_CASCADE) if t["name"] == current_name),
-                -1
+        def _load_whisper():
+            global _whisper_model_cache, _model_info
+            if _whisper_model_cache is None:
+                _whisper_model_cache, _model_info = _load_best_model()
+            return _whisper_model_cache, _model_info
+
+        # Execute inside global ModelManager session (Zero-Idle Memory)
+        with global_model_manager.session("stt_whisper", _load_whisper, _unload_whisper) as (model, info_dict):
+
+            # ── Step 2: Transcribe ────────────────────────────────────────
+            try:
+                segments_iter, info = model.transcribe(
+                    audio_path, **_TRANSCRIBE_PARAMS
+                )
+                segments, full_text = _collect_segments(segments_iter)
+
+            except (RuntimeError, MemoryError) as oom_err:
+                err_str = str(oom_err).lower()
+                is_oom = (
+                    "out of memory" in err_str
+                    or "oom" in err_str
+                    or isinstance(oom_err, MemoryError)
+                )
+                if not is_oom:
+                    raise
+
+                # ── OOM Recovery: drop model, cascade to smaller ─────────
+                _log.warning(f"OOM with {_model_info['model']}: {oom_err}")
+                _whisper_model_cache = None
+                _clear_gpu_memory()
+
+                current_name = _model_info["model"]
+                current_idx = next(
+                    (i for i, t in enumerate(_MODEL_CASCADE) if t["name"] == current_name),
+                    -1
+                )
+
+                recovered = False
+                for tier in _MODEL_CASCADE[current_idx + 1:]:
+                    _log.info(f"  OOM recovery → trying {tier['name']} on CPU...")
+                    m, err = _try_load_model(tier["name"], "cpu", "int8")
+                    if m is not None:
+                        _whisper_model_cache = m
+                        _model_info = {
+                            "model": tier["name"], "params": tier["params"],
+                            "accuracy": tier["accuracy"], "disk": tier["disk"],
+                            "device": "CPU → int8 (OOM recovery)",
+                        }
+                        _log.info(f"  ✓ Recovered: {tier['name']}")
+                        recovered = True
+                        break
+
+                if not recovered:
+                    raise RuntimeError("All models exhausted after OOM")
+
+                # Retry transcription
+                segments_iter, info = _whisper_model_cache.transcribe(
+                    audio_path, **_TRANSCRIBE_PARAMS
+                )
+                segments, full_text = _collect_segments(segments_iter)
+
+            # ── Step 3: Build Response ────────────────────────────────────
+            detected_lang = info.language if info.language else "en"
+            lang_prob = (
+                round(info.language_probability, 3)
+                if info.language_probability else 0.0
             )
 
-            recovered = False
-            for tier in _MODEL_CASCADE[current_idx + 1:]:
-                _log.info(f"  OOM recovery → trying {tier['name']} on CPU...")
-                model, err = _try_load_model(tier["name"], "cpu", "int8")
-                if model is not None:
-                    _whisper_model_cache = model
-                    _model_info = {
-                        "model": tier["name"], "params": tier["params"],
-                        "accuracy": tier["accuracy"], "disk": tier["disk"],
-                        "device": "CPU → int8 (OOM recovery)",
-                    }
-                    _log.info(f"  ✓ Recovered: {tier['name']}")
-                    recovered = True
-                    break
-
-            if not recovered:
-                raise RuntimeError("All models exhausted after OOM")
-
-            # Retry transcription
-            segments_iter, info = _whisper_model_cache.transcribe(
-                audio_path, **_TRANSCRIBE_PARAMS
+            # Compute average word confidence across all segments
+            all_confidences = []
+            for seg in segments:
+                for w in seg.get("words", []):
+                    all_confidences.append(w["confidence"])
+            avg_confidence = (
+                round(sum(all_confidences) / len(all_confidences), 3)
+                if all_confidences else 0.0
             )
-            segments, full_text = _collect_segments(segments_iter)
 
-        # ── Step 4: Build Response ────────────────────────────────────
-        detected_lang = info.language if info.language else "en"
-        lang_prob = (
-            round(info.language_probability, 3)
-            if info.language_probability else 0.0
-        )
-
-        # Compute average word confidence across all segments
-        all_confidences = []
-        for seg in segments:
-            for w in seg.get("words", []):
-                all_confidences.append(w["confidence"])
-        avg_confidence = (
-            round(sum(all_confidences) / len(all_confidences), 3)
-            if all_confidences else 0.0
-        )
-
-        return {
-            "available": True,
-            "language": detected_lang,
-            "language_confidence": lang_prob,
-            "full_text": full_text,
-            "segments": segments,
-            "model": _model_info.get("model", "unknown"),
-            "model_accuracy": _model_info.get("accuracy", "unknown"),
-            "device": _model_info.get("device", "unknown"),
-            "avg_word_confidence": avg_confidence,
-            "segment_count": len(segments),
-        }
+            return {
+                "available": True,
+                "language": detected_lang,
+                "language_confidence": lang_prob,
+                "full_text": full_text,
+                "segments": segments,
+                "model": _model_info.get("model", "unknown") if _model_info else "unknown",
+                "model_accuracy": _model_info.get("accuracy", "unknown") if _model_info else "unknown",
+                "device": _model_info.get("device", "unknown") if _model_info else "unknown",
+                "avg_word_confidence": avg_confidence,
+                "segment_count": len(segments),
+            }
 
     except Exception as e:
         return {
@@ -781,14 +794,13 @@ def transcribe_audio(path):
         }
 
     finally:
-        # ── Step 5: Cleanup ───────────────────────────────────────────
-        # Remove temp preprocessed audio file
+        # ── Step 4: Cleanup ───────────────────────────────────────────
         if temp_audio_path and os.path.exists(temp_audio_path):
             try:
                 os.remove(temp_audio_path)
             except OSError:
                 pass
 
-        # Gentle GC after every transcription (Flask long-running server)
         gc.collect()
+
 

@@ -97,25 +97,34 @@ def upscale(src, out_path, scale=2, model_key="fast"):
             return _lanczos_upscale(src, out_path, scale)
 
     try:
-        sr = cv2.dnn_superres.DnnSuperResImpl_create()
-        sr.readModel(model_path)
-        sr.setModel(cv_name, scale)
-        result = sr.upsample(img)
-        # PNG output keeps the reconstructed text/edges lossless (no JPEG
-        # blocking around sharp glyphs); pass quality only for JPEG targets.
-        ext = os.path.splitext(out_path)[1].lower()
-        params = ([cv2.IMWRITE_JPEG_QUALITY, 95]
-                  if ext in (".jpg", ".jpeg") else [])
-        cv2.imwrite(out_path, result, params)
-        rh, rw = result.shape[:2]
-        return {
-            "engine": cv_name,
-            "scale": scale,
-            "size": (rw, rh),
-            "downgraded": downgraded,
-        }
+        from model_manager import global_model_manager
+
+        def _load_sr():
+            sr = cv2.dnn_superres.DnnSuperResImpl_create()
+            sr.readModel(model_path)
+            sr.setModel(cv_name, scale)
+            return sr, {"engine": cv_name, "scale": scale}
+
+        def _unload_sr(sr_instance):
+            del sr_instance
+
+        model_id = f"image_superres_{cv_name}_x{scale}"
+        with global_model_manager.session(model_id, _load_sr, _unload_sr) as (sr, meta):
+            result = sr.upsample(img)
+            ext = os.path.splitext(out_path)[1].lower()
+            params = ([cv2.IMWRITE_JPEG_QUALITY, 95]
+                      if ext in (".jpg", ".jpeg") else [])
+            cv2.imwrite(out_path, result, params)
+            rh, rw = result.shape[:2]
+            return {
+                "engine": cv_name,
+                "scale": scale,
+                "size": (rw, rh),
+                "downgraded": downgraded,
+            }
     except Exception:
         return _lanczos_upscale(src, out_path, scale)
+
 
 
 def available_engines():

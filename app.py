@@ -1,7 +1,9 @@
 import os
+import time
 import uuid
 import json
 import zipfile
+
 import re
 import shutil
 import tempfile
@@ -32,12 +34,58 @@ app.config['MAX_CONTENT_LENGTH'] = 500 * 1024 * 1024
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['PROCESSED_FOLDER'] = PROCESSED_FOLDER
 
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-os.makedirs(PROCESSED_FOLDER, exist_ok=True)
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  END-TO-END PLATFORM MEMORY & STORAGE OPTIMIZER
+# ═══════════════════════════════════════════════════════════════════════════
+
+import gc
+import sys
+
+def _cleanup_old_temp_files(max_age_seconds=3600):
+    """
+    Background purger: Removes uploaded and processed temporary files
+    older than max_age_seconds to prevent SSD disk bloat.
+    """
+    now = time.time()
+    for folder in [UPLOAD_FOLDER, PROCESSED_FOLDER]:
+        if not os.path.exists(folder):
+            continue
+        for root, dirs, files in os.walk(folder):
+            # Skip filmstrip thumbnails
+            if "thumbs" in root:
+                continue
+            for f in files:
+                filepath = os.path.join(root, f)
+                try:
+                    if os.path.isfile(filepath):
+                        file_age = now - os.path.getmtime(filepath)
+                        if file_age > max_age_seconds:
+                            os.remove(filepath)
+                except Exception:
+                    pass
+
+@app.after_request
+def end_to_end_memory_reclaim(response):
+    """
+    Global End-to-End HTTP Teardown Hook:
+    Runs garbage collection and OS working set memory reclamation after
+    EVERY request to keep Flask's baseline memory at ~30 MB.
+    """
+    try:
+        gc.collect()
+        if sys.platform == "win32":
+            import ctypes
+            ctypes.windll.psapi.EmptyWorkingSet(ctypes.windll.kernel32.GetCurrentProcess())
+    except Exception:
+        pass
+    return response
 
 @app.route('/')
 def studio_landing():
+    _cleanup_old_temp_files()
     return render_template('landing.html')
+
 
 @app.route('/audio')
 def audio_editor():
