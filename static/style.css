@@ -66,9 +66,9 @@
     --radius-xs: 6px;
     --radius-pill: 50px;
 
-    /* ── Motion ── */
-    --speed: 0.2s;
-    --ease: cubic-bezier(0.4, 0, 0.2, 1);
+    /* ── Motion (60fps Spring Easing) ── */
+    --speed: 0.25s;
+    --ease: cubic-bezier(0.16, 1, 0.3, 1);
 
     color-scheme: light;
 }

@@ -75,10 +75,12 @@
     font-family: inherit;
     font-size: 0.68rem;
     font-weight: 600;
-    transition: all var(--speed) var(--ease);
+    transition: transform 0.2s var(--ease), background-color 0.2s var(--ease), border-color 0.2s var(--ease), color 0.2s var(--ease);
+    backface-visibility: hidden;
+    transform: translateZ(0);
 }
 .ie-tool i { font-size: 1.1rem; }
-.ie-tool:hover { background: var(--surface-2); color: var(--primary); }
+.ie-tool:hover { background: var(--surface-2); color: var(--primary); transform: translateY(-1px); }
 .ie-tool.active { background: var(--primary-light); border-color: var(--primary); color: var(--primary); }
 
 /* ── STAGE ── */

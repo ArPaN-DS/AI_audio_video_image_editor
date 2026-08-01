@@ -1,6 +1,6 @@
 /* ─────────────────────────────────────────────────────────────
    Audio Cutter Pro Studio — Landing Page Styles (landing.css)
-   Ultra-Soft · Approachable · Layman Friendly · Modern Glass
+   60fps GPU Compositor-Accelerated · Silky Smooth · No Jank
    ───────────────────────────────────────────────────────────── */
 
 .landing-body {
@@ -11,7 +11,7 @@
     display: flex;
     flex-direction: column;
     overflow-x: hidden;
-    transition: background-color 0.3s ease, color 0.3s ease;
+    transition: background-color 0.25s ease, color 0.25s ease;
 }
 
 html[data-theme="light"] .landing-body {
@@ -95,17 +95,19 @@ html[data-theme="light"] .page-nav {
     font-weight: 600;
     color: var(--text-muted, #94a3b8);
     text-decoration: none;
-    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.2s ease, color 0.2s ease;
+    backface-visibility: hidden;
+    transform: translateZ(0);
 }
 
 .page-nav-link:hover {
     color: #ffffff;
-    background: rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.12);
 }
 
 html[data-theme="light"] .page-nav-link:hover {
     color: #0f172a;
-    background: rgba(0, 0, 0, 0.06);
+    background: rgba(0, 0, 0, 0.08);
 }
 
 .page-nav-link.active {
@@ -131,7 +133,9 @@ html[data-theme="light"] .page-nav-link:hover {
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.2s ease;
+    backface-visibility: hidden;
+    transform: translateZ(0);
 }
 
 html[data-theme="light"] .header-btn {
@@ -140,9 +144,13 @@ html[data-theme="light"] .header-btn {
 }
 
 .header-btn:hover {
-    transform: scale(1.05);
+    transform: translateY(-1px) scale(1.05);
     background: rgba(99, 102, 241, 0.15);
     color: #6366f1;
+}
+
+.header-btn:active {
+    transform: scale(0.96);
 }
 
 /* ─── HERO SECTION ─── */
@@ -205,7 +213,7 @@ html[data-theme="light"] .hero-subtitle {
     color: #1E293B;
 }
 
-/* ─── SMART AUTO-DETECT DROPZONE ─── */
+/* ─── SMART AUTO-DETECT DROPZONE (60fps Pseudo-Element Shadow) ─── */
 .smart-dropzone-container {
     max-width: 800px;
     margin: 0 auto 3.5rem;
@@ -219,23 +227,39 @@ html[data-theme="light"] .hero-subtitle {
     padding: 2.5rem 2rem;
     text-align: center;
     cursor: pointer;
-    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
     position: relative;
     backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
     overflow: hidden;
+    transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.2s ease, border-color 0.2s ease;
+    backface-visibility: hidden;
+    transform: translateZ(0);
+}
+
+.smart-dropzone::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    box-shadow: 0 20px 40px -10px rgba(99, 102, 241, 0.4);
+    opacity: 0;
+    transition: opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    pointer-events: none;
 }
 
 html[data-theme="light"] .smart-dropzone {
     background: rgba(255, 255, 255, 0.95);
     border-color: rgba(99, 102, 241, 0.4);
-    box-shadow: 0 10px 30px rgba(99, 102, 241, 0.08);
 }
 
 .smart-dropzone:hover, .smart-dropzone.dragover {
     border-color: #6366f1;
     background: rgba(99, 102, 241, 0.12);
     transform: translateY(-3px);
-    box-shadow: 0 20px 40px -10px rgba(99, 102, 241, 0.35);
+}
+
+.smart-dropzone:hover::after, .smart-dropzone.dragover::after {
+    opacity: 1;
 }
 
 .dropzone-icons {
@@ -253,11 +277,13 @@ html[data-theme="light"] .smart-dropzone {
     align-items: center;
     justify-content: center;
     font-size: 1.35rem;
-    transition: transform 0.25s ease;
+    transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    backface-visibility: hidden;
+    transform: translateZ(0);
 }
 
 .smart-dropzone:hover .dropzone-icon-badge {
-    transform: scale(1.1);
+    transform: translateY(-2px) scale(1.08);
 }
 
 .badge-audio { background: rgba(236, 72, 153, 0.25); color: #f472b6; }
@@ -297,6 +323,11 @@ html[data-theme="light"] .dropzone-desc {
     font-size: 0.9rem;
     border-radius: 0.75rem;
     box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3);
+    transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.dropzone-browse-btn:active {
+    transform: scale(0.97);
 }
 
 /* ─── 3-STEP BEGINNER GUIDE ─── */
@@ -321,6 +352,14 @@ html[data-theme="light"] .dropzone-desc {
     align-items: flex-start;
     gap: 1rem;
     backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    backface-visibility: hidden;
+    transform: translateZ(0);
+}
+
+.step-card:hover {
+    transform: translateY(-2px);
 }
 
 html[data-theme="light"] .step-card {
@@ -346,21 +385,20 @@ html[data-theme="light"] .step-card {
     font-size: 1rem;
     font-weight: 700;
     margin: 0 0 0.25rem 0;
-
 }
 
 .step-content p {
     font-size: 0.875rem;
-    color: #94a3b8;
+    color: #CBD5E1;
     margin: 0;
     line-height: 1.4;
 }
 
 html[data-theme="light"] .step-content p {
-    color: #64748b;
+    color: #334155;
 }
 
-/* ─── STUDIO CARDS GRID ─── */
+/* ─── STUDIO CARDS GRID (60fps Compositor-Optimized) ─── */
 .studio-grid-section {
     max-width: 1100px;
     margin: 0 auto;
@@ -401,16 +439,29 @@ html[data-theme="light"] .step-content p {
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease;
     backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
     position: relative;
     overflow: hidden;
+    backface-visibility: hidden;
+    transform: translateZ(0);
+}
+
+.studio-card::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    box-shadow: 0 20px 45px -10px rgba(0, 0, 0, 0.45);
+    opacity: 0;
+    transition: opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    pointer-events: none;
 }
 
 html[data-theme="light"] .studio-card {
     background: rgba(255, 255, 255, 0.9);
     border-color: rgba(0, 0, 0, 0.08);
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.04);
 }
 
 .studio-card::before {
@@ -421,7 +472,6 @@ html[data-theme="light"] .studio-card {
     right: 0;
     height: 4px;
     background: transparent;
-    transition: background 0.3s ease;
 }
 
 .studio-card.card-audio::before { background: linear-gradient(90deg, #ec4899, #8b5cf6); }
@@ -429,13 +479,12 @@ html[data-theme="light"] .studio-card {
 .studio-card.card-image::before { background: linear-gradient(90deg, #10b981, #84cc16); }
 
 .studio-card:hover {
-    transform: translateY(-6px);
+    transform: translateY(-5px);
     border-color: rgba(99, 102, 241, 0.4);
-    box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.3);
 }
 
-html[data-theme="light"] .studio-card:hover {
-    box-shadow: 0 20px 40px -15px rgba(99, 102, 241, 0.15);
+.studio-card:hover::after {
+    opacity: 1;
 }
 
 .card-icon-header {
@@ -465,13 +514,13 @@ html[data-theme="light"] .studio-card:hover {
     padding: 0.25rem 0.65rem;
     border-radius: 0.5rem;
     background: rgba(255, 255, 255, 0.06);
-    color: #94a3b8;
+    color: #CBD5E1;
     border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 html[data-theme="light"] .route-pill {
     background: rgba(0, 0, 0, 0.05);
-    color: #475569;
+    color: #334155;
     border-color: rgba(0, 0, 0, 0.08);
 }
 
@@ -484,7 +533,7 @@ html[data-theme="light"] .route-pill {
 .card-subtitle {
     font-size: 0.875rem;
     font-weight: 600;
-    color: #6366f1;
+    color: #818cf8;
     margin-bottom: 0.75rem;
 }
 
@@ -541,7 +590,9 @@ html[data-theme="light"] .card-features li {
     justify-content: center;
     gap: 0.6rem;
     text-decoration: none;
-    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s ease;
+    backface-visibility: hidden;
+    transform: translateZ(0);
 }
 
 .card-audio .card-action-btn {
@@ -563,9 +614,12 @@ html[data-theme="light"] .card-features li {
 }
 
 .card-action-btn:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+    transform: translateY(-2px);
     color: white;
+}
+
+.card-action-btn:active {
+    transform: scale(0.97);
 }
 
 /* ─── HIGHLIGHTS SECTION ─── */
@@ -594,6 +648,13 @@ html[data-theme="light"] .highlights-section {
     border-radius: 1.25rem;
     background: rgba(30, 41, 59, 0.4);
     border: 1px solid rgba(255, 255, 255, 0.05);
+    transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    backface-visibility: hidden;
+    transform: translateZ(0);
+}
+
+.highlight-box:hover {
+    transform: translateY(-2px);
 }
 
 html[data-theme="light"] .highlight-box {
@@ -628,6 +689,6 @@ html[data-theme="light"] .highlight-desc {
     text-align: center;
     padding: 2rem 1.5rem;
     font-size: 0.875rem;
-    color: #64748b;
+    color: #CBD5E1;
     border-top: 1px solid rgba(255, 255, 255, 0.05);
 }
