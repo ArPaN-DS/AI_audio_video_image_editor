@@ -616,9 +616,14 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        const spinner = document.getElementById('loadingOverlay');
-        const loadingText = document.getElementById('loadingText');
-        spinner.classList.remove('hidden');
+        if (window.ProcessingOverlay) {
+            window.ProcessingOverlay.show({
+                title: 'Audio Export Engine',
+                stageText: `Processing ${allRegions.length} audio region(s) & preparing export...`,
+                category: 'audio'
+            });
+            window.ProcessingOverlay.updateProgress(35, 'Cutting waveform regions & rendering audio output...');
+        }
 
         const formData = new FormData(e.target);
 
@@ -629,7 +634,7 @@ document.addEventListener('DOMContentLoaded', () => {
             formData.append('file', fileInput.files[0]);
         } else {
             showToast('No audio source found.', 'error');
-            spinner.classList.add('hidden');
+            if (window.ProcessingOverlay) window.ProcessingOverlay.hide();
             return;
         }
 
@@ -642,10 +647,17 @@ document.addEventListener('DOMContentLoaded', () => {
         formData.append('regions', JSON.stringify(regionsData));
 
         try {
-            loadingText.textContent = `Processing ${allRegions.length} region(s)...`;
+            if (window.ProcessingOverlay) {
+                window.ProcessingOverlay.updateProgress(75, 'Encoding final audio file...');
+            }
+
             const resp = await fetch('/cut', { method: 'POST', body: formData });
 
             if (resp.ok) {
+                if (window.ProcessingOverlay) {
+                    window.ProcessingOverlay.updateProgress(100, '✅ Export complete! Downloading...');
+                }
+
                 const contentType = resp.headers.get('content-type');
                 const blob = await resp.blob();
                 const url = window.URL.createObjectURL(blob);
@@ -664,18 +676,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 a.remove();
                 URL.revokeObjectURL(url);
 
-                loadingText.textContent = '✅ Download started!';
                 showToast('✅ Your audio has been exported successfully!', 'success');
-                setTimeout(() => { spinner.classList.add('hidden'); }, 1800);
+                setTimeout(() => {
+                    if (window.ProcessingOverlay) window.ProcessingOverlay.hide();
+                }, 1000);
             } else {
                 const errText = await resp.text();
                 showToast(`Error: ${errText}`, 'error');
-                spinner.classList.add('hidden');
+                if (window.ProcessingOverlay) window.ProcessingOverlay.hide();
             }
         } catch (err) {
             console.error(err);
             showToast('Network error. Check your connection.', 'error');
-            spinner.classList.add('hidden');
+            if (window.ProcessingOverlay) window.ProcessingOverlay.hide();
         }
     };
 
@@ -791,8 +804,24 @@ document.addEventListener('DOMContentLoaded', () => {
             formData.append(key, val);
         }
 
-        const resultsPanel = document.getElementById('aiResultsPanel');
-        const resultsContent = document.getElementById('aiResultsContent');
+        // Map endpoint to natural language titles & stage descriptions
+        const aiMeta = {
+            '/ai/transcribe': { title: 'AI Speech-to-Text Studio', stage: 'Transcribing spoken voice using local Whisper AI model...' },
+            '/ai/detect-silence': { title: 'AI Silence Detection', stage: 'Scanning audio waveform to locate silent gaps & pauses...' },
+            '/ai/auto-trim': { title: 'AI Auto-Trimmer', stage: 'Analyzing audio thresholds & auto-trimming silence...' },
+            '/ai/noise-reduce': { title: 'AI Noise Reduction Engine', stage: 'Filtering background noise & leveling audio voice clarity...' },
+            '/ai/bpm': { title: 'BPM & Beat Tracker', stage: 'Tracking rhythm beats & calculating tempo (BPM)...' }
+        };
+        const meta = aiMeta[endpoint] || { title: 'AI Audio Processor', stage: 'Processing audio file using AI models...' };
+
+        if (window.ProcessingOverlay) {
+            window.ProcessingOverlay.show({
+                title: meta.title,
+                stageText: meta.stage,
+                category: 'audio'
+            });
+            window.ProcessingOverlay.updateProgress(35, meta.stage);
+        }
 
         try {
             showToast('🤖 AI processing started...', 'info');
@@ -800,6 +829,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 method: 'POST',
                 body: formData
             });
+
+            if (window.ProcessingOverlay) {
+                window.ProcessingOverlay.updateProgress(80, 'Finalizing results & generating output...');
+            }
 
             if (!resp.ok) {
                 const text = await resp.text();
@@ -818,12 +851,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 onResponse(json);
             }
+
+            if (window.ProcessingOverlay) {
+                window.ProcessingOverlay.updateProgress(100, '✅ Complete!');
+            }
         } catch (err) {
             console.error('[AI Error]', err);
             showToast(`🤖 AI Error: ${err.message}`, 'error');
         } finally {
             btn.classList.remove('loading');
             btn.innerHTML = originalHtml;
+            if (window.ProcessingOverlay) {
+                setTimeout(() => window.ProcessingOverlay.hide(), 500);
+            }
         }
     }
 

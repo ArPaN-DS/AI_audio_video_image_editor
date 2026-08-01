@@ -49,8 +49,26 @@
     const clipDur = (c) => Math.max(0.05, (c.out - c.in) / (c.speed || 1));
     const totalDur = () => clips.reduce((a, c) => a + clipDur(c), 0);
 
-    function showLoading(txt) { $('loadingText').textContent = txt || 'Processing...'; $('loadingOverlay').classList.remove('hidden'); }
-    function hideLoading() { $('loadingOverlay').classList.add('hidden'); }
+    function showLoading(txt, percent = 30) {
+        if (window.ProcessingOverlay) {
+            window.ProcessingOverlay.show({
+                title: 'Video Studio Engine',
+                stageText: txt || 'Processing video clips & rendering timeline...',
+                category: 'video'
+            });
+            window.ProcessingOverlay.updateProgress(percent, txt || 'Working on video project...');
+        } else {
+            $('loadingText').textContent = txt || 'Processing...';
+            $('loadingOverlay').classList.remove('hidden');
+        }
+    }
+    function hideLoading() {
+        if (window.ProcessingOverlay) {
+            window.ProcessingOverlay.hide();
+        } else {
+            $('loadingOverlay').classList.add('hidden');
+        }
+    }
 
     function toast(msg, type = 'info') {
         document.querySelectorAll('.app-toast').forEach(t => t.remove());

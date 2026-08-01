@@ -581,7 +581,16 @@
         const model = document.querySelector('#ieUpscaleModel .ve-chip.active').dataset.model;
         const btn = $('ieEnhanceBtn');
         btn.disabled = true;
-        showLoading(model === 'best' ? 'Enhancing (Best mode — this can take a bit)...' : 'Enhancing...');
+
+        if (window.ProcessingOverlay) {
+            window.ProcessingOverlay.show({
+                title: 'AI Super-Resolution Engine',
+                stageText: model === 'best' ? 'AI is reconstructing sharp pixel details & edges (EDSR)...' : 'AI is upscaling image resolution (FSRCNN)...',
+                category: 'image'
+            });
+            window.ProcessingOverlay.updateProgress(30, 'Analyzing image structures...');
+        }
+
         try {
             const beforeBlob = await currentImageBlob();
             const beforeURL = URL.createObjectURL(beforeBlob);
@@ -591,11 +600,21 @@
             fd.append('file', beforeBlob, 'image.png');
             fd.append('scale', scale);
             fd.append('model', model);
+
+            if (window.ProcessingOverlay) {
+                window.ProcessingOverlay.updateProgress(65, 'Enhancing textures & refining high-resolution output...');
+            }
+
             const res = await fetch('/image/enhance', { method: 'POST', body: fd });
             if (!res.ok) {
                 URL.revokeObjectURL(beforeURL);
                 const e = await res.json().catch(() => ({})); toast(e.error || 'Enhance failed', 'error'); return;
             }
+
+            if (window.ProcessingOverlay) {
+                window.ProcessingOverlay.updateProgress(95, 'Preparing before/after comparison...');
+            }
+
             const engine = res.headers.get('X-Enhance-Engine') || '';
             const downgraded = res.headers.get('X-Enhance-Downgraded') === '1';
             const afterURL = URL.createObjectURL(await res.blob());
@@ -610,7 +629,9 @@
         } catch (e) {
             toast('Enhance failed: ' + e.message, 'error');
         } finally {
-            hideLoading();
+            if (window.ProcessingOverlay) {
+                window.ProcessingOverlay.hide();
+            }
             btn.disabled = false;
         }
     }
