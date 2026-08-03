@@ -463,11 +463,9 @@
     //  STAGE PREVIEW (video sync)
     // ═══════════════════════════════════════
     function rebuildStageVideos() {
-        // Remove stale
         Object.keys(videoEls).forEach(id => {
             if (!clips.find(c => c.id === id)) { videoEls[id].remove(); delete videoEls[id]; }
         });
-        // Create missing (only for video clips)
         clips.forEach(c => {
             if (!c.hasVideo) return;
             if (videoEls[c.id]) return;
@@ -476,7 +474,9 @@
             v.src = m.url;
             v.preload = 'auto';
             v.playsInline = true;
-            v.muted = true;   // stage playback muted; we manage a single active clip's audio separately if needed
+            v.muted = true;
+            v.onloadeddata = () => renderStageAt(playhead);
+            v.onseeked = () => renderStageAt(playhead);
             videoEls[c.id] = v;
             stageVideos.appendChild(v);
         });
