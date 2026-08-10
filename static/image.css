@@ -11,6 +11,7 @@
 }
 
 .hidden { display: none !important; }
+.ie-hero.hidden { display: none !important; }
 
 /* ── HERO ── */
 .ie-hero {
@@ -597,3 +598,5 @@
     .ie-hero-features { grid-template-columns: 1fr; }
     .page-nav { display: none; }
 }
+
+/* Image Editor Clean Canvas Styling */

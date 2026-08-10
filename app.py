@@ -11,6 +11,7 @@ from flask import Flask, render_template, request, send_file, jsonify, abort
 import ai_processor
 import video_processor
 import image_processor
+import audio_processor
 from pydub import AudioSegment
 from logger import log_upload_details
 from io import BytesIO
@@ -28,11 +29,14 @@ app.secret_key = os.environ.get("FLASK_SECRET_KEY", "change-me-in-production")
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 UPLOAD_FOLDER = os.path.join(BASE_DIR, 'uploads')
 PROCESSED_FOLDER = os.path.join(BASE_DIR, 'processed')
+PROJECTS_FOLDER = os.path.join(BASE_DIR, 'projects')
+os.makedirs(PROJECTS_FOLDER, exist_ok=True)
 
 # Config: 500MB Limit
 app.config['MAX_CONTENT_LENGTH'] = 500 * 1024 * 1024 
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['PROCESSED_FOLDER'] = PROCESSED_FOLDER
+app.config['PROJECTS_FOLDER'] = PROJECTS_FOLDER
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -85,6 +89,126 @@ def end_to_end_memory_reclaim(response):
 def studio_landing():
     _cleanup_old_temp_files()
     return render_template('landing.html')
+
+
+@app.route('/studio')
+def master_studio():
+    _cleanup_old_temp_files()
+    return render_template('studio.html')
+
+
+@app.route('/studio/project/save', methods=['POST'])
+def studio_project_save():
+    """Save project JSON state (.aviproject)."""
+    try:
+        data = request.get_json(silent=True)
+        if not data or 'name' not in data:
+            return jsonify({"error": "Invalid project data"}), 400
+        
+        project_id = data.get('id') or str(uuid.uuid4())
+        data['id'] = project_id
+        data['updated_at'] = time.time()
+        
+        filepath = os.path.join(app.config['PROJECTS_FOLDER'], f"{project_id}.aviproject")
+        with open(filepath, 'w', encoding='utf-8') as f:
+            json.dump(data, f, indent=2)
+            
+        return jsonify({"status": "success", "id": project_id, "file": f"{project_id}.aviproject"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/studio/project/load/<project_id>', methods=['GET'])
+def studio_project_load(project_id):
+    """Load project JSON state (.aviproject)."""
+    if not re.match(r'^[A-Za-z0-9-]+$', project_id):
+        return jsonify({"error": "Invalid project ID"}), 400
+    filepath = os.path.join(app.config['PROJECTS_FOLDER'], f"{project_id}.aviproject")
+    if not os.path.exists(filepath):
+        return jsonify({"error": "Project not found"}), 404
+        
+    try:
+        with open(filepath, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        return jsonify(data)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/audio/lufs', methods=['POST'])
+def audio_calculate_lufs():
+    """Calculate integrated LUFS & True Peak loudness metrics."""
+    if 'file' not in request.files: return jsonify({"error": "No file"}), 400
+    file = request.files['file']
+    if file.filename == '': return jsonify({"error": "No file"}), 400
+    
+    temp_path = save_temp_upload(file)
+    try:
+        metrics = audio_processor.calculate_lufs(temp_path)
+        return jsonify(metrics)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+
+
+@app.route('/audio/eq', methods=['POST'])
+def audio_apply_eq():
+    """Apply 10-Band Parametric EQ."""
+    if 'file' not in request.files: return jsonify({"error": "No file"}), 400
+    file = request.files['file']
+    if file.filename == '': return jsonify({"error": "No file"}), 400
+    
+    eq_json = request.form.get('eq_bands', '{}')
+    try:
+        eq_bands = json.loads(eq_json)
+    except Exception:
+        eq_bands = {}
+        
+    temp_path = save_temp_upload(file)
+    out_path = os.path.join(app.config['PROCESSED_FOLDER'], f"eq_{uuid.uuid4()}.wav")
+    try:
+        audio_processor.apply_parametric_eq(temp_path, out_path, eq_bands=eq_bands)
+        return send_file(out_path, mimetype='audio/wav', as_attachment=True, download_name="eq_processed.wav")
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+
+
+@app.route('/audio/multitrack-mix', methods=['POST'])
+def audio_multitrack_mix():
+    """Mix multiple audio clips according to multitrack specs."""
+    spec = request.get_json(silent=True)
+    if not spec or 'tracks' not in spec:
+        return jsonify({"error": "Invalid mix spec"}), 400
+        
+    out_format = spec.get('format', 'wav')
+    out_name = f"mix_{uuid.uuid4()}.{out_format}"
+    out_path = os.path.join(app.config['PROCESSED_FOLDER'], out_name)
+    
+    # Resolve relative paths inside tracks
+    tracks = spec.get('tracks', [])
+    resolved_tracks = []
+    for t in tracks:
+        media_id = t.get('media_id')
+        p = _media_path(media_id)
+        if p:
+            t_copy = dict(t)
+            t_copy['file_path'] = p
+            resolved_tracks.append(t_copy)
+            
+    if not resolved_tracks:
+        return jsonify({"error": "No valid media found in tracks spec"}), 400
+        
+    try:
+        master_vol = float(spec.get('master_volume', 1.0))
+        audio_processor.mix_audio_tracks(resolved_tracks, out_path, master_volume=master_vol, format=out_format)
+        return send_file(out_path, mimetype=f"audio/{out_format}", as_attachment=True, download_name=f"multitrack_master.{out_format}")
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route('/audio')

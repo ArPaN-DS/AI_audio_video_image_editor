@@ -49,8 +49,8 @@
         </div>
     </header>
 
-    <!-- ─── UPLOAD HERO (shown until first media added) ─── -->
-    <div class="ve-hero" id="veHero">
+    <!-- ─── UPLOAD HERO (hidden to allow full-screen editor layout) ─── -->
+    <div class="ve-hero hidden" id="veHero">
         <div class="card ve-hero-card">
             <div class="upload-area" id="veUploadArea">
                 <div class="upload-icon"><i class="fas fa-clapperboard"></i></div>
@@ -59,28 +59,11 @@
                     Everything stays on your machine</p>
                 <input type="file" id="veFileInput" accept="video/*,audio/*" multiple>
             </div>
-            <div class="ve-hero-features">
-                <div class="ve-hero-feature"><i class="fas fa-scissors"></i>
-                    <div><strong>Cut & Arrange</strong><span>Trim, split and reorder clips on a magnetic
-                            timeline</span></div>
-                </div>
-                <div class="ve-hero-feature"><i class="fas fa-music"></i>
-                    <div><strong>Audio + Video Combo</strong><span>Background music, per-clip volume, fades &amp;
-                            audio-only export</span></div>
-                </div>
-                <div class="ve-hero-feature"><i class="fas fa-font"></i>
-                    <div><strong>Text & Filters</strong><span>Text overlays, speed control, color filters &amp;
-                            transitions</span></div>
-                </div>
-                <div class="ve-hero-feature"><i class="fas fa-file-audio"></i>
-                    <div><strong>Audio Extractor</strong><span>Pull MP3/WAV out of any video in one click</span></div>
-                </div>
-            </div>
         </div>
     </div>
 
     <!-- ─── EDITOR ─── -->
-    <div class="ve-editor hidden" id="veEditor">
+    <div class="ve-editor" id="veEditor">
 
         <div class="ve-workspace">
 
@@ -102,9 +85,13 @@
                     <div class="ve-stage" id="veStage">
                         <div class="ve-stage-videos" id="veStageVideos"></div>
                         <div class="ve-stage-texts" id="veStageTexts"></div>
-                        <div class="ve-stage-empty" id="veStageEmpty">
-                            <i class="fas fa-clapperboard"></i>
-                            <p>Add a clip to the timeline to preview</p>
+                        <div class="ve-stage-empty" id="veStageEmpty" style="cursor: pointer; line-height: 1.5;">
+                            <div style="font-size: 3rem; color: #6366f1; margin-bottom: 12px; line-height: 1;"><i class="fas fa-clapperboard"></i></div>
+                            <p style="font-size: 1.1rem; font-weight: 600; margin: 0 0 6px 0; line-height: 1.4; color: #ffffff;">Drop your Video or Audio files here</p>
+                            <p style="font-size: 0.85rem; opacity: 0.7; margin: 0 0 16px 0; line-height: 1.4; color: #cccccc;">Supports MP4, MKV, MOV, WEBM, MP3, WAV and more</p>
+                            <button class="btn-small" type="button" style="padding: 8px 18px; font-size: 0.9rem;" onclick="document.getElementById('veFileInput2').click()">
+                                <i class="fas fa-folder-open"></i> Browse Files
+                            </button>
                         </div>
                     </div>
                 </div>

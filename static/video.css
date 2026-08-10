@@ -57,6 +57,7 @@
 
 .hidden { display: none !important; }
 .hidden-input { display: none; }
+.ve-hero.hidden { display: none !important; }
 
 /* ═══════════════════════════════════════
    HERO / UPLOAD
@@ -845,3 +846,5 @@
     .page-nav { display: none; }
     .ve-hero-features { grid-template-columns: 1fr; }
 }
+
+/* Video Editor Clean Canvas Styling */

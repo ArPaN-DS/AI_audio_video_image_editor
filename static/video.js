@@ -109,7 +109,9 @@
         if (!files.length) { toast('Please choose video or audio files.', 'warning'); return; }
 
         hero.classList.add('hidden');
-        editor.classList.remove('hidden');
+        const veEditor = document.getElementById('veEditor');
+        veEditor.classList.remove('hidden');
+        veEditor.classList.remove('ve-pre-upload');
 
         for (const file of files) {
             showLoading(`Importing ${file.name}...`);

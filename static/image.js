@@ -44,7 +44,10 @@
             URL.revokeObjectURL(url);
             setBaseFromImage(img);
             hero.classList.add('hidden');
-            editor.classList.remove('hidden');
+            const ieEditor = document.getElementById('ieEditor');
+            ieEditor.classList.remove('hidden');
+            const pl = document.getElementById('ieCanvasPlaceholder');
+            if (pl) pl.style.display = 'none';
             resetAll(false);
             renderCanvas();
             toast('Image loaded', 'success');

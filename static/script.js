@@ -165,8 +165,16 @@ document.addEventListener('DOMContentLoaded', () => {
         // Don't re-show editor if we're in the middle of a reset
         if (isResetting) return;
 
-        editorSec.classList.remove('hidden');
-        editorSec.style.display = '';
+        const editorEl = document.getElementById('editor-interface');
+        editorEl.classList.remove('hidden');
+        editorEl.classList.remove('editor-pre-upload');
+
+        // Hide waveform placeholder and show file info bar
+        const wfPlaceholder = document.getElementById('waveformPlaceholder');
+        if (wfPlaceholder) wfPlaceholder.style.display = 'none';
+        document.getElementById('fileInfoBar')?.classList.remove('hidden');
+        document.getElementById('waveform-container')?.classList.add('waveform-loaded');
+
         uploadSec.classList.add('hidden');
         recordSec.classList.add('hidden');
         document.getElementById('newFileBtn').classList.remove('hidden');
@@ -508,8 +516,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const us = document.getElementById('uploadSection');
         const rs = document.getElementById('recordSection');
 
-        ei.style.display = 'none';
-        ei.classList.add('hidden');
+        ei.style.display = '';
+        ei.classList.remove('hidden');
+        document.getElementById('fileInfoBar')?.classList.add('hidden');
+        const wfPlaceholder = document.getElementById('waveformPlaceholder');
+        if (wfPlaceholder) wfPlaceholder.style.display = '';
+        document.getElementById('waveform-container')?.classList.remove('waveform-loaded');
 
         us.style.display = '';
         us.classList.remove('hidden');

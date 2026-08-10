@@ -59,40 +59,11 @@
     <div class="container">
         <div class="card">
 
-            <!-- TABS -->
-            <div class="tabs">
-                <button class="tab-btn active" id="btnTabUpload">
-                    <i class="fas fa-upload"></i> Upload File
-                </button>
-                <button class="tab-btn" id="btnTabRecord">
-                    <i class="fas fa-microphone"></i> Record Audio
-                </button>
-            </div>
-
-            <!-- UPLOAD AREA -->
-            <div class="upload-area" id="uploadSection">
-                <div class="upload-icon"><i class="fas fa-cloud-upload-alt"></i></div>
-                <p class="upload-title">Drop your Audio or Video file here</p>
-                <p class="upload-subtitle">Supports MP3, WAV, OGG, FLAC, M4A, MP4, MKV and more</p>
-                <input type="file" id="fileInput" accept="audio/*,video/*">
-            </div>
-
-            <!-- RECORD AREA -->
-            <div class="record-area hidden" id="recordSection">
-                <button id="recordBtn" class="record-circle">
-                    <i class="fas fa-microphone"></i>
-                </button>
-                <p id="recordStatus">Click the red button to start recording from your microphone</p>
-                <button id="stopRecordBtn" class="stop-btn hidden">
-                    <i class="fas fa-stop"></i> Stop & Edit
-                </button>
-            </div>
-
             <!-- ─── EDITOR INTERFACE ─── -->
-            <div id="editor-interface" class="hidden">
+            <div id="editor-interface">
 
-                <!-- FILE INFO BAR -->
-                <div class="file-info-bar" id="fileInfoBar">
+                <!-- FILE INFO BAR (Hidden until audio is loaded) -->
+                <div class="file-info-bar hidden" id="fileInfoBar">
                     <div class="file-info-left">
                         <div class="file-detail">
                             <i class="fas fa-file-audio"></i>
@@ -113,8 +84,38 @@
                     </button>
                 </div>
 
-                <!-- WAVEFORM -->
+                <!-- WAVEFORM VIEWPORT (Upload dropzone before upload, Waveform after upload) -->
                 <div id="waveform-container">
+                    <div id="waveformPlaceholder" class="waveform-placeholder" style="padding: 0; width: 100%;">
+                        <!-- TABS -->
+                        <div class="tabs" style="width: 100%; margin-bottom: 12px;">
+                            <button class="tab-btn active" id="btnTabUpload">
+                                <i class="fas fa-upload"></i> Upload File
+                            </button>
+                            <button class="tab-btn" id="btnTabRecord">
+                                <i class="fas fa-microphone"></i> Record Audio
+                            </button>
+                        </div>
+
+                        <!-- UPLOAD AREA -->
+                        <div class="upload-area" id="uploadSection" style="width: 100%;">
+                            <div class="upload-icon"><i class="fas fa-cloud-upload-alt"></i></div>
+                            <p class="upload-title">Drop your Audio or Video file here</p>
+                            <p class="upload-subtitle">Supports MP3, WAV, OGG, FLAC, M4A, MP4, MKV and more</p>
+                            <input type="file" id="fileInput" accept="audio/*,video/*">
+                        </div>
+
+                        <!-- RECORD AREA -->
+                        <div class="record-area hidden" id="recordSection" style="width: 100%;">
+                            <button id="recordBtn" class="record-circle">
+                                <i class="fas fa-microphone"></i>
+                            </button>
+                            <p id="recordStatus">Click the red button to start recording from your microphone</p>
+                            <button id="stopRecordBtn" class="stop-btn hidden">
+                                <i class="fas fa-stop"></i> Stop & Edit
+                            </button>
+                        </div>
+                    </div>
                     <div id="waveform"></div>
                     <div id="wave-timeline"></div>
                     <div class="waveform-hint">
