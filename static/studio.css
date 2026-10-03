@@ -853,3 +853,34 @@ kbd {
     font-size: 0.75rem;
     color: var(--accent-cyan);
 }
+
+/* --------------------------------------------------------------------------
+   RESPONSIVE — Pro Studio Production Breakpoints
+   -------------------------------------------------------------------------- */
+
+@media (max-width: 1024px) {
+    .workspace-tabs { overflow-x: auto; max-width: 320px; white-space: nowrap; }
+    .ws-tab { padding: 5px 10px; font-size: 0.75rem; }
+    .mode-label { font-size: 0.75rem; }
+}
+
+@media (max-width: 860px) {
+    body.studio-body { height: auto; overflow: auto; min-height: 100vh; }
+    .studio-header { flex-wrap: wrap; height: auto; padding: 10px 12px; gap: 8px; }
+    .header-left, .header-center, .header-right { width: 100%; justify-content: space-between; }
+    .header-center { order: 2; justify-content: center; }
+    .header-right { order: 3; justify-content: flex-end; }
+    .workspace-grid { display: flex; flex-direction: column; height: auto; }
+    .modal-card { width: 92vw; }
+}
+
+@media (max-width: 480px) {
+    .brand-logo .logo-text { font-size: 0.82rem; }
+    .btn-sm { padding: 6px 10px; font-size: 0.75rem; }
+    .workspace-tabs { max-width: 100%; }
+}
+
+/* Touch targets */
+@media (hover: none) and (pointer: coarse) {
+    .ws-tab, .btn, .modal-close { min-height: 44px; display: inline-flex; align-items: center; justify-content: center; }
+}

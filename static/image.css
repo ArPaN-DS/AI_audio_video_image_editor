@@ -589,14 +589,43 @@
     box-shadow: 0 8px 24px rgba(217, 119, 6, 0.45);
 }
 
-/* ── RESPONSIVE ── */
+/* ── RESPONSIVE — Image Editor Production Breakpoints ── */
+
+@media (max-width: 1100px) {
+    .ie-editor { grid-template-columns: 72px 1fr 280px; }
+}
+
 @media (max-width: 900px) {
-    .ie-body { height: auto; overflow: auto; }
+    .ie-body { height: auto; overflow: auto; min-height: 100vh; }
     .ie-editor { grid-template-columns: 1fr; height: auto; }
-    .ie-toolbar { flex-direction: row; overflow-x: auto; border-right: none; border-bottom: 1px solid var(--border); }
-    .ie-stage { min-height: 50vh; }
+    .ie-toolbar { flex-direction: row; justify-content: space-around; overflow-x: auto; border-right: none; border-bottom: 1px solid var(--border); padding: 8px 12px; gap: 8px; }
+    .ie-tool { flex: 1; min-width: 54px; padding: 8px 4px; }
+    .ie-stage { min-height: 45vh; padding: 16px; }
+    #ieCanvas { max-height: 60vh; }
     .ie-hero-features { grid-template-columns: 1fr; }
     .page-nav { display: none; }
 }
 
-/* Image Editor Clean Canvas Styling */
+@media (max-width: 580px) {
+    .ie-stage { padding: 10px; min-height: 38vh; }
+    .ie-action-bar { padding: 10px 12px; flex-wrap: wrap; gap: 6px; }
+    .ie-filter-grid { grid-template-columns: repeat(3, 1fr); gap: 6px; }
+    .ie-section { padding: 12px; }
+    .ie-compare-overlay { padding: 10px; }
+    .ie-compare-btns { width: 100%; justify-content: flex-end; margin-left: 0; }
+    .ve-export-btn { width: 100%; padding: 14px 20px; font-size: 0.95rem; }
+}
+
+@media (max-width: 380px) {
+    .ie-filter-grid { grid-template-columns: repeat(2, 1fr); }
+    .ie-tool span { font-size: 0.62rem; }
+}
+
+/* Touch Optimizations */
+@media (hover: none) and (pointer: coarse) {
+    .ie-tool { min-height: 44px; justify-content: center; }
+    .ie-filter { min-height: 40px; display: inline-flex; align-items: center; justify-content: center; }
+    .ve-chip { min-height: 44px; }
+    .mini-btn { min-width: 44px; min-height: 44px; }
+    .btn-outline, .btn-small { min-height: 44px; }
+}

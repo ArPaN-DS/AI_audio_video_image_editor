@@ -692,3 +692,36 @@ html[data-theme="light"] .highlight-desc {
     color: #CBD5E1;
     border-top: 1px solid rgba(255, 255, 255, 0.05);
 }
+
+/* ─── RESPONSIVE PRODUCTION BREAKPOINTS ─── */
+.mobile-menu-btn {
+    display: none;
+}
+
+@media (max-width: 768px) {
+    .page-nav { display: none !important; }
+    .mobile-menu-btn { display: flex !important; }
+}
+
+@media (max-width: 900px) {
+    .landing-hero { padding: 3rem 1.25rem 2rem; }
+    .hero-title { font-size: clamp(1.8rem, 6vw, 3rem); }
+    .hero-subtitle { font-size: 0.95rem; }
+    .smart-dropzone { padding: 2rem 1.25rem; }
+    .section-heading { font-size: 1.8rem; margin-bottom: 1.75rem; }
+    .studio-cards-container { grid-template-columns: 1fr; gap: 1.25rem; }
+}
+
+@media (max-width: 480px) {
+    .landing-hero { padding: 2rem 0.85rem 1.5rem; }
+    .hero-pill-badge { font-size: 0.72rem; padding: 4px 10px; }
+    .smart-dropzone-container { margin: 1.5rem auto 2.5rem; }
+    .dropzone-title { font-size: 1.15rem; }
+    .dropzone-desc { font-size: 0.82rem; }
+    .studio-card { padding: 1.25rem; }
+    .highlights-section { padding: 2.5rem 1rem; }
+}
+
+@media (hover: none) and (pointer: coarse) {
+    .card-action-btn, .dropzone-browse-btn { min-height: 44px; display: inline-flex; align-items: center; justify-content: center; }
+}

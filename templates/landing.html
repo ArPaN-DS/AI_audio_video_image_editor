@@ -42,8 +42,32 @@
             <button id="themeToggle" class="header-btn" title="Switch theme" aria-label="Switch theme">
                 <i class="fas fa-moon"></i>
             </button>
+            <button id="mobileMenuBtn" class="header-btn mobile-menu-btn" title="Open Navigation Menu" aria-label="Open Navigation Menu">
+                <i class="fas fa-bars"></i>
+            </button>
         </div>
     </header>
+
+    <!-- ─── MOBILE NAVIGATION DRAWER ─── -->
+    <div id="mobileNavDrawer" class="mobile-nav-drawer hidden">
+        <div class="mobile-nav-backdrop" id="mobileNavBackdrop"></div>
+        <div class="mobile-nav-content">
+            <div class="mobile-nav-header">
+                <div class="logo-container">
+                    <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo">
+                    <span class="mobile-nav-title">Media Studio</span>
+                </div>
+                <button id="closeMobileNav" class="close-btn" aria-label="Close Navigation Menu">&times;</button>
+            </div>
+            <nav class="mobile-nav-links">
+                <a href="/" class="mobile-nav-link active"><i class="fas fa-th-large"></i> Hub</a>
+                <a href="/audio" class="mobile-nav-link"><i class="fas fa-music"></i> Audio Editor</a>
+                <a href="/video" class="mobile-nav-link"><i class="fas fa-film"></i> Video Editor</a>
+                <a href="/image" class="mobile-nav-link"><i class="fas fa-image"></i> Image Editor</a>
+                <a href="/studio" class="mobile-nav-link pro-link"><i class="fas fa-sliders-h"></i> Pro Studio</a>
+            </nav>
+        </div>
+    </div>
 
     <!-- ─── HERO SECTION ─── -->
     <section class="landing-hero">

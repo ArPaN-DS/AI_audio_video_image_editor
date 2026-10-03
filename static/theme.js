@@ -32,6 +32,37 @@
         window.dispatchEvent(new CustomEvent('themechange', { detail: { theme: theme } }));
     }
 
+    function initMobileNav() {
+        var menuBtn = document.getElementById('mobileMenuBtn');
+        var drawer = document.getElementById('mobileNavDrawer');
+        var backdrop = document.getElementById('mobileNavBackdrop');
+        var closeBtn = document.getElementById('closeMobileNav');
+
+        if (!menuBtn || !drawer) return;
+
+        function openDrawer() {
+            drawer.classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+            if (menuBtn) menuBtn.setAttribute('aria-expanded', 'true');
+        }
+
+        function closeDrawer() {
+            drawer.classList.add('hidden');
+            document.body.style.overflow = '';
+            if (menuBtn) menuBtn.setAttribute('aria-expanded', 'false');
+        }
+
+        menuBtn.addEventListener('click', openDrawer);
+        if (backdrop) backdrop.addEventListener('click', closeDrawer);
+        if (closeBtn) closeBtn.addEventListener('click', closeDrawer);
+
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape' && drawer && !drawer.classList.contains('hidden')) {
+                closeDrawer();
+            }
+        });
+    }
+
     function init() {
         syncButton();
         var btn = document.getElementById('themeToggle');
@@ -40,6 +71,7 @@
                 apply(current() === 'dark' ? 'light' : 'dark');
             });
         }
+        initMobileNav();
         // Follow the OS preference only while the user hasn't chosen explicitly.
         try {
             var mq = window.matchMedia('(prefers-color-scheme: dark)');

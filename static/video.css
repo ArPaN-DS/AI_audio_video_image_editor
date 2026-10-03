@@ -831,20 +831,61 @@
 }
 
 /* ═══════════════════════════════════════
-   RESPONSIVE
+   RESPONSIVE — Video Editor Production Breakpoints
    ═══════════════════════════════════════ */
-@media (max-width: 1100px) {
-    :root { --ve-panel-w: 240px; }
+
+@media (max-width: 1200px) {
+    :root { --ve-panel-w: 260px; }
+    .ve-tl-left { flex-wrap: wrap; gap: 6px; }
+    .btn-outline { padding: 6px 10px; font-size: 0.78rem; }
 }
 
-@media (max-width: 900px) {
-    .ve-body { overflow: auto; height: auto; }
-    .ve-workspace { grid-template-columns: 1fr; }
-    .ve-editor { height: auto; }
-    .ve-panel { max-height: 300px; }
-    .ve-stage-col { min-height: 320px; }
-    .page-nav { display: none; }
+@media (max-width: 992px) {
+    :root { --ve-panel-w: 220px; }
+    .ve-hero-card { padding: 24px 18px; }
+    .ve-hero-features { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+}
+
+@media (max-width: 860px) {
+    .ve-body { overflow: auto; height: auto; min-height: 100vh; }
+    .ve-editor { height: auto; min-height: calc(100vh - 56px); }
+    .ve-workspace { display: flex; flex-direction: column; gap: 0; background: var(--bg); }
+    .ve-stage-col { order: 1; min-height: 320px; padding: 12px; }
+    .ve-media-panel { order: 2; max-height: 280px; border-top: 1px solid var(--border); }
+    .ve-inspector { order: 3; max-height: 340px; border-top: 1px solid var(--border); }
+    .ve-timeline-area { height: 260px; border-top: 2px solid var(--border); }
     .ve-hero-features { grid-template-columns: 1fr; }
+    .page-nav { display: none; }
 }
 
-/* Video Editor Clean Canvas Styling */
+@media (max-width: 580px) {
+    .ve-stage-col { padding: 8px; gap: 10px; }
+    .ve-stage { border-radius: 8px; }
+    .ve-transport { flex-wrap: wrap; justify-content: space-between; padding: 10px 12px; gap: 8px; }
+    .ve-transport .time-display { font-size: 0.82rem; }
+    .ve-transport-right { width: 100%; }
+    .ve-export-btn { width: 100%; justify-content: center; padding: 12px 18px; font-size: 0.95rem; }
+    .ve-timeline-toolbar { flex-direction: column; align-items: stretch; gap: 10px; padding: 10px 12px; }
+    .ve-tl-left { width: 100%; display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; }
+    .ve-tl-left .btn-outline { width: 100%; justify-content: center; padding: 8px 6px; font-size: 0.76rem; }
+    .ve-tl-right { width: 100%; justify-content: center; }
+    .ve-zoom-range { width: 100%; flex: 1; }
+    .ve-quick-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
+    .ve-quick-panel { padding: 16px 12px; margin: 12px; }
+}
+
+@media (max-width: 380px) {
+    .ve-tl-left { grid-template-columns: 1fr; }
+    .ve-chip-row { gap: 4px; }
+    .ve-chip { padding: 6px 8px; font-size: 0.74rem; }
+}
+
+/* Touch Optimizations */
+@media (hover: none) and (pointer: coarse) {
+    .ve-handle { width: 20px; }
+    .ve-handle-l { left: -5px; }
+    .ve-handle-r { right: -5px; }
+    .mini-btn { min-width: 44px; min-height: 44px; }
+    .play-btn { min-width: 48px; min-height: 48px; }
+    .btn-outline, .btn-small, .ve-chip { min-height: 44px; display: inline-flex; align-items: center; justify-content: center; }
+}
