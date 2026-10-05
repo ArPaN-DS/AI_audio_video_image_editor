@@ -10,7 +10,7 @@
 .agent-page-body {
     --sidebar-w: 264px;
     --topbar-h: 56px;
-    --chat-col: 768px;
+    --chat-col: 1100px;
     --composer-radius: var(--radius-xl-token);
 
     margin: 0;
@@ -720,7 +720,7 @@
 /* Agent Message: Premium studio card */
 .message-row.agent .message-bubble {
     flex: 1;
-    max-width: min(100%, 74ch);
+    max-width: min(100%, 90ch);
     padding: 14px 18px;
     border-radius: 16px;
     background: var(--chat-agent-bg);
