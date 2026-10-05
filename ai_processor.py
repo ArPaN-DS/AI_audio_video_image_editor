@@ -1,33 +1,91 @@
-import os
-import numpy as np
-import librosa
-import noisereduce as nr
-import soundfile as sf
+import runtime_tuning  # noqa: F401  (thread-pool defaults before numeric libraries load)
 
-def detect_silence(path, min_silence_len=0.5, silence_thresh=40):
-    """
-    Detects silent gaps in the audio.
-    min_silence_len: minimum duration of silence in seconds to be registered
-    silence_thresh: threshold (in dB) below reference to consider silence (equivalent to top_db in librosa.effects.split)
-    """
-    y, sr = librosa.load(path, sr=None, mono=True)
-    duration = librosa.get_duration(y=y, sr=sr)
-    
-    # split returns intervals of non-silent regions
-    non_silent_intervals = librosa.effects.split(y, top_db=silence_thresh)
-    
+import os
+import re
+import shutil
+import numpy as np
+
+from runtime_tuning import import_noisereduce, lazy_module
+
+# Heavy libraries load on first use, not at server start.
+librosa = lazy_module("librosa")
+nr = lazy_module("noisereduce", loader=import_noisereduce)
+sf = lazy_module("soundfile")
+
+
+# ── Streamed frame energy ─────────────────────────────────────────────────
+#
+# librosa.load(sr=None, mono=True) + feature.rms materialise the whole signal
+# and then a (frame_length x n_frames) float32 copy of it — ~4x the signal for
+# the default 2048/512 framing (a 10-minute 48 kHz file peaks around 0.6 GB,
+# an hour at several GB). The helpers below stream the decoded file and call
+# librosa's own rms on frame-aligned chunks of the centre-padded signal, so the
+# per-frame values are bit-identical while memory stays O(chunk).
+
+_RMS_CHUNK_FRAMES = 4096
+
+
+def _stream_mono_rms(path, frame_length=2048, hop_length=512):
+    """(rms[n_frames] float32, sr, n_samples) identical to
+    ``librosa.feature.rms(y=librosa.load(path, sr=None, mono=True)[0])[0]``,
+    or None when the file is not a block-decodable PCM container."""
+    import audio_processor as ap
+    try:
+        info = sf.info(path)
+    except Exception:
+        return None
+    if str(info.format).upper() not in ap._STREAMABLE_FORMATS or info.frames <= 0:
+        return None
+    n, sr, channels = int(info.frames), int(info.samplerate), int(info.channels)
+    half = frame_length // 2
+    padded = n + 2 * half
+    if padded < frame_length:
+        return None
+    n_frames = 1 + (padded - frame_length) // hop_length
+    out = np.empty(n_frames, dtype=np.float32)
+    reader = ap._SequentialReader(path, channels, n)
+    try:
+        for k0 in range(0, n_frames, _RMS_CHUNK_FRAMES):
+            k1 = min(n_frames, k0 + _RMS_CHUNK_FRAMES)
+            a = k0 * hop_length - half                     # signal coords of the padded window
+            b = (k1 - 1) * hop_length + frame_length - half
+            block = reader.read(max(a, 0), min(b, n))
+            mono = block[0] if channels == 1 else np.mean(block, axis=0)
+            if a < 0 or b > n:
+                mono = np.concatenate([np.zeros(max(0, -a), dtype=np.float32), mono,
+                                       np.zeros(max(0, b - n), dtype=np.float32)])
+            out[k0:k1] = librosa.feature.rms(y=mono, frame_length=frame_length, hop_length=hop_length,
+                                             center=False)[0]
+    finally:
+        reader.close()
+    return out, sr, n
+
+
+def _nonsilent_frames(rms, top_db):
+    """librosa.effects._signal_to_frame_nonsilent for a mono rms curve."""
+    db = librosa.amplitude_to_db(rms, ref=np.max, top_db=None)
+    return db > -top_db
+
+
+def _split_from_rms(rms, n_samples, top_db, hop_length=512):
+    """librosa.effects.split on precomputed frame energies (same edge rules)."""
+    non_silent = _nonsilent_frames(rms, top_db)
+    edges = [np.flatnonzero(np.diff(non_silent.astype(int))) + 1]
+    if non_silent[0]:
+        edges.insert(0, np.array([0]))
+    if non_silent[-1]:
+        edges.append(np.array([len(non_silent)]))
+    edges = np.concatenate(edges) * hop_length
+    edges = np.minimum(edges, n_samples)
+    return edges.reshape((-1, 2))
+
+
+def _silence_regions(non_silent_intervals, sr, duration, min_silence_len):
     silence_regions = []
-    
-    # Convert samples to seconds
-    non_silent_secs = []
-    for start_idx, end_idx in non_silent_intervals:
-        non_silent_secs.append((start_idx / sr, end_idx / sr))
-        
+    non_silent_secs = [(start_idx / sr, end_idx / sr) for start_idx, end_idx in non_silent_intervals]
     if not non_silent_secs:
         # The entire audio is silent
         return [{"start": 0.0, "end": round(duration, 3), "duration": round(duration, 3)}]
-        
-    # Find the gaps between non-silent regions
     current_time = 0.0
     for start_sec, end_sec in non_silent_secs:
         if start_sec - current_time >= min_silence_len:
@@ -37,26 +95,57 @@ def detect_silence(path, min_silence_len=0.5, silence_thresh=40):
                 "duration": round(start_sec - current_time, 3)
             })
         current_time = end_sec
-        
     if duration - current_time >= min_silence_len:
         silence_regions.append({
             "start": round(current_time, 3),
             "end": round(duration, 3),
             "duration": round(duration - current_time, 3)
         })
-        
     return silence_regions
+
+
+def detect_silence(path, min_silence_len=0.5, silence_thresh=40):
+    """
+    Detects silent gaps in the audio.
+    min_silence_len: minimum duration of silence in seconds to be registered
+    silence_thresh: threshold (in dB) below reference to consider silence (equivalent to top_db in librosa.effects.split)
+    """
+    streamed = _stream_mono_rms(path)
+    if streamed is not None:
+        rms, sr, n = streamed
+        intervals = _split_from_rms(rms, n, silence_thresh)
+        return _silence_regions(intervals, sr, n / sr, min_silence_len)
+
+    y, sr = librosa.load(path, sr=None, mono=True)
+    duration = librosa.get_duration(y=y, sr=sr)
+
+    # split returns intervals of non-silent regions
+    non_silent_intervals = librosa.effects.split(y, top_db=silence_thresh)
+    return _silence_regions(non_silent_intervals, sr, duration, min_silence_len)
+
 
 def auto_trim_silence(path, threshold=40):
     """
     Detects silent portions at start and end and returns proposed trim points.
     """
-    y, sr = librosa.load(path, sr=None, mono=True)
-    duration = librosa.get_duration(y=y, sr=sr)
-    
-    # trim returns the trimmed signal and the start/end samples
-    y_trimmed, index = librosa.effects.trim(y, top_db=threshold)
-    
+    streamed = _stream_mono_rms(path)
+    if streamed is not None:
+        rms, sr, n = streamed
+        duration = n / sr
+        # librosa.effects.trim on precomputed frame energies.
+        nonzero = np.flatnonzero(_nonsilent_frames(rms, threshold))
+        if nonzero.size > 0:
+            index = (int(nonzero[0]) * 512, min(n, int(nonzero[-1] + 1) * 512))
+        else:
+            index = (0, 0)
+    else:
+        y, sr = librosa.load(path, sr=None, mono=True)
+        duration = librosa.get_duration(y=y, sr=sr)
+
+        # trim returns the trimmed signal and the start/end samples
+        y_trimmed, index = librosa.effects.trim(y, top_db=threshold)
+        del y, y_trimmed
+
     trimmed_start = float(index[0]) / sr
     trimmed_end = float(index[1]) / sr
     
@@ -97,9 +186,12 @@ def reduce_noise(path, output_path):
     Applies local noise reduction using noisereduce package.
     Preserves stereo shape.
     """
-    # Load with mono=False to keep stereo if present
-    y, sr = librosa.load(path, sr=None, mono=False)
-    
+    import audio_processor
+    # Keep the channel layout; unreadable input raises a ValueError.
+    y, sr = audio_processor.load_audio_array(path)
+    if y.shape[0] == 1:
+        y = y[0]
+
     # Run noise reduction
     reduced_y = nr.reduce_noise(y=y, sr=sr)
     
@@ -117,11 +209,17 @@ def detect_voice_activity(path, threshold_db=-35.0, frame_length=2048, hop_lengt
     Performs Voice Activity Detection using RMS energy analysis.
     Classifies frames as 'speech' or 'silence'.
     """
-    y, sr = librosa.load(path, sr=None, mono=True)
-    duration = librosa.get_duration(y=y, sr=sr)
-    
-    # Compute RMS energy for each frame
-    rms = librosa.feature.rms(y=y, frame_length=frame_length, hop_length=hop_length)[0]
+    streamed = _stream_mono_rms(path, frame_length, hop_length)
+    if streamed is not None:
+        rms, sr, n = streamed
+        duration = n / sr
+    else:
+        y, sr = librosa.load(path, sr=None, mono=True)
+        duration = librosa.get_duration(y=y, sr=sr)
+
+        # Compute RMS energy for each frame
+        rms = librosa.feature.rms(y=y, frame_length=frame_length, hop_length=hop_length)[0]
+        del y
     
     # Avoid log of zero
     rms = np.maximum(rms, 1e-10)
@@ -392,7 +490,7 @@ def _preprocess_audio(path):
             return path, None  # (path, temp_file_to_cleanup)
 
         # Resample to 16kHz
-        _log.info(f"Resampling audio: {sr}Hz → 16000Hz")
+        _log.info(f"Resampling audio: {sr}Hz -> 16000Hz")
         y_16k = librosa.resample(y, orig_sr=sr, target_sr=16000)
 
         # Write to temp file
@@ -449,6 +547,40 @@ def _clear_gpu_memory():
     gc.collect()
 
 
+_STT_TIER_CEILING = {"lite": "small", "balanced": "medium", "max": "large-v3-turbo"}
+
+
+def _eligible_cascade():
+    """
+    Speech model ladder filtered by the adaptive quality governor: a pinned
+    MEDIA_QUALITY_TIER caps the largest model, and models that recently failed
+    for memory reasons are skipped during their cooldown. The smallest tier is
+    always kept so transcription can still run.
+    """
+    try:
+        from model_manager import global_quality_governor
+        ceiling_tier = global_quality_governor.tier_override()
+        ceiling = _STT_TIER_CEILING.get(ceiling_tier)
+        names = [t["name"] for t in _MODEL_CASCADE]
+        start = names.index(ceiling) if ceiling in names else 0
+        eligible = [
+            t for t in _MODEL_CASCADE[start:]
+            if not global_quality_governor.is_paused("speech.transcribe", t["name"])
+        ]
+        return eligible or [_MODEL_CASCADE[-1]]
+    except Exception:
+        return list(_MODEL_CASCADE)
+
+
+def _report_stt_failure(model_name, error):
+    try:
+        from model_manager import global_quality_governor, is_resource_error
+        if is_resource_error(error):
+            global_quality_governor.report_failure("speech.transcribe", model_name, error)
+    except Exception:
+        pass
+
+
 def _load_best_model():
     """
     3-Phase cascading model loader:
@@ -483,7 +615,7 @@ def _load_best_model():
         vfree = gpu["vram_free_gb"]
         _log.info("Phase 1 → GPU")
 
-        for tier in _MODEL_CASCADE:
+        for tier in _eligible_cascade():
             name = tier["name"]
 
             # Pick best compute type: int8_float16 preferred on GPU
@@ -508,6 +640,7 @@ def _load_best_model():
                 }
 
             _log.warning(f"  ✗ {name}: {err}")
+            _report_stt_failure(name, err)
             _clear_gpu_memory()
 
         _log.info("Phase 1 done — no GPU model fit. → CPU")
@@ -517,7 +650,7 @@ def _load_best_model():
     _log.info("Phase 2 → CPU")
     free_ram = _get_free_ram_gb()  # Re-check after GPU cleanup
 
-    for tier in _MODEL_CASCADE:
+    for tier in _eligible_cascade():
         name = tier["name"]
         if free_ram < tier["cpu_ram_min"]:
             _log.info(f"  ✗ {name}: need {tier['cpu_ram_min']:.1f} GB, have {free_ram:.1f} GB")
@@ -535,6 +668,7 @@ def _load_best_model():
             }
 
         _log.warning(f"  ✗ {name}: {err}")
+        _report_stt_failure(name, err)
         gc.collect()
 
     # ── Phase 3: Emergency ────────────────────────────────────────────
@@ -735,21 +869,23 @@ def transcribe_audio(path):
                 segments, full_text = _collect_segments(segments_iter)
 
             except (RuntimeError, MemoryError) as oom_err:
-                err_str = str(oom_err).lower()
-                is_oom = (
-                    "out of memory" in err_str
-                    or "oom" in err_str
-                    or isinstance(oom_err, MemoryError)
-                )
-                if not is_oom:
+                from model_manager import is_resource_error
+                if not is_resource_error(oom_err):
                     raise
 
                 # ── OOM Recovery: drop model, cascade to smaller ─────────
-                _log.warning(f"OOM with {_model_info['model']}: {oom_err}")
+                current_name = (_model_info or {}).get("model", "")
+                _log.warning("Speech model ran out of memory; recovering with a lighter model.")
+                _report_stt_failure(current_name, oom_err)
+
+                # Release every reference to the failed model BEFORE loading a
+                # smaller one, otherwise both stay resident and recovery OOMs too.
+                model = None
+                info_dict = None
                 _whisper_model_cache = None
+                global_model_manager.release_active_instance()
                 _clear_gpu_memory()
 
-                current_name = _model_info["model"]
                 current_idx = next(
                     (i for i, t in enumerate(_MODEL_CASCADE) if t["name"] == current_name),
                     -1
@@ -766,9 +902,12 @@ def transcribe_audio(path):
                             "accuracy": tier["accuracy"], "disk": tier["disk"],
                             "device": "CPU → int8 (OOM recovery)",
                         }
+                        global_model_manager.adopt_active_instance(m, _model_info)
                         _log.info(f"  ✓ Recovered: {tier['name']}")
                         recovered = True
                         break
+                    _report_stt_failure(tier["name"], err)
+                    gc.collect()
 
                 if not recovered:
                     raise RuntimeError("All models exhausted after OOM")
@@ -826,46 +965,113 @@ def transcribe_audio(path):
         gc.collect()
 
 
-def detect_filler_words(path, custom_words=None):
-    """
-    Analyzes audio transcript for filler words ('um', 'uh', 'like', 'you know', 'er', 'ah').
-    Returns a list of region cut intervals with word timestamps.
-    """
-    default_fillers = {"um", "uh", "er", "ah", "like", "you know", "hmm"}
-    target_words = set(custom_words) if custom_words else default_fillers
+# ── Filler words ──────────────────────────────────────────────────────────
+#
+# Limitation (documented, not hidden): automatic transcription is trained to
+# write what the speaker *meant*, so hesitation sounds ("um", "uh") are often
+# left out of the transcript entirely. Only fillers that actually appear in
+# the transcript can be marked; nothing is invented.
 
-    # Use transcribe_audio to get word-level timing
+HESITATION_FILLERS = ("um", "umm", "uh", "uhh", "uhm", "erm", "er", "err", "ah", "ahh",
+                      "eh", "hmm", "hm", "mm", "mmm", "mhm")
+# Opt-in: these are often meaningful words, so they cause false positives.
+DISCOURSE_MARKERS = ("like", "you know", "so", "i mean", "basically", "actually",
+                     "literally", "kind of", "sort of")
+
+_HESITATION_RE = re.compile(r"^(?:u+m+|u+h+m*|e+r+m*|a+h+|e+h+|h+m+|m+h*m+)$")
+_FILLER_STRIP = ".,!?;:\"'()[]{}…-–—"
+
+FILLER_LIMITATION_NOTE = (
+    "Speech recognition tends to tidy up hesitations, so some 'um' and 'uh' sounds "
+    "may be missing from the transcript and cannot be marked. Words such as 'like', "
+    "'so' and 'you know' are only checked when you turn them on, because they are "
+    "usually meaningful."
+)
+
+
+def _normalize_filler_token(text):
+    return (text or "").strip().lower().strip(_FILLER_STRIP).strip()
+
+
+def detect_filler_words(path, custom_words=None, include_discourse_markers=False):
+    """
+    Find filler words in the transcript with word-level timestamps.
+
+    Default: conservative hesitation sounds only (um, uh, erm, ah, hmm …,
+    including elongated spellings such as "ummm"). Discourse markers
+    ("like", "you know", "so", …) are opt-in via ``include_discourse_markers``.
+    ``custom_words`` replaces the default list; multi-word phrases are matched
+    across consecutive words. See ``FILLER_LIMITATION_NOTE`` for what cannot
+    be detected.
+    """
+    if custom_words:
+        targets = {_normalize_filler_token(w) for w in custom_words if _normalize_filler_token(w)}
+        use_patterns = False
+    else:
+        targets = set(HESITATION_FILLERS)
+        use_patterns = True
+        if include_discourse_markers:
+            targets |= set(DISCOURSE_MARKERS)
+    phrases = sorted((tuple(t.split()) for t in targets if " " in t), key=len, reverse=True)
+    singles = {t for t in targets if " " not in t}
+
     res = transcribe_audio(path)
     if not res.get("available"):
-        raise RuntimeError(res.get("error", "Transcription failed"))
+        raise RuntimeError(res.get("error", "Speech could not be transcribed."))
 
-    detected_fillers = []
-    segments = res.get("segments", [])
-    for seg in segments:
-        words = seg.get("words", [])
-        for w in words:
-            clean_w = w.get("word", "").strip().lower().strip(".,!?")
-            if clean_w in target_words:
-                start_t = round(w.get("start", 0.0), 3)
-                end_t = round(w.get("end", 0.0), 3)
-                detected_fillers.append({
-                    "word": w.get("word", "").strip(),
-                    "start": start_t,
-                    "end": end_t,
-                    "duration": round(end_t - start_t, 3),
-                    "confidence": w.get("confidence", 1.0)
-                })
+    words = []
+    for seg in res.get("segments", []):
+        for w in seg.get("words", []) or []:
+            token = _normalize_filler_token(w.get("word", ""))
+            if token:
+                words.append((token, w))
+
+    detected = []
+    i = 0
+    while i < len(words):
+        matched = 0
+        for phrase in phrases:
+            k = len(phrase)
+            if tuple(tok for tok, _ in words[i:i + k]) == phrase:
+                matched = k
+                break
+        if not matched:
+            token = words[i][0]
+            if token in singles or (use_patterns and _HESITATION_RE.match(token)):
+                matched = 1
+        if matched:
+            first = words[i][0]
+            is_hesitation = matched == 1 and (first in HESITATION_FILLERS or _HESITATION_RE.match(first))
+            span = [w for _, w in words[i:i + matched]]
+            start_t = round(float(span[0].get("start", 0.0)), 3)
+            end_t = round(float(span[-1].get("end", 0.0)), 3)
+            detected.append({
+                "word": " ".join(w.get("word", "").strip() for w in span),
+                "start": start_t,
+                "end": end_t,
+                "duration": round(end_t - start_t, 3),
+                "confidence": round(min(float(w.get("confidence", 1.0)) for w in span), 3),
+                "kind": "hesitation" if is_hesitation else ("custom" if custom_words else "discourse_marker"),
+            })
+            i += matched
+        else:
+            i += 1
 
     return {
-        "total_fillers": len(detected_fillers),
-        "fillers": detected_fillers
+        "total_fillers": len(detected),
+        "fillers": detected,
+        "words_checked": len(words),
+        "discourse_markers_checked": bool(include_discourse_markers or custom_words),
+        "note": FILLER_LIMITATION_NOTE,
     }
 
 
 def enhance_speech_studio(input_path, output_path):
     """
-    Applies AI speech enhancement and de-reverb (DeepFilterNet).
-    Falls back to high-grade spectral noise reduction if DeepFilterNet is not present.
+    Speech enhancement and de-reverb with the neural voice-isolation model.
+    When that capability is unavailable, falls back to spectral noise
+    reduction and says so in the result (``fallback: True`` plus a note);
+    if the fallback also fails, the error is raised.
     """
     from model_manager import global_model_manager
     try:
@@ -873,7 +1079,7 @@ def enhance_speech_studio(input_path, output_path):
 
         def _load_df():
             model, df_state, _ = init_df()
-            return (model, df_state), {"engine": "deepfilternet"}
+            return (model, df_state), {"engine": "neural_voice_isolation"}
 
         def _unload_df(instance):
             del instance
@@ -882,180 +1088,329 @@ def enhance_speech_studio(input_path, output_path):
             audio, _ = load_audio(input_path, sr=df_state.sr())
             enhanced = enhance(model, df_state, audio)
             save_audio(output_path, enhanced, sr=df_state.sr())
-            return {"engine": "deepfilternet", "status": "success"}
+            return {"engine": "neural_voice_isolation", "status": "success", "fallback": False}
 
     except ImportError:
-        # Fallback to enhanced spectral noise reduction via noisereduce
         reduce_noise(input_path, output_path)
-        return {"engine": "noisereduce_fallback", "status": "success"}
-    except Exception as e:
-        # If any runtime error occurs, attempt fallback noise reduction
+        return {
+            "engine": "spectral_noise_reduction", "status": "success", "fallback": True,
+            "note": "Advanced voice isolation is not installed, so spectral noise reduction was applied instead.",
+        }
+    except Exception:
+        _log.warning("Voice isolation could not run on this file; using spectral noise reduction instead.")
         reduce_noise(input_path, output_path)
-        return {"engine": "noisereduce_fallback", "status": "success", "note": str(e)}
+        return {
+            "engine": "spectral_noise_reduction", "status": "success", "fallback": True,
+            "note": "Advanced voice isolation could not process this file, so spectral noise reduction was applied instead.",
+        }
 
 
-def separate_stems(input_path, output_dir, stems_mode="2"):
+def separate_stems(input_path, output_dir, stems_mode="2", quality="auto", fmt="wav"):
     """
-    Splits audio into Vocals and Instrumental stems (or 4 stems) using Demucs.
-    stems_mode: '2' (Vocals & Instrumental) or '4' (Vocals, Drums, Bass, Other)
+    Split audio into vocals + instrumental ('2') or vocals / drums / bass /
+    other ('4'). Delegates to ``separation_processor`` (tiered: studio model
+    when installed locally, DSP baseline otherwise) and keeps the legacy
+    layout: ``<output_dir>/<stem>.wav`` with the instrumental as ``no_vocals``.
+    Unusable input raises ValueError; other failures raise RuntimeError.
     """
-    from model_manager import global_model_manager
-    import subprocess
-    os.makedirs(output_dir, exist_ok=True)
-
+    import separation_processor
+    mode = "4stem" if str(stems_mode).strip() == "4" else "vocals"
     try:
-        def _load_demucs():
-            return "demucs_cli", {"engine": "demucs_htdemucs"}
-
-        def _unload_demucs(instance):
-            gc.collect()
-
-        with global_model_manager.session("demucs_stem_separator", _load_demucs, _unload_demucs):
-            cmd = [
-                sys.executable, "-m", "demucs.separate",
-                "-n", "htdemucs",
-                "-o", output_dir,
-                input_path
-            ]
-            if stems_mode == "2":
-                cmd.insert(4, "--two-stems")
-                cmd.insert(5, "vocals")
-
-            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
-            if proc.returncode != 0:
-                raise RuntimeError(f"Demucs separation error: {proc.stderr[-500:]}")
-
-            track_name = os.path.splitext(os.path.basename(input_path))[0]
-            separated_folder = os.path.join(output_dir, "htdemucs", track_name)
-
-            results = {"status": "success", "mode": stems_mode}
-            stems = ["vocals", "no_vocals", "drums", "bass", "other"]
-            for stem in stems:
-                src = os.path.join(separated_folder, f"{stem}.wav")
-                dst = os.path.join(output_dir, f"{stem}.wav")
-                if os.path.exists(src):
-                    shutil.move(src, dst)
-                    results[stem] = f"/processed/{os.path.basename(output_dir)}/{stem}.wav"
-
-            return results
-
-    except Exception as e:
-        raise RuntimeError(f"Stem separation failed: {str(e)}")
-
-
-def trim_silence_gaps(input_path, output_path, min_silence_len=1.0, silence_thresh=-40):
-    """
-    Auto-detects and trims silence gaps longer than `min_silence_len` seconds.
-    Uses FFmpeg silencedetect and filter complex to extract non-silent audio segments.
-    """
-    import subprocess
-    import re
-
-    cmd = [
-        "ffmpeg", "-y", "-i", input_path,
-        "-af", f"silencedetect=noise={silence_thresh}dB:d={min_silence_len}",
-        "-f", "null", "-"
-    ]
-    proc = subprocess.run(cmd, capture_output=True, text=True)
-    stderr = proc.stderr
-
-    starts = [float(x) for x in re.findall(r"silence_start: ([\d\.]+)", stderr)]
-    ends = [float(x) for x in re.findall(r"silence_end: ([\d\.]+)", stderr)]
-
-    if not starts or len(starts) != len(ends):
-        shutil.copyfile(input_path, output_path)
-        return {"status": "success", "silences_removed": 0}
-
-    dur_cmd = ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", input_path]
-    dur_res = subprocess.run(dur_cmd, capture_output=True, text=True)
-    try:
-        total_dur = float(dur_res.stdout.strip() or "0")
+        report = separation_processor.separate(input_path, output_dir, mode=mode, quality=quality, fmt=fmt)
     except ValueError:
-        total_dur = 0.0
+        raise
+    except Exception as e:
+        _log.warning("Stem separation failed (%s).", type(e).__name__)
+        raise RuntimeError("Stem separation failed.") from e
 
-    non_silent = []
-    curr = 0.0
-    for s, e in zip(starts, ends):
-        if s - curr >= 0.1:
-            non_silent.append((curr, s))
-        curr = e
-    if total_dur > 0 and total_dur - curr >= 0.1:
-        non_silent.append((curr, total_dur))
-
-    if not non_silent:
-        shutil.copyfile(input_path, output_path)
-        return {"status": "success", "silences_removed": 0}
-
-    filter_parts = []
-    concat_parts = []
-    for idx, (seg_start, seg_end) in enumerate(non_silent):
-        filter_parts.append(f"[0:a]atrim=start={seg_start}:end={seg_end},asetpts=PTS-STARTPTS[a{idx}];")
-        concat_parts.append(f"[a{idx}]")
-
-    fc = "".join(filter_parts) + "".join(concat_parts) + f"concat=n={len(non_silent)}:v=0:a=1[outa]"
-
-    trim_cmd = [
-        "ffmpeg", "-y", "-i", input_path,
-        "-filter_complex", fc,
-        "-map", "[outa]",
-        output_path
-    ]
-    tproc = subprocess.run(trim_cmd, capture_output=True, text=True)
-    if tproc.returncode != 0:
-        shutil.copyfile(input_path, output_path)
-
-    return {"status": "success", "silences_removed": len(starts)}
+    folder = os.path.basename(os.path.normpath(output_dir))
+    results = {
+        "status": "success",
+        "mode": stems_mode,
+        "quality": report["quality"]["label"],
+        "quality_note": report["quality_note"],
+        "warnings": report["warnings"],
+    }
+    for stem, path in report["stems"].items():
+        legacy = "no_vocals" if stem == "instrumental" else stem
+        ext = os.path.splitext(path)[1]
+        target = os.path.join(output_dir, f"{legacy}{ext}")
+        if os.path.abspath(path) != os.path.abspath(target):
+            shutil.move(path, target)
+        results[legacy] = f"/processed/{folder}/{legacy}{ext}"
+    return results
 
 
-def auto_duck_music(speech_path, music_path, output_path, duck_db=-12.0):
+def _snap_to_zero_crossing(mono, pos, radius):
+    """Move a cut point to the quietest sample (nearest zero crossing) nearby."""
+    lo = max(0, pos - radius)
+    hi = min(len(mono), pos + radius + 1)
+    if hi - lo < 2:
+        return pos
+    window = np.abs(mono[lo:hi])
+    return int(lo + np.argmin(window))
+
+
+def trim_silence_gaps(input_path, output_path, min_silence_len=1.0, silence_thresh=-40,
+                      keep_silence=0.15, crossfade_ms=20.0):
     """
-    AI Auto-Ducking: Automatically lowers background music volume by `duck_db` dB
-    whenever speech is detected in the speech audio track.
+    Shorten pauses longer than ``min_silence_len`` seconds.
+
+    Silence = 10 ms frames whose RMS is below ``silence_thresh`` dBFS. Each
+    long pause is cut down to ``keep_silence`` seconds of natural room tone
+    (breathing room), cut points are snapped to zero crossings, and the joins
+    are equal-power crossfaded over ``crossfade_ms`` (10–30 ms) so there are
+    no clicks. Leading/trailing pauses get a short fade instead.
+
+    Raises ValueError when the input cannot be read or the settings are
+    invalid; it never hands back an untouched copy as a "trimmed" result.
     """
-    import subprocess
-    cmd = [
-        "ffmpeg", "-y",
-        "-i", music_path,
-        "-i", speech_path,
-        "-filter_complex",
-        f"[0:a][1:a]sidechaincompress=threshold=0.05:ratio=4:attack=50:release=300:level_in=1[ducked];[ducked][1:a]amix=inputs=2:duration=first[outa]",
-        "-map", "[outa]",
-        output_path
-    ]
-    proc = subprocess.run(cmd, capture_output=True, text=True)
-    if proc.returncode != 0:
-        raise RuntimeError(f"Auto-ducking failed: {proc.stderr[-400:]}")
-    return {"status": "success", "engine": "ffmpeg_sidechain_ducking"}
+    import audio_processor as ap
+
+    try:
+        min_silence_len = float(min_silence_len)
+        silence_thresh = float(silence_thresh)
+        keep_silence = float(keep_silence)
+        crossfade_ms = float(crossfade_ms)
+    except (TypeError, ValueError):
+        raise ValueError("Silence trimming settings must be numbers.")
+    if not (0.1 <= min_silence_len <= 60.0):
+        raise ValueError("Choose a minimum pause length between 0.1 and 60 seconds.")
+    if not (-90.0 <= silence_thresh <= -10.0):
+        raise ValueError("Choose a silence threshold between -90 and -10 dB.")
+    keep_silence = min(max(keep_silence, 0.0), min_silence_len)
+    crossfade_ms = min(max(crossfade_ms, 10.0), 30.0)
+
+    y, sr = ap.load_audio_array(input_path)
+    n = y.shape[1]
+    frame = max(1, int(round(sr * 0.01)))
+    n_frames = n // frame
+    if n_frames == 0:
+        raise ValueError("This audio is too short to trim.")
+
+    power = np.mean(np.asarray(y[:, :n_frames * frame], dtype=np.float64) ** 2, axis=0)
+    frame_db = 10.0 * np.log10(power.reshape(n_frames, frame).mean(axis=1) + 1e-12)
+    silent = frame_db < silence_thresh
+
+    # Runs of silent frames → candidate pauses (in samples).
+    padded = np.concatenate([[False], silent, [False]])
+    edges = np.flatnonzero(np.diff(padded.astype(np.int8)))
+    runs = list(zip(edges[0::2], edges[1::2]))
+    min_frames = int(round(min_silence_len / 0.01))
+    half_keep = int(round(keep_silence * sr / 2.0))
+    xf = max(2, int(round(crossfade_ms * 1e-3 * sr)))
+    snap = max(1, int(round(0.005 * sr)))
+    mono = np.asarray(y.mean(axis=0), dtype=np.float64)
+
+    cuts = []  # (cut_start, cut_end) sample ranges to remove
+    for a_f, b_f in runs:
+        if b_f - a_f < min_frames:
+            continue
+        a = a_f * frame
+        b = n if b_f >= n_frames else b_f * frame
+        leading, trailing = a == 0, b >= n
+        if leading and trailing:
+            raise ValueError("This audio is entirely silent, so there is nothing to keep.")
+        cut_start = 0 if leading else a + half_keep
+        cut_end = n if trailing else b - half_keep
+        if not leading:
+            cut_start = _snap_to_zero_crossing(mono, cut_start, snap)
+        if not trailing:
+            cut_end = _snap_to_zero_crossing(mono, cut_end, snap)
+        if cut_end - cut_start > 2 * xf:
+            cuts.append((cut_start, cut_end))
+
+    if not cuts:
+        ap.write_audio_array(output_path, y, sr)
+        return {"status": "success", "silences_removed": 0, "removed_seconds": 0.0,
+                "input_duration": round(n / sr, 3), "output_duration": round(n / sr, 3),
+                "message": f"No pauses longer than {min_silence_len:g} s were found."}
+
+    # Kept regions between cuts; interior joins overlap by `xf` samples.
+    keeps = []
+    pos = 0
+    for cs, ce in cuts:
+        if cs > pos:
+            keeps.append([pos, cs])
+        pos = ce
+    if pos < n:
+        keeps.append([pos, n])
+    for k in range(len(keeps) - 1):  # extend each side of an interior join by xf/2
+        keeps[k][1] = min(n, keeps[k][1] + xf // 2)
+        keeps[k + 1][0] = max(0, keeps[k + 1][0] - (xf - xf // 2))
+
+    fade_in = np.sin(0.5 * np.pi * (np.arange(xf) + 0.5) / xf)  # equal-power
+    fade_out = np.cos(0.5 * np.pi * (np.arange(xf) + 0.5) / xf)
+    pieces = []
+    tail = None
+    for idx, (s, e) in enumerate(keeps):
+        seg = np.asarray(y[:, s:e], dtype=np.float64).copy()
+        if idx == 0 and cuts[0][0] == 0 and seg.shape[1] >= xf:
+            seg[:, :xf] *= fade_in          # file now starts mid room-tone
+        if idx == len(keeps) - 1 and cuts[-1][1] == n and seg.shape[1] >= xf:
+            seg[:, -xf:] *= fade_out        # file now ends mid room-tone
+        if tail is not None and seg.shape[1] >= xf:
+            seg[:, :xf] = tail * fade_out + seg[:, :xf] * fade_in
+        elif tail is not None:
+            pieces.append(tail)
+        if idx < len(keeps) - 1 and seg.shape[1] >= 2 * xf:
+            pieces.append(seg[:, :-xf])
+            tail = seg[:, -xf:]
+        else:
+            pieces.append(seg)
+            tail = None
+    if tail is not None:
+        pieces.append(tail)
+    out = np.concatenate(pieces, axis=1)
+
+    ap.write_audio_array(output_path, out, sr)
+    removed = (n - out.shape[1]) / sr
+    return {"status": "success", "silences_removed": len(cuts),
+            "removed_seconds": round(removed, 3),
+            "input_duration": round(n / sr, 3),
+            "output_duration": round(out.shape[1] / sr, 3)}
+
+
+def _match_channels(y, channels):
+    if y.shape[0] == channels:
+        return y
+    mono = y.mean(axis=0, keepdims=True)
+    return np.repeat(mono, channels, axis=0)
+
+
+def auto_duck_music(speech_path, music_path, output_path, duck_db=None,
+                    bed_lu_below_voice=18.0, attack_ms=80.0, release_ms=500.0,
+                    hold_ms=250.0, true_peak_ceiling=-1.0):
+    """
+    Sidechain-style auto-ducking: mixes voice + music so the voice keeps its
+    level and only the music is turned down while someone is speaking.
+
+    * Gain staging: the voice is summed at unity gain (no automatic halving of
+      every input), so speech loudness is preserved.
+    * Depth: during speech the music bed sits ``bed_lu_below_voice`` LU (15–20
+      recommended) under the voice's integrated loudness. A numeric
+      ``duck_db`` forces a fixed attenuation instead.
+    * Envelope: look-ahead attack (``attack_ms``), ``hold_ms`` hold across
+      short pauses, slew-limited ``release_ms`` recovery — no pumping/clicks.
+    * Safety: a true-peak limiter keeps the mix under ``true_peak_ceiling``.
+    Raises ValueError when either input is unreadable or has no content.
+    """
+    import audio_processor as ap
+    from scipy.signal import resample_poly
+
+    bed_lu_below_voice = float(bed_lu_below_voice)
+    if not (6.0 <= bed_lu_below_voice <= 30.0):
+        raise ValueError("Choose a music bed level between 6 and 30 LU below the voice.")
+
+    speech, sr = ap.load_audio_array(speech_path)
+    music, sr_m = ap.load_audio_array(music_path)
+    if sr_m != sr:
+        g = math.gcd(int(sr), int(sr_m))
+        music = resample_poly(music, sr // g, sr_m // g, axis=-1).astype(np.float32)
+
+    channels = max(speech.shape[0], music.shape[0])
+    speech = _match_channels(speech, channels).astype(np.float64)
+    music = _match_channels(music, channels).astype(np.float64)
+    n = max(speech.shape[1], music.shape[1])
+    speech = np.pad(speech, ((0, 0), (0, n - speech.shape[1])))
+    music = np.pad(music, ((0, 0), (0, n - music.shape[1])))
+
+    voice_lufs = ap.measure_loudness_array(speech, sr, include_true_peak=False)["integrated_lufs"]
+    music_lufs = ap.measure_loudness_array(music, sr, include_true_peak=False)["integrated_lufs"]
+    if voice_lufs <= ap.LOUDNESS_FLOOR_LUFS:
+        raise ValueError("No speech was found in the voice track, so there is nothing to duck under.")
+    if music_lufs <= ap.LOUDNESS_FLOOR_LUFS:
+        raise ValueError("The music track is silent.")
+
+    if duck_db is not None:
+        duck_gain_db = -abs(float(duck_db))
+    else:
+        duck_gain_db = min(0.0, (voice_lufs - bed_lu_below_voice) - music_lufs)
+
+    # Speech activity from 50 ms RMS evaluated every 10 ms.
+    hop = max(1, int(round(sr * 0.01)))
+    win = 5
+    n_frames = int(math.ceil(n / hop))
+    p = np.mean(speech ** 2, axis=0)
+    p = np.pad(p, (0, n_frames * hop - n))
+    frame_pow = p.reshape(n_frames, hop).mean(axis=1)
+    smooth_pow = np.convolve(frame_pow, np.ones(win) / win, mode="same")
+    level_db = 10.0 * np.log10(smooth_pow + 1e-12)
+    active = level_db > max(voice_lufs - 20.0, -60.0)
+
+    # Hold across short gaps, and look ahead so the duck lands before the word.
+    hold = int(round(hold_ms / 10.0))
+    look = int(round(attack_ms / 10.0))
+    if active.any():
+        idx = np.flatnonzero(active)
+        dilated = np.zeros(n_frames + hold + look + 1, dtype=bool)
+        for shift in range(-look, hold + 1):
+            pos = idx + shift
+            pos = pos[(pos >= 0) & (pos < n_frames)]
+            dilated[pos] = True
+        active = dilated[:n_frames]
+
+    # Slew-limited gain (dB per 10 ms frame): attack/release ramps, no steps.
+    depth = max(abs(duck_gain_db), 1.0)
+    down_step = depth / max(1.0, attack_ms / 10.0)
+    up_step = depth / max(1.0, release_ms / 10.0)
+    target = np.where(active, duck_gain_db, 0.0)
+    gain_db = np.empty(n_frames)
+    g = float(target[0])
+    for i in range(n_frames):
+        t = target[i]
+        if t < g:
+            g = max(t, g - down_step)
+        elif t > g:
+            g = min(t, g + up_step)
+        gain_db[i] = g
+    centers = (np.arange(n_frames) + 0.5) * hop
+    gain = 10.0 ** (np.interp(np.arange(n), centers, gain_db) / 20.0)
+
+    mix = speech + music * gain[np.newaxis, :]
+    mix, limited_db = ap.true_peak_limit(mix, sr, true_peak_ceiling)
+    ap.write_audio_array(output_path, mix, sr)
+
+    return {
+        "status": "success",
+        "voice_lufs": round(float(voice_lufs), 2),
+        "music_lufs": round(float(music_lufs), 2),
+        "duck_gain_db": round(float(duck_gain_db), 2),
+        "bed_lu_below_voice": round(float(voice_lufs - (music_lufs + duck_gain_db)), 2),
+        "speech_coverage": round(float(active.mean()), 3),
+        "limiter_reduction_db": round(float(limited_db), 2),
+    }
 
 
 def pitch_preserved_speed(input_path, output_path, speed=1.25):
     """
-    Pitch-Preserved Audio Speed Changer (0.5x to 2.0x):
+    Pitch-Preserved Audio Speed Changer (0.25x to 4.0x):
     Changes playback speed without altering vocal pitch (WSOLA time-stretching).
     """
-    import subprocess
-    speed = max(0.5, min(2.0, float(speed)))
+    import math
+    import video_processor
+    speed = float(speed)
+    if not math.isfinite(speed) or not 0.25 <= speed <= 4:
+        raise ValueError('Choose a playback speed between 0.25x and 4x.')
     cmd = [
-        "ffmpeg", "-y", "-i", input_path,
-        "-filter:a", f"atempo={speed}",
+        video_processor.FFMPEG, "-y", "-i", input_path, '-vn',
+        "-filter:a", ','.join(video_processor._atempo_chain(speed)),
         output_path
     ]
-    proc = subprocess.run(cmd, capture_output=True, text=True)
-    if proc.returncode != 0:
-        raise RuntimeError(f"Pitch-preserved speed adjustment failed: {proc.stderr[-400:]}")
-    return {"status": "success", "speed": speed, "engine": "ffmpeg_atempo"}
+    video_processor._run(cmd, timeout=1200)
+    return {"status": "success", "speed": speed}
 
 
 def generate_youtube_chapters(media_path):
     """
-    AI Auto-Chapter Marker Generator for YouTube:
-    Analyzes speech transcripts via Whisper and groups topics into timestamped YouTube chapter markers.
+    Auto-Chapter Marker Generator for YouTube:
+    Analyzes speech transcripts and groups topics into timestamped YouTube chapter markers.
     """
-    from ai_processor import transcribe_audio
-
     result = transcribe_audio(media_path)
-    if not result.get("available") or not result.get("segments"):
-        return {"status": "success", "chapters": ["00:00 Intro"]}
+    if not result.get("available"):
+        raise ValueError("The speech could not be transcribed, so chapters could not be generated.")
+    if not result.get("segments"):
+        raise ValueError("No speech was found, so there is nothing to build chapters from.")
 
     segments = result["segments"]
     chapters = [{"time": "00:00", "title": "Intro"}]

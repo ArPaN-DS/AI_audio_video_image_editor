@@ -37,7 +37,7 @@
     //  LOAD
     // ═══════════════════════════════════════
     function loadImageFile(file) {
-        if (!file || !file.type.startsWith('image/')) { toast('Please choose an image file.', 'warning'); return; }
+        if (!file || !file.type.startsWith('image/')) { toast('That file isn’t an image. Choose a JPG, PNG, WEBP, GIF or BMP file.', 'warning'); return; }
         const img = new Image();
         const url = URL.createObjectURL(file);
         img.onload = () => {
@@ -48,11 +48,12 @@
             ieEditor.classList.remove('hidden');
             const pl = document.getElementById('ieCanvasPlaceholder');
             if (pl) pl.style.display = 'none';
+            setHasImage(true);
             resetAll(false);
             renderCanvas();
             toast('Image loaded', 'success');
         };
-        img.onerror = () => { URL.revokeObjectURL(url); toast('Could not load that image.', 'error'); };
+        img.onerror = () => { URL.revokeObjectURL(url); toast('Couldn’t open that image. The file may be damaged or in an unsupported format.', 'error'); };
         img.src = url;
     }
 
@@ -61,6 +62,31 @@
         base.width = img.naturalWidth;
         base.height = img.naturalHeight;
         base.getContext('2d').drawImage(img, 0, 0);
+    }
+
+    // Enable the editing UI only once there is something to edit.
+    function setHasImage(has) {
+        const stageEl = $('ieStage');
+        if (stageEl) stageEl.classList.toggle('has-image', has);
+        document.body.classList.toggle('ie-has-image', has);
+        document.querySelectorAll('#iePanel .ie-section, #ieToolbar').forEach(el => { el.inert = !has; });
+        if ($('ieResetBtn')) $('ieResetBtn').disabled = !has;
+    }
+
+    // Small preview of the current photo, shown under each filter preset.
+    let thumbSource = null;
+    function refreshFilterThumbs() {
+        const grid = $('ieFilterGrid');
+        if (!grid || !base || !base.width || !base.height) return;
+        try {
+            const t = document.createElement('canvas');
+            t.width = 120; t.height = 90;
+            const tc = t.getContext('2d');
+            const r = Math.max(t.width / base.width, t.height / base.height);
+            const w = base.width * r, h = base.height * r;
+            tc.drawImage(base, (t.width - w) / 2, (t.height - h) / 2, w, h);
+            grid.style.setProperty('--ie-thumb', `url("${t.toDataURL('image/jpeg', 0.72)}")`);
+        } catch (e) { /* zero-size or tainted canvas: keep the neutral swatch */ }
     }
 
     function cloneCanvas(src) {
@@ -98,6 +124,7 @@
         if (!base) return;
         canvas.width = base.width;
         canvas.height = base.height;
+        if (base !== thumbSource) { thumbSource = base; refreshFilterThumbs(); }
 
         // 1) photo + adjustments/filters
         ctx.filter = buildFilter();
@@ -193,7 +220,7 @@
         // selection outline
         if (selectedText === t.id) {
             ctx.save();
-            ctx.strokeStyle = '#2563EB';
+            ctx.strokeStyle = '#4F46E5';
             ctx.setLineDash([6, 4]);
             ctx.lineWidth = Math.max(2, canvas.width / 400);
             const b = t._bounds, pad = 8;
@@ -275,6 +302,7 @@
     //  TRANSFORMS (destructive → bake into base)
     // ═══════════════════════════════════════
     function rotate(deg) {
+        if (!base) return;
         snapshot();
         const c = document.createElement('canvas');
         const swap = Math.abs(deg) === 90;
@@ -289,6 +317,7 @@
         renderCanvas();
     }
     function flip(horizontal) {
+        if (!base) return;
         snapshot();
         const c = document.createElement('canvas');
         c.width = base.width; c.height = base.height;
@@ -321,6 +350,7 @@
     //  CROP
     // ═══════════════════════════════════════
     function startCropTool() {
+        if (!base) return;
         cropBox = { x: base.width * 0.1, y: base.height * 0.1, w: base.width * 0.8, h: base.height * 0.8 };
         renderCropOverlay();
     }
@@ -554,13 +584,13 @@
         const mime = fmt === 'jpeg' ? 'image/jpeg' : fmt === 'webp' ? 'image/webp' : 'image/png';
         canvas.toBlob((blob) => {
             selectedText = sel; renderCanvas();
-            if (!blob) { toast('Export failed', 'error'); return; }
+            if (!blob) { toast('Couldn’t create the file. Try PNG, or a smaller image.', 'error'); return; }
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url; a.download = 'edited.' + (fmt === 'jpeg' ? 'jpg' : fmt);
             document.body.appendChild(a); a.click(); a.remove();
             setTimeout(() => URL.revokeObjectURL(url), 4000);
-            toast('Downloaded', 'success');
+            toast('Image downloaded', 'success');
         }, mime, mime === 'image/png' ? undefined : q);
     }
 
@@ -581,17 +611,18 @@
     async function enhance() {
         if (!base) return;
         const scale = +document.querySelector('#ieUpscaleAmount .ve-chip.active').dataset.scale;
-        const model = document.querySelector('#ieUpscaleModel .ve-chip.active').dataset.model;
+        const activeUpscaleChip = document.querySelector('#ieUpscaleModel .ve-chip.active');
+        const model = activeUpscaleChip ? activeUpscaleChip.dataset.model : 'auto';
         const btn = $('ieEnhanceBtn');
         btn.disabled = true;
 
         if (window.ProcessingOverlay) {
             window.ProcessingOverlay.show({
-                title: 'AI Super-Resolution Engine',
-                stageText: model === 'best' ? 'AI is reconstructing sharp pixel details & edges (EDSR)...' : 'AI is upscaling image resolution (FSRCNN)...',
+                title: 'Upscaling image',
+                stageText: model === 'best' ? 'Rebuilding fine detail and sharp edges…' : 'Increasing resolution…',
                 category: 'image'
             });
-            window.ProcessingOverlay.updateProgress(30, 'Analyzing image structures...');
+            window.ProcessingOverlay.updateProgress(30, 'Analyzing the image…');
         }
 
         try {
@@ -605,17 +636,17 @@
             fd.append('model', model);
 
             if (window.ProcessingOverlay) {
-                window.ProcessingOverlay.updateProgress(65, 'Enhancing textures & refining high-resolution output...');
+                window.ProcessingOverlay.updateProgress(65, 'Refining textures and edges…');
             }
 
             const res = await fetch('/image/enhance', { method: 'POST', body: fd });
             if (!res.ok) {
                 URL.revokeObjectURL(beforeURL);
-                const e = await res.json().catch(() => ({})); toast(e.error || 'Enhance failed', 'error'); return;
+                const e = await res.json().catch(() => ({})); toast(e.error || 'Upscaling failed. Try 2× or the Fast quality setting.', 'error'); return;
             }
 
             if (window.ProcessingOverlay) {
-                window.ProcessingOverlay.updateProgress(95, 'Preparing before/after comparison...');
+                window.ProcessingOverlay.updateProgress(95, 'Preparing the comparison…');
             }
 
             const engine = res.headers.get('X-Enhance-Engine') || '';
@@ -627,10 +658,10 @@
                 pending = { afterImg, beforeURL, afterURL, scale, engine, downgraded, beforeSize };
                 openCompare(beforeURL, afterURL, { beforeSize, afterSize: { w: afterImg.naturalWidth, h: afterImg.naturalHeight }, engine, downgraded });
             };
-            afterImg.onerror = () => { URL.revokeObjectURL(beforeURL); URL.revokeObjectURL(afterURL); toast('Could not load enhanced image', 'error'); };
+            afterImg.onerror = () => { URL.revokeObjectURL(beforeURL); URL.revokeObjectURL(afterURL); toast('The upscaled image couldn’t be displayed. Try again.', 'error'); };
             afterImg.src = afterURL;
         } catch (e) {
-            toast('Enhance failed: ' + e.message, 'error');
+            toast('Upscaling failed: ' + e.message + '. Try again.', 'error');
         } finally {
             if (window.ProcessingOverlay) {
                 window.ProcessingOverlay.hide();
@@ -641,20 +672,29 @@
 
     // ─── BEFORE / AFTER COMPARE ───
     let compareMeta = null;
+    let compareReturnFocus = null;
+    let dividerPct = 50;
+
+    function enhanceTierLabel(tier) {
+        if (tier === 'best') return 'Best quality';
+        if (tier === 'fast') return 'Fast';
+        return 'Standard';
+    }
 
     function openCompare(beforeURL, afterURL, meta) {
         compareMeta = meta;
         $('ieCompareBefore').src = beforeURL;
         $('ieCompareAfter').src = afterURL;
 
-        const eng = meta.engine === 'edsr' ? 'Best · EDSR' : meta.engine === 'fsrcnn' ? 'Fast · FSRCNN' : 'Lanczos';
+        const eng = enhanceTierLabel(meta.engine);
         $('ieCompareInfo').textContent =
             `${meta.beforeSize.w}×${meta.beforeSize.h}  →  ${meta.afterSize.w}×${meta.afterSize.h}  ·  ${eng}` +
-            (meta.downgraded ? '  (auto-switched to Fast for size)' : '');
+            (meta.downgraded ? '  ·  switched to Fast for this image size' : '');
 
         // Show FIRST so the stage has real dimensions, then size the frame.
+        compareReturnFocus = document.activeElement;
         $('ieCompareOverlay').classList.remove('hidden');
-        requestAnimationFrame(() => { fitCompareFrame(); setDivider(50); });
+        requestAnimationFrame(() => { fitCompareFrame(); setDivider(50); $('ieCompareFrame').focus(); });
     }
 
     function fitCompareFrame() {
@@ -672,6 +712,8 @@
 
     function setDivider(pct) {
         pct = clamp(pct, 0, 100);
+        dividerPct = pct;
+        $('ieCompareFrame').setAttribute('aria-valuenow', String(Math.round(pct)));
         $('ieCompareDivider').style.left = pct + '%';
         // BEFORE image shows from left edge up to the divider
         $('ieCompareBefore').style.clipPath = `inset(0 ${100 - pct}% 0 0)`;
@@ -685,7 +727,7 @@
         setBaseFromImage(pending.afterImg);
         texts = []; strokes = []; selectedText = null;  // baked into pixels now
         renderCanvas();
-        const eng = pending.engine === 'edsr' ? 'Best (EDSR)' : pending.engine === 'fsrcnn' ? 'Fast (FSRCNN)' : 'Lanczos';
+        const eng = enhanceTierLabel(pending.engine);
         toast(`Upscaled ${pending.scale}× · ${eng}`, 'success');
         closeCompare();
     }
@@ -694,6 +736,8 @@
         $('ieCompareOverlay').classList.add('hidden');
         if (pending) { URL.revokeObjectURL(pending.beforeURL); URL.revokeObjectURL(pending.afterURL); }
         pending = null;
+        if (compareReturnFocus && document.contains(compareReturnFocus)) compareReturnFocus.focus();
+        compareReturnFocus = null;
     }
 
     function initCompare() {
@@ -716,26 +760,34 @@
         }
         frame.addEventListener('mousedown', down);
         frame.addEventListener('touchstart', down, { passive: false });
+        frame.addEventListener('keydown', e => {
+            const step = e.shiftKey ? 10 : 2;
+            if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') { e.preventDefault(); setDivider(dividerPct - step); }
+            else if (e.key === 'ArrowRight' || e.key === 'ArrowUp') { e.preventDefault(); setDivider(dividerPct + step); }
+            else if (e.key === 'Home') { e.preventDefault(); setDivider(0); }
+            else if (e.key === 'End') { e.preventDefault(); setDivider(100); }
+        });
         window.addEventListener('resize', () => { if (!$('ieCompareOverlay').classList.contains('hidden')) fitCompareFrame(); });
         $('ieCompareKeep').onclick = keepEnhanced;
-        $('ieCompareDiscard').onclick = () => { toast('Kept your original', 'info'); closeCompare(); };
+        $('ieCompareDiscard').onclick = () => { toast('Result discarded. Your original is unchanged.', 'info'); closeCompare(); };
         $('ieCompareClose').onclick = closeCompare;
     }
 
     async function removeBg() {
-        if (!base) { toast('Please load an image first.', 'warning'); return; }
+        if (!base) { toast('Open an image first.', 'warning'); return; }
 
         const activeModelBtn = document.querySelector('#ieRemoveBgModel .ve-chip.active');
-        const modelName = activeModelBtn ? activeModelBtn.dataset.model : 'isnet-general-use';
+        const modelName = activeModelBtn ? activeModelBtn.dataset.model : 'ultra-hd';
         const alphaMatting = $('ieAlphaMattingBtn') ? $('ieAlphaMattingBtn').classList.contains('active') : true;
 
         if (window.ProcessingOverlay) {
             window.ProcessingOverlay.show({
-                title: 'AI Background Removal',
-                message: `Refining edges & isolating background (${modelName})...`
+                title: 'Removing background',
+                stageText: 'Finding the subject and refining its edges…',
+                category: 'image'
             });
         } else {
-            showLoading('Removing background...');
+            showLoading('Removing background…');
         }
 
         try {
@@ -754,7 +806,7 @@
 
             const res = await fetch('/image/remove-bg', { method: 'POST', body: fd });
             if (!res.ok) {
-                const e = await res.json().catch(() => ({})); toast(e.error || 'Background removal failed', 'error'); return;
+                const e = await res.json().catch(() => ({})); toast(e.error || 'Background removal failed. Try the Fast setting or a smaller image.', 'error'); return;
             }
 
             const afterBlob = await res.blob();
@@ -765,11 +817,11 @@
                 setBaseFromImage(afterImg);
                 renderCanvas();
                 URL.revokeObjectURL(afterURL);
-                toast('Studio Background Removal complete!', 'success');
+                toast('Background removed', 'success');
             };
             afterImg.src = afterURL;
         } catch (e) {
-            toast('Background removal failed: ' + e.message, 'error');
+            toast('Background removal failed: ' + e.message + '. Try again.', 'error');
         } finally {
             if (window.ProcessingOverlay) {
                 window.ProcessingOverlay.hide();
@@ -780,15 +832,16 @@
     }
 
     async function enhanceClarity() {
-        if (!base) { toast('Please load an image first.', 'warning'); return; }
+        if (!base) { toast('Open an image first.', 'warning'); return; }
 
         if (window.ProcessingOverlay) {
             window.ProcessingOverlay.show({
-                title: 'Photo Clarity & Denoise',
-                message: 'Polishing micro-contrast & removing compression noise...'
+                title: 'Improving clarity',
+                stageText: 'Reducing noise and recovering fine detail…',
+                category: 'image'
             });
         } else {
-            showLoading('Polishing clarity...');
+            showLoading('Improving clarity…');
         }
 
         try {
@@ -805,7 +858,7 @@
 
             const res = await fetch('/image/clarity', { method: 'POST', body: fd });
             if (!res.ok) {
-                const e = await res.json().catch(() => ({})); toast(e.error || 'Clarity polish failed', 'error'); return;
+                const e = await res.json().catch(() => ({})); toast(e.error || 'Couldn’t improve clarity. Try a smaller image.', 'error'); return;
             }
 
             const afterBlob = await res.blob();
@@ -816,11 +869,11 @@
                 setBaseFromImage(afterImg);
                 renderCanvas();
                 URL.revokeObjectURL(afterURL);
-                toast('✨ Photo Clarity Polish complete!', 'success');
+                toast('Clarity improved', 'success');
             };
             afterImg.src = afterURL;
         } catch (e) {
-            toast('Clarity polish failed: ' + e.message, 'error');
+            toast('Couldn’t improve clarity: ' + e.message + '. Try again.', 'error');
         } finally {
             if (window.ProcessingOverlay) {
                 window.ProcessingOverlay.hide();
@@ -831,15 +884,16 @@
     }
 
     async function restoreFaces() {
-        if (!base) { toast('Please load an image first.', 'warning'); return; }
+        if (!base) { toast('Open an image first.', 'warning'); return; }
 
         if (window.ProcessingOverlay) {
             window.ProcessingOverlay.show({
-                title: 'AI Face & Portrait Restorer',
-                message: 'Detecting faces & sharpening facial details...'
+                title: 'Restoring faces',
+                stageText: 'Finding faces and sharpening their detail…',
+                category: 'image'
             });
         } else {
-            showLoading('Restoring faces...');
+            showLoading('Restoring faces…');
         }
 
         try {
@@ -856,7 +910,7 @@
 
             const res = await fetch('/image/restore-faces', { method: 'POST', body: fd });
             if (!res.ok) {
-                const e = await res.json().catch(() => ({})); toast(e.error || 'Face restoration failed', 'error'); return;
+                const e = await res.json().catch(() => ({})); toast(e.error || 'Face restoration failed. Make sure the photo shows a clear face and try again.', 'error'); return;
             }
 
             const afterBlob = await res.blob();
@@ -867,11 +921,11 @@
                 setBaseFromImage(afterImg);
                 renderCanvas();
                 URL.revokeObjectURL(afterURL);
-                toast('👤 AI Face Restoration complete!', 'success');
+                toast('Faces restored', 'success');
             };
             afterImg.src = afterURL;
         } catch (e) {
-            toast('Face restoration failed: ' + e.message, 'error');
+            toast('Face restoration failed: ' + e.message + '. Try again.', 'error');
         } finally {
             if (window.ProcessingOverlay) {
                 window.ProcessingOverlay.hide();
@@ -881,7 +935,7 @@
         }
     }
 
-    function showLoading(txt) { $('ieLoadingText').textContent = txt || 'Working...'; $('ieLoadingOverlay').classList.remove('hidden'); }
+    function showLoading(txt) { $('ieLoadingText').textContent = txt || 'Working…'; $('ieLoadingOverlay').classList.remove('hidden'); }
     function hideLoading() { $('ieLoadingOverlay').classList.add('hidden'); }
 
     // ═══════════════════════════════════════
@@ -905,16 +959,18 @@
     function toast(msg, type = 'info') {
         document.querySelectorAll('.app-toast').forEach(t => t.remove());
         const el = document.createElement('div');
-        el.className = 'app-toast';
-        const colors = { error: '#e74c3c', warning: '#f39c12', success: '#27ae60', info: '#2c3e50' };
-        el.textContent = msg;
-        el.style.cssText = `position:fixed;bottom:30px;left:50%;transform:translateX(-50%) translateY(20px);
-            background:${colors[type] || colors.info};color:#fff;padding:14px 28px;border-radius:12px;
-            font-size:.88rem;font-weight:600;z-index:99999;box-shadow:0 10px 30px rgba(0,0,0,.25);
-            opacity:0;transition:all .35s cubic-bezier(.16,1,.3,1);`;
+        const icons = { error: 'fa-circle-exclamation', warning: 'fa-triangle-exclamation', success: 'fa-circle-check', info: 'fa-circle-info' };
+        el.className = 'app-toast app-toast-' + (icons[type] ? type : 'info');
+        el.setAttribute('role', type === 'error' ? 'alert' : 'status');
+        const icon = document.createElement('i');
+        icon.className = 'fas ' + (icons[type] || icons.info);
+        icon.setAttribute('aria-hidden', 'true');
+        const text = document.createElement('span');
+        text.textContent = msg;
+        el.append(icon, text);
         document.body.appendChild(el);
-        requestAnimationFrame(() => { el.style.opacity = '1'; el.style.transform = 'translateX(-50%) translateY(0)'; });
-        setTimeout(() => { el.style.opacity = '0'; el.style.transform = 'translateX(-50%) translateY(20px)'; setTimeout(() => el.remove(), 400); }, 3000);
+        requestAnimationFrame(() => el.classList.add('is-visible'));
+        setTimeout(() => { el.classList.remove('is-visible'); setTimeout(() => el.remove(), 260); }, type === 'error' ? 5000 : 3000);
     }
 
     // ═══════════════════════════════════════
@@ -932,6 +988,24 @@
             ['dragleave', 'drop'].forEach(ev => ua.addEventListener(ev, () => ua.classList.remove('drag-active')));
             ua.addEventListener('drop', e => { e.preventDefault(); loadImageFile(e.dataTransfer.files[0]); });
         }
+
+        // Empty-state browse button + drag-and-drop onto the canvas stage
+        safeClick('ieBrowseBtn', () => $('ieFileInput') && $('ieFileInput').click());
+        const stageEl = $('ieStage');
+        if (stageEl) {
+            let dragDepth = 0;
+            const hasFiles = e => e.dataTransfer && [...(e.dataTransfer.types || [])].includes('Files');
+            stageEl.addEventListener('dragenter', e => { if (!hasFiles(e)) return; e.preventDefault(); dragDepth++; stageEl.classList.add('is-dragover'); });
+            stageEl.addEventListener('dragover', e => { if (!hasFiles(e)) return; e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; });
+            stageEl.addEventListener('dragleave', () => { dragDepth = Math.max(0, dragDepth - 1); if (!dragDepth) stageEl.classList.remove('is-dragover'); });
+            stageEl.addEventListener('drop', e => {
+                if (!hasFiles(e)) return;
+                e.preventDefault(); dragDepth = 0; stageEl.classList.remove('is-dragover');
+                loadImageFile(e.dataTransfer.files[0]);
+            });
+        }
+        setHasImage(!!base);
+        initPressedSync();
 
         // Paste from clipboard
         document.addEventListener('paste', e => {
@@ -1035,25 +1109,71 @@
         safeClick('ieNewBtn', () => $('ieFileInput') && $('ieFileInput').click());
 
         // Help
-        safeClick('ieHelpBtn', () => $('ieShortcutsOverlay') && $('ieShortcutsOverlay').classList.remove('hidden'));
-        safeClick('ieCloseShortcuts', () => $('ieShortcutsOverlay') && $('ieShortcutsOverlay').classList.add('hidden'));
+        safeClick('ieHelpBtn', openShortcuts);
+        safeClick('ieCloseShortcuts', closeShortcuts);
+        safeBind('ieShortcutsOverlay', 'mousedown', e => { if (e.target === $('ieShortcutsOverlay')) closeShortcuts(); });
 
         // Keyboard shortcuts
         document.addEventListener('keydown', onKey);
     }
 
+    // ─── Shortcuts dialog + aria-pressed mirroring ───
+    let shortcutsReturnFocus = null;
+    function openShortcuts() {
+        const ov = $('ieShortcutsOverlay'); if (!ov) return;
+        if (ov.classList.contains('hidden')) shortcutsReturnFocus = document.activeElement;
+        ov.classList.remove('hidden');
+        const btn = $('ieCloseShortcuts'); if (btn) requestAnimationFrame(() => btn.focus());
+    }
+    function closeShortcuts() {
+        const ov = $('ieShortcutsOverlay'); if (!ov || ov.classList.contains('hidden')) return;
+        ov.classList.add('hidden');
+        if (shortcutsReturnFocus && document.contains(shortcutsReturnFocus)) shortcutsReturnFocus.focus();
+        shortcutsReturnFocus = null;
+    }
+    const PRESSABLE = '.ve-seg .ve-chip, .ve-chip[data-toggle], .ie-filter, .ie-tool';
+    function syncPressed(el) { el.setAttribute('aria-pressed', el.classList.contains('active') ? 'true' : 'false'); }
+    function initPressedSync() {
+        document.querySelectorAll(PRESSABLE).forEach(syncPressed);
+        new MutationObserver(muts => muts.forEach(m => {
+            if (m.target.matches && m.target.matches(PRESSABLE)) syncPressed(m.target);
+        })).observe(document.body, { subtree: true, attributes: true, attributeFilter: ['class'] });
+    }
+    function trapFocus(e, container) {
+        if (e.key !== 'Tab' || !container) return;
+        const items = [...container.querySelectorAll('button:not([disabled]), [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')]
+            .filter(el => el.offsetParent !== null);
+        if (!items.length) return;
+        const first = items[0], last = items[items.length - 1];
+        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    }
+
     function onKey(e) {
+        // Open dialogs own the keyboard: Esc closes, Tab stays inside.
+        const sc = $('ieShortcutsOverlay'), cmp = $('ieCompareOverlay');
+        if (sc && !sc.classList.contains('hidden')) {
+            if (e.key === 'Escape') { e.preventDefault(); closeShortcuts(); } else trapFocus(e, sc);
+            return;
+        }
+        if (cmp && !cmp.classList.contains('hidden')) {
+            if (e.key === 'Escape') { e.preventDefault(); closeCompare(); } else trapFocus(e, cmp);
+            return;
+        }
         const tag = (e.target.tagName || '').toLowerCase();
-        const typing = tag === 'input' || tag === 'textarea';
+        const typing = tag === 'input' || tag === 'textarea' || tag === 'select';
+        if (!typing && e.key === '?') { e.preventDefault(); openShortcuts(); return; }
+        if (e.key === 'Escape' && tool === 'crop' && cropBox) { e.preventDefault(); cancelCrop(); return; }
         if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')) { e.preventDefault(); undo(); return; }
         if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || e.key === 'Y')) { e.preventDefault(); redo(); return; }
         if (typing) return;
         if (!base) return;
+        if (e.ctrlKey || e.metaKey || e.altKey) return;   // leave Ctrl+C / Ctrl+V etc. to the browser
         if (e.key === 'v' || e.key === 'V') setTool('move');
         else if (e.key === 'c' || e.key === 'C') setTool('crop');
         else if (e.key === 't' || e.key === 'T') setTool('text');
         else if (e.key === 'b' || e.key === 'B') setTool('draw');
-        else if (e.key === 'Enter' && tool === 'crop') applyCrop();
+        else if (e.key === 'Enter' && tool === 'crop' && tag !== 'button') applyCrop();
         else if ((e.key === 'Delete' || e.key === 'Backspace') && selectedText) {
             snapshot(); texts = texts.filter(x => x.id !== selectedText); selectedText = null; editingText = null; renderCanvas();
         }

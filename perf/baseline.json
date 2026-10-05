@@ -1,0 +1,1726 @@
+{
+  "label": "baseline",
+  "system": {
+    "python": "3.11.9",
+    "cpu_count": 16,
+    "ram_total_gb": 15.6,
+    "ram_free_gb_at_start": 4.7,
+    "platform": "win32",
+    "time": "2026-10-05 22:40:44"
+  },
+  "capabilities": [
+    {
+      "scenario": "audio.lufs_10s",
+      "import_sec": 3.382,
+      "idle": {
+        "rss_mb": 265.7,
+        "private_mb": 1204.7,
+        "threads": 34,
+        "handles": 388,
+        "python_threads": 1
+      },
+      "heavy_modules_after_import": [
+        "PIL",
+        "joblib",
+        "librosa",
+        "noisereduce",
+        "numpy",
+        "pydub",
+        "scipy",
+        "soundfile",
+        "torch"
+      ],
+      "latency_sec": 0.127,
+      "error": null,
+      "peak_rss_mb": 318.3,
+      "peak_private_mb": 1287.0,
+      "peak_vram_delta_mb": 0.0,
+      "post": {
+        "rss_mb": 284.4,
+        "private_mb": 1252.9,
+        "threads": 34,
+        "handles": 413,
+        "python_threads": 1
+      },
+      "post_rss_delta_mb": 18.8,
+      "post_private_delta_mb": 48.2,
+      "thread_delta": 0,
+      "handle_delta": 25,
+      "model_resident_after": false,
+      "process_write_mb": 0.0,
+      "output_mb": 0.0,
+      "heavy_modules_after_job": [
+        "PIL",
+        "joblib",
+        "librosa",
+        "noisereduce",
+        "numpy",
+        "pydub",
+        "scipy",
+        "soundfile",
+        "torch"
+      ]
+    },
+    {
+      "scenario": "audio.lufs_10min",
+      "import_sec": 3.528,
+      "idle": {
+        "rss_mb": 264.2,
+        "private_mb": 1203.4,
+        "threads": 34,
+        "handles": 388,
+        "python_threads": 1
+      },
+      "heavy_modules_after_import": [
+        "PIL",
+        "joblib",
+        "librosa",
+        "noisereduce",
+        "numpy",
+        "pydub",
+        "scipy",
+        "soundfile",
+        "torch"
+      ],
+      "latency_sec": 5.65,
+      "error": null,
+      "peak_rss_mb": 768.0,
+      "peak_private_mb": 1714.1,
+      "peak_vram_delta_mb": 0.0,
+      "post": {
+        "rss_mb": 283.9,
+        "private_mb": 1252.3,
+        "threads": 34,
+        "handles": 413,
+        "python_threads": 1
+      },
+      "post_rss_delta_mb": 19.7,
+      "post_private_delta_mb": 48.9,
+      "thread_delta": 0,
+      "handle_delta": 25,
+      "model_resident_after": false,
+      "process_write_mb": 0.0,
+      "output_mb": 0.0,
+      "heavy_modules_after_job": [
+        "PIL",
+        "joblib",
+        "librosa",
+        "noisereduce",
+        "numpy",
+        "pydub",
+        "scipy",
+        "soundfile",
+        "torch"
+      ]
+    },
+    {
+      "scenario": "audio.lufs_10min_mp3",
+      "import_sec": 3.994,
+      "idle": {
+        "rss_mb": 264.8,
+        "private_mb": 1203.9,
+        "threads": 34,
+        "handles": 388,
+        "python_threads": 1
+      },
+      "heavy_modules_after_import": [
+        "PIL",
+        "joblib",
+        "librosa",
+        "noisereduce",
+        "numpy",
+        "pydub",
+        "scipy",
+        "soundfile",
+        "torch"
+      ],
+      "latency_sec": 10.502,
+      "error": null,
+      "peak_rss_mb": 738.9,
+      "peak_private_mb": 1714.6,
+      "peak_vram_delta_mb": 0.3,
+      "post": {
+        "rss_mb": 284.2,
+        "private_mb": 1252.4,
+        "threads": 34,
+        "handles": 413,
+        "python_threads": 1
+      },
+      "post_rss_delta_mb": 19.4,
+      "post_private_delta_mb": 48.4,
+      "thread_delta": 0,
+      "handle_delta": 25,
+      "model_resident_after": false,
+      "process_write_mb": 0.0,
+      "output_mb": 0.0,
+      "heavy_modules_after_job": [
+        "PIL",
+        "joblib",
+        "librosa",
+        "noisereduce",
+        "numpy",
+        "pydub",
+        "scipy",
+        "soundfile",
+        "torch"
+      ]
+    },
+    {
+      "scenario": "audio.normalize_10s",
+      "import_sec": 8.962,
+      "idle": {
+        "rss_mb": 266.7,
+        "private_mb": 1205.7,
+        "threads": 34,
+        "handles": 388,
+        "python_threads": 1
+      },
+      "heavy_modules_after_import": [
+        "PIL",
+        "joblib",
+        "librosa",
+        "noisereduce",
+        "numpy",
+        "pydub",
+        "scipy",
+        "soundfile",
+        "torch"
+      ],
+      "latency_sec": 1.129,
+      "error": null,
+      "peak_rss_mb": 344.2,
+      "peak_private_mb": 1316.5,
+      "peak_vram_delta_mb": 0.0,
+      "post": {
+        "rss_mb": 284.7,
+        "private_mb": 1253.0,
+        "threads": 34,
+        "handles": 413,
+        "python_threads": 1
+      },
+      "post_rss_delta_mb": 18.0,
+      "post_private_delta_mb": 47.3,
+      "thread_delta": 0,
+      "handle_delta": 25,
+      "model_resident_after": false,
+      "process_write_mb": 1.8,
+      "output_mb": 1.8,
+      "heavy_modules_after_job": [
+        "PIL",
+        "joblib",
+        "librosa",
+        "noisereduce",
+        "numpy",
+        "pydub",
+        "scipy",
+        "soundfile",
+        "torch"
+      ]
+    },
+    {
+      "scenario": "audio.normalize_10min",
+      "import_sec": 5.824,
+      "idle": {
+        "rss_mb": 265.2,
+        "private_mb": 1204.6,
+        "threads": 34,
+        "handles": 388,
+        "python_threads": 1
+      },
+      "heavy_modules_after_import": [
+        "PIL",
+        "joblib",
+        "librosa",
+        "noisereduce",
+        "numpy",
+        "pydub",
+        "scipy",
+        "soundfile",
+        "torch"
+      ],
+      "latency_sec": 55.742,
+      "error": null,
+      "peak_rss_mb": 3548.3,
+      "peak_private_mb": 4775.0,
+      "peak_vram_delta_mb": 49.1,
+      "post": {
+        "rss_mb": 156.0,
+        "private_mb": 1252.2,
+        "threads": 31,
+        "handles": 413,
+        "python_threads": 1
+      },
+      "post_rss_delta_mb": -109.2,
+      "post_private_delta_mb": 47.7,
+      "thread_delta": -3,
+      "handle_delta": 25,
+      "model_resident_after": false,
+      "process_write_mb": 109.9,
+      "output_mb": 109.9,
+      "heavy_modules_after_job": [
+        "PIL",
+        "joblib",
+        "librosa",
+        "noisereduce",
+        "numpy",
+        "pydub",
+        "scipy",
+        "soundfile",
+        "torch"
+      ]
+    },
+    {
+      "scenario": "audio.eq_10s",
+      "import_sec": 2.965,
+      "idle": {
+        "rss_mb": 265.4,
+        "private_mb": 1204.6,
+        "threads": 34,
+        "handles": 388,
+        "python_threads": 1
+      },
+      "heavy_modules_after_import": [
+        "PIL",
+        "joblib",
+        "librosa",
+        "noisereduce",
+        "numpy",
+        "pydub",
+        "scipy",
+        "soundfile",
+        "torch"
+      ],
+      "latency_sec": 1.232,
+      "error": null,
+      "peak_rss_mb": 387.6,
+      "peak_private_mb": 1300.2,
+      "peak_vram_delta_mb": 0.0,
+      "post": {
+        "rss_mb": 363.1,
+        "private_mb": 1272.6,
+        "threads": 34,
+        "handles": 462,
+        "python_threads": 1
+      },
+      "post_rss_delta_mb": 97.7,
+      "post_private_delta_mb": 68.1,
+      "thread_delta": 0,
+      "handle_delta": 74,
+      "model_resident_after": false,
+      "process_write_mb": 1.8,
+      "output_mb": 1.8,
+      "heavy_modules_after_job": [
+        "PIL",
+        "joblib",
+        "librosa",
+        "noisereduce",
+        "numba",
+        "numpy",
+        "pydub",
+        "scipy",
+        "soundfile",
+        "torch"
+      ]
+    },
+    {
+      "scenario": "audio.eq_10min",
+      "import_sec": 2.931,
+      "idle": {
+        "rss_mb": 264.7,
+        "private_mb": 1203.7,
+        "threads": 34,
+        "handles": 388,
+        "python_threads": 1
+      },
+      "heavy_modules_after_import": [
+        "PIL",
+        "joblib",
+        "librosa",
+        "noisereduce",
+        "numpy",
+        "pydub",
+        "scipy",
+        "soundfile",
+        "torch"
+      ],
+      "latency_sec": 9.93,
+      "error": null,
+      "peak_rss_mb": 2147.8,
+      "peak_private_mb": 3060.5,
+      "peak_vram_delta_mb": 4.8,
+      "post": {
+        "rss_mb": 362.1,
+        "private_mb": 1271.1,
+        "threads": 34,
+        "handles": 462,
+        "python_threads": 1
+      },
+      "post_rss_delta_mb": 97.3,
+      "post_private_delta_mb": 67.4,
+      "thread_delta": 0,
+      "handle_delta": 74,
+      "model_resident_after": false,
+      "process_write_mb": 109.9,
+      "output_mb": 109.9,
+      "heavy_modules_after_job": [
+        "PIL",
+        "joblib",
+        "librosa",
+        "noisereduce",
+        "numba",
+        "numpy",
+        "pydub",
+        "scipy",
+        "soundfile",
+        "torch"
+      ]
+    },
+    {
+      "scenario": "audio.silence_10min",
+      "import_sec": 18.982,
+      "idle": {
+        "rss_mb": 265.2,
+        "private_mb": 1204.4,
+        "threads": 34,
+        "handles": 388,
+        "python_threads": 1
+      },
+      "heavy_modules_after_import": [
+        "PIL",
+        "joblib",
+        "librosa",
+        "noisereduce",
+        "numpy",
+        "pydub",
+        "scipy",
+        "soundfile",
+        "torch"
+      ],
+      "latency_sec": 29.899,
+      "error": null,
+      "peak_rss_mb": 1041.8,
+      "peak_private_mb": 1948.8,
+      "peak_vram_delta_mb": 3.4,
+      "post": {
+        "rss_mb": 383.3,
+        "private_mb": 1289.0,
+        "threads": 34,
+        "handles": 470,
+        "python_threads": 1
+      },
+      "post_rss_delta_mb": 118.1,
+      "post_private_delta_mb": 84.6,
+      "thread_delta": 0,
+      "handle_delta": 82,
+      "model_resident_after": false,
+      "process_write_mb": 0.0,
+      "output_mb": 0.0,
+      "heavy_modules_after_job": [
+        "PIL",
+        "joblib",
+        "librosa",
+        "noisereduce",
+        "numba",
+        "numpy",
+        "pydub",
+        "scipy",
+        "sklearn",
+        "soundfile",
+        "torch"
+      ]
+    },
+    {
+      "scenario": "audio.vad_10min",
+      "import_sec": 10.204,
+      "idle": {
+        "rss_mb": 264.7,
+        "private_mb": 1204.0,
+        "threads": 34,
+        "handles": 388,
+        "python_threads": 1
+      },
+      "heavy_modules_after_import": [
+        "PIL",
+        "joblib",
+        "librosa",
+        "noisereduce",
+        "numpy",
+        "pydub",
+        "scipy",
+        "soundfile",
+        "torch"
+      ],
+      "latency_sec": 3.142,
+      "error": null,
+      "peak_rss_mb": 1020.4,
+      "peak_private_mb": 1931.1,
+      "peak_vram_delta_mb": 0.0,
+      "post": {
+        "rss_mb": 362.8,
+        "private_mb": 1272.2,
+        "threads": 34,
+        "handles": 462,
+        "python_threads": 1
+      },
+      "post_rss_delta_mb": 98.1,
+      "post_private_delta_mb": 68.2,
+      "thread_delta": 0,
+      "handle_delta": 74,
+      "model_resident_after": false,
+      "process_write_mb": 0.0,
+      "output_mb": 0.0,
+      "heavy_modules_after_job": [
+        "PIL",
+        "joblib",
+        "librosa",
+        "noisereduce",
+        "numba",
+        "numpy",
+        "pydub",
+        "scipy",
+        "soundfile",
+        "torch"
+      ]
+    },
+    {
+      "scenario": "audio.trim_gaps_10min",
+      "import_sec": 3.422,
+      "idle": {
+        "rss_mb": 265.0,
+        "private_mb": 1204.0,
+        "threads": 34,
+        "handles": 388,
+        "python_threads": 1
+      },
+      "heavy_modules_after_import": [
+        "PIL",
+        "joblib",
+        "librosa",
+        "noisereduce",
+        "numpy",
+        "pydub",
+        "scipy",
+        "soundfile",
+        "torch"
+      ],
+      "latency_sec": 18.044,
+      "error": null,
+      "peak_rss_mb": 2113.5,
+      "peak_private_mb": 3053.7,
+      "peak_vram_delta_mb": 0.0,
+      "post": {
+        "rss_mb": 283.8,
+        "private_mb": 1220.3,
+        "threads": 34,
+        "handles": 413,
+        "python_threads": 1
+      },
+      "post_rss_delta_mb": 18.8,
+      "post_private_delta_mb": 16.3,
+      "thread_delta": 0,
+      "handle_delta": 25,
+      "model_resident_after": false,
+      "process_write_mb": 97.4,
+      "output_mb": 97.4,
+      "heavy_modules_after_job": [
+        "PIL",
+        "joblib",
+        "librosa",
+        "noisereduce",
+        "numpy",
+        "pydub",
+        "scipy",
+        "soundfile",
+        "torch"
+      ]
+    },
+    {
+      "scenario": "audio.denoise_10s",
+      "import_sec": 4.442,
+      "idle": {
+        "rss_mb": 264.8,
+        "private_mb": 1203.9,
+        "threads": 34,
+        "handles": 388,
+        "python_threads": 1
+      },
+      "heavy_modules_after_import": [
+        "PIL",
+        "joblib",
+        "librosa",
+        "noisereduce",
+        "numpy",
+        "pydub",
+        "scipy",
+        "soundfile",
+        "torch"
+      ],
+      "latency_sec": 0.502,
+      "error": null,
+      "peak_rss_mb": 418.9,
+      "peak_private_mb": 1391.9,
+      "peak_vram_delta_mb": 0.0,
+      "post": {
+        "rss_mb": 283.7,
+        "private_mb": 1252.2,
+        "threads": 34,
+        "handles": 415,
+        "python_threads": 1
+      },
+      "post_rss_delta_mb": 18.9,
+      "post_private_delta_mb": 48.2,
+      "thread_delta": 0,
+      "handle_delta": 27,
+      "model_resident_after": false,
+      "process_write_mb": 1.8,
+      "output_mb": 1.8,
+      "heavy_modules_after_job": [
+        "PIL",
+        "joblib",
+        "librosa",
+        "noisereduce",
+        "numpy",
+        "pydub",
+        "scipy",
+        "soundfile",
+        "torch"
+      ]
+    },
+    {
+      "scenario": "audio.denoise_10min",
+      "import_sec": 6.52,
+      "idle": {
+        "rss_mb": 265.4,
+        "private_mb": 1204.5,
+        "threads": 34,
+        "handles": 388,
+        "python_threads": 1
+      },
+      "heavy_modules_after_import": [
+        "PIL",
+        "joblib",
+        "librosa",
+        "noisereduce",
+        "numpy",
+        "pydub",
+        "scipy",
+        "soundfile",
+        "torch"
+      ],
+      "latency_sec": 56.565,
+      "error": null,
+      "peak_rss_mb": 1148.4,
+      "peak_private_mb": 1914.4,
+      "peak_vram_delta_mb": 0.0,
+      "post": {
+        "rss_mb": 284.9,
+        "private_mb": 1253.5,
+        "threads": 32,
+        "handles": 420,
+        "python_threads": 2
+      },
+      "post_rss_delta_mb": 19.5,
+      "post_private_delta_mb": 49.0,
+      "thread_delta": -2,
+      "handle_delta": 32,
+      "model_resident_after": false,
+      "process_write_mb": 109.9,
+      "output_mb": 109.9,
+      "heavy_modules_after_job": [
+        "PIL",
+        "joblib",
+        "librosa",
+        "noisereduce",
+        "numpy",
+        "pydub",
+        "scipy",
+        "soundfile",
+        "torch"
+      ]
+    },
+    {
+      "scenario": "audio.duck_10s",
+      "import_sec": 5.215,
+      "idle": {
+        "rss_mb": 264.4,
+        "private_mb": 1203.8,
+        "threads": 34,
+        "handles": 388,
+        "python_threads": 1
+      },
+      "heavy_modules_after_import": [
+        "PIL",
+        "joblib",
+        "librosa",
+        "noisereduce",
+        "numpy",
+        "pydub",
+        "scipy",
+        "soundfile",
+        "torch"
+      ],
+      "latency_sec": 0.193,
+      "error": null,
+      "peak_rss_mb": 314.4,
+      "peak_private_mb": 1284.8,
+      "peak_vram_delta_mb": 0.0,
+      "post": {
+        "rss_mb": 284.1,
+        "private_mb": 1252.9,
+        "threads": 34,
+        "handles": 413,
+        "python_threads": 1
+      },
+      "post_rss_delta_mb": 19.7,
+      "post_private_delta_mb": 49.0,
+      "thread_delta": 0,
+      "handle_delta": 25,
+      "model_resident_after": false,
+      "process_write_mb": 0.6,
+      "output_mb": 0.6,
+      "heavy_modules_after_job": [
+        "PIL",
+        "joblib",
+        "librosa",
+        "noisereduce",
+        "numpy",
+        "pydub",
+        "scipy",
+        "soundfile",
+        "torch"
+      ]
+    },
+    {
+      "scenario": "audio.speed_10min",
+      "import_sec": 5.375,
+      "idle": {
+        "rss_mb": 264.4,
+        "private_mb": 1203.6,
+        "threads": 34,
+        "handles": 388,
+        "python_threads": 1
+      },
+      "heavy_modules_after_import": [
+        "PIL",
+        "joblib",
+        "librosa",
+        "noisereduce",
+        "numpy",
+        "pydub",
+        "scipy",
+        "soundfile",
+        "torch"
+      ],
+      "latency_sec": 1.419,
+      "error": null,
+      "peak_rss_mb": 282.4,
+      "peak_private_mb": 1219.5,
+      "peak_vram_delta_mb": 0.0,
+      "post": {
+        "rss_mb": 282.4,
+        "private_mb": 1219.5,
+        "threads": 34,
+        "handles": 413,
+        "python_threads": 1
+      },
+      "post_rss_delta_mb": 18.1,
+      "post_private_delta_mb": 15.9,
+      "thread_delta": 0,
+      "handle_delta": 25,
+      "model_resident_after": false,
+      "process_write_mb": 0.0,
+      "output_mb": 87.9,
+      "heavy_modules_after_job": [
+        "PIL",
+        "joblib",
+        "librosa",
+        "noisereduce",
+        "numpy",
+        "pydub",
+        "scipy",
+        "soundfile",
+        "torch"
+      ]
+    },
+    {
+      "scenario": "stt_10s",
+      "import_sec": 4.908,
+      "idle": {
+        "rss_mb": 265.1,
+        "private_mb": 1204.2,
+        "threads": 34,
+        "handles": 388,
+        "python_threads": 1
+      },
+      "heavy_modules_after_import": [
+        "PIL",
+        "joblib",
+        "librosa",
+        "noisereduce",
+        "numpy",
+        "pydub",
+        "scipy",
+        "soundfile",
+        "torch"
+      ],
+      "latency_sec": 37.863,
+      "error": null,
+      "peak_rss_mb": 2056.8,
+      "peak_private_mb": 4503.2,
+      "peak_vram_delta_mb": 2201.1,
+      "post": {
+        "rss_mb": 1046.3,
+        "private_mb": 2413.6,
+        "threads": 40,
+        "handles": 603,
+        "python_threads": 3
+      },
+      "post_rss_delta_mb": 781.3,
+      "post_private_delta_mb": 1209.4,
+      "thread_delta": 6,
+      "handle_delta": 215,
+      "model_resident_after": false,
+      "process_write_mb": 0.0,
+      "output_mb": 0.0,
+      "heavy_modules_after_job": [
+        "PIL",
+        "ctranslate2",
+        "faster_whisper",
+        "joblib",
+        "librosa",
+        "noisereduce",
+        "numba",
+        "numpy",
+        "onnxruntime",
+        "pydub",
+        "scipy",
+        "soundfile",
+        "torch"
+      ]
+    },
+    {
+      "scenario": "stt_10min",
+      "import_sec": 13.676,
+      "idle": {
+        "rss_mb": 264.5,
+        "private_mb": 1203.7,
+        "threads": 34,
+        "handles": 388,
+        "python_threads": 1
+      },
+      "heavy_modules_after_import": [
+        "PIL",
+        "joblib",
+        "librosa",
+        "noisereduce",
+        "numpy",
+        "pydub",
+        "scipy",
+        "soundfile",
+        "torch"
+      ],
+      "latency_sec": 117.162,
+      "error": null,
+      "peak_rss_mb": 2045.2,
+      "peak_private_mb": 4758.6,
+      "peak_vram_delta_mb": 2361.1,
+      "post": {
+        "rss_mb": 1048.2,
+        "private_mb": 2418.4,
+        "threads": 40,
+        "handles": 608,
+        "python_threads": 3
+      },
+      "post_rss_delta_mb": 783.7,
+      "post_private_delta_mb": 1214.7,
+      "thread_delta": 6,
+      "handle_delta": 220,
+      "model_resident_after": false,
+      "process_write_mb": 0.0,
+      "output_mb": 0.0,
+      "heavy_modules_after_job": [
+        "PIL",
+        "ctranslate2",
+        "faster_whisper",
+        "joblib",
+        "librosa",
+        "noisereduce",
+        "numba",
+        "numpy",
+        "onnxruntime",
+        "pydub",
+        "scipy",
+        "soundfile",
+        "torch"
+      ]
+    },
+    {
+      "scenario": "video.probe",
+      "import_sec": 3.082,
+      "idle": {
+        "rss_mb": 268.4,
+        "private_mb": 1207.4,
+        "threads": 34,
+        "handles": 389,
+        "python_threads": 1
+      },
+      "heavy_modules_after_import": [
+        "PIL",
+        "joblib",
+        "librosa",
+        "noisereduce",
+        "numpy",
+        "pydub",
+        "scipy",
+        "soundfile",
+        "torch"
+      ],
+      "latency_sec": 0.855,
+      "error": null,
+      "peak_rss_mb": 285.8,
+      "peak_private_mb": 1222.8,
+      "peak_vram_delta_mb": 0.0,
+      "post": {
+        "rss_mb": 285.8,
+        "private_mb": 1222.6,
+        "threads": 34,
+        "handles": 414,
+        "python_threads": 1
+      },
+      "post_rss_delta_mb": 17.5,
+      "post_private_delta_mb": 15.3,
+      "thread_delta": 0,
+      "handle_delta": 25,
+      "model_resident_after": false,
+      "process_write_mb": 0.0,
+      "output_mb": 0.0,
+      "heavy_modules_after_job": [
+        "PIL",
+        "joblib",
+        "librosa",
+        "noisereduce",
+        "numpy",
+        "pydub",
+        "scipy",
+        "soundfile",
+        "torch"
+      ]
+    },
+    {
+      "scenario": "video.filmstrip_30s",
+      "import_sec": 8.845,
+      "idle": {
+        "rss_mb": 265.3,
+        "private_mb": 1204.6,
+        "threads": 34,
+        "handles": 389,
+        "python_threads": 1
+      },
+      "heavy_modules_after_import": [
+        "PIL",
+        "joblib",
+        "librosa",
+        "noisereduce",
+        "numpy",
+        "pydub",
+        "scipy",
+        "soundfile",
+        "torch"
+      ],
+      "latency_sec": 1.899,
+      "error": null,
+      "peak_rss_mb": 283.2,
+      "peak_private_mb": 1220.3,
+      "peak_vram_delta_mb": 56.9,
+      "post": {
+        "rss_mb": 283.1,
+        "private_mb": 1220.2,
+        "threads": 34,
+        "handles": 414,
+        "python_threads": 1
+      },
+      "post_rss_delta_mb": 17.8,
+      "post_private_delta_mb": 15.6,
+      "thread_delta": 0,
+      "handle_delta": 25,
+      "model_resident_after": false,
+      "process_write_mb": 0.0,
+      "output_mb": 0.0,
+      "heavy_modules_after_job": [
+        "PIL",
+        "joblib",
+        "librosa",
+        "noisereduce",
+        "numpy",
+        "pydub",
+        "scipy",
+        "soundfile",
+        "torch"
+      ]
+    },
+    {
+      "scenario": "video.compress_1080p_30s",
+      "import_sec": 10.378,
+      "idle": {
+        "rss_mb": 264.6,
+        "private_mb": 1203.9,
+        "threads": 34,
+        "handles": 389,
+        "python_threads": 1
+      },
+      "heavy_modules_after_import": [
+        "PIL",
+        "joblib",
+        "librosa",
+        "noisereduce",
+        "numpy",
+        "pydub",
+        "scipy",
+        "soundfile",
+        "torch"
+      ],
+      "latency_sec": 17.825,
+      "error": null,
+      "peak_rss_mb": 282.4,
+      "peak_private_mb": 1219.4,
+      "peak_vram_delta_mb": 0.0,
+      "post": {
+        "rss_mb": 282.4,
+        "private_mb": 1219.3,
+        "threads": 34,
+        "handles": 414,
+        "python_threads": 1
+      },
+      "post_rss_delta_mb": 17.8,
+      "post_private_delta_mb": 15.4,
+      "thread_delta": 0,
+      "handle_delta": 25,
+      "model_resident_after": false,
+      "process_write_mb": 0.0,
+      "output_mb": 2.6,
+      "heavy_modules_after_job": [
+        "PIL",
+        "joblib",
+        "librosa",
+        "noisereduce",
+        "numpy",
+        "pydub",
+        "scipy",
+        "soundfile",
+        "torch"
+      ]
+    },
+    {
+      "scenario": "video.enhance_1080p_30s",
+      "import_sec": 6.403,
+      "idle": {
+        "rss_mb": 265.0,
+        "private_mb": 1204.1,
+        "threads": 34,
+        "handles": 389,
+        "python_threads": 1
+      },
+      "heavy_modules_after_import": [
+        "PIL",
+        "joblib",
+        "librosa",
+        "noisereduce",
+        "numpy",
+        "pydub",
+        "scipy",
+        "soundfile",
+        "torch"
+      ],
+      "latency_sec": 15.696,
+      "error": null,
+      "peak_rss_mb": 283.3,
+      "peak_private_mb": 1220.1,
+      "peak_vram_delta_mb": 0.0,
+      "post": {
+        "rss_mb": 283.3,
+        "private_mb": 1219.9,
+        "threads": 34,
+        "handles": 414,
+        "python_threads": 1
+      },
+      "post_rss_delta_mb": 18.3,
+      "post_private_delta_mb": 15.9,
+      "thread_delta": 0,
+      "handle_delta": 25,
+      "model_resident_after": false,
+      "process_write_mb": 0.0,
+      "output_mb": 44.9,
+      "heavy_modules_after_job": [
+        "PIL",
+        "joblib",
+        "librosa",
+        "noisereduce",
+        "numpy",
+        "pydub",
+        "scipy",
+        "soundfile",
+        "torch"
+      ]
+    },
+    {
+      "scenario": "video.scenes_30s",
+      "import_sec": 5.62,
+      "idle": {
+        "rss_mb": 265.2,
+        "private_mb": 1204.3,
+        "threads": 34,
+        "handles": 389,
+        "python_threads": 1
+      },
+      "heavy_modules_after_import": [
+        "PIL",
+        "joblib",
+        "librosa",
+        "noisereduce",
+        "numpy",
+        "pydub",
+        "scipy",
+        "soundfile",
+        "torch"
+      ],
+      "latency_sec": 5.743,
+      "error": null,
+      "peak_rss_mb": 459.3,
+      "peak_private_mb": 1419.1,
+      "peak_vram_delta_mb": 0.0,
+      "post": {
+        "rss_mb": 309.4,
+        "private_mb": 1264.6,
+        "threads": 34,
+        "handles": 561,
+        "python_threads": 1
+      },
+      "post_rss_delta_mb": 44.2,
+      "post_private_delta_mb": 60.3,
+      "thread_delta": 0,
+      "handle_delta": 172,
+      "model_resident_after": false,
+      "process_write_mb": 0.0,
+      "output_mb": 0.0,
+      "heavy_modules_after_job": [
+        "PIL",
+        "cv2",
+        "joblib",
+        "librosa",
+        "noisereduce",
+        "numpy",
+        "pydub",
+        "scenedetect",
+        "scipy",
+        "soundfile",
+        "torch"
+      ]
+    },
+    {
+      "scenario": "image.upscale_12mp",
+      "import_sec": 3.098,
+      "idle": {
+        "rss_mb": 264.5,
+        "private_mb": 1203.6,
+        "threads": 34,
+        "handles": 389,
+        "python_threads": 1
+      },
+      "heavy_modules_after_import": [
+        "PIL",
+        "joblib",
+        "librosa",
+        "noisereduce",
+        "numpy",
+        "pydub",
+        "scipy",
+        "soundfile",
+        "torch"
+      ],
+      "latency_sec": 3.767,
+      "error": null,
+      "peak_rss_mb": 874.5,
+      "peak_private_mb": 1809.4,
+      "peak_vram_delta_mb": 0.0,
+      "post": {
+        "rss_mb": 291.5,
+        "private_mb": 1224.9,
+        "threads": 34,
+        "handles": 531,
+        "python_threads": 1
+      },
+      "post_rss_delta_mb": 27.0,
+      "post_private_delta_mb": 21.3,
+      "thread_delta": 0,
+      "handle_delta": 142,
+      "model_resident_after": false,
+      "process_write_mb": 6.4,
+      "output_mb": 6.4,
+      "heavy_modules_after_job": [
+        "PIL",
+        "cv2",
+        "joblib",
+        "librosa",
+        "noisereduce",
+        "numpy",
+        "pydub",
+        "scipy",
+        "soundfile",
+        "torch"
+      ]
+    },
+    {
+      "scenario": "image.upscale_2mp",
+      "import_sec": 4.697,
+      "idle": {
+        "rss_mb": 265.2,
+        "private_mb": 1204.4,
+        "threads": 34,
+        "handles": 389,
+        "python_threads": 1
+      },
+      "heavy_modules_after_import": [
+        "PIL",
+        "joblib",
+        "librosa",
+        "noisereduce",
+        "numpy",
+        "pydub",
+        "scipy",
+        "soundfile",
+        "torch"
+      ],
+      "latency_sec": 0.849,
+      "error": null,
+      "peak_rss_mb": 384.3,
+      "peak_private_mb": 1318.1,
+      "peak_vram_delta_mb": 2.0,
+      "post": {
+        "rss_mb": 291.2,
+        "private_mb": 1224.9,
+        "threads": 34,
+        "handles": 531,
+        "python_threads": 1
+      },
+      "post_rss_delta_mb": 26.0,
+      "post_private_delta_mb": 20.4,
+      "thread_delta": 0,
+      "handle_delta": 142,
+      "model_resident_after": false,
+      "process_write_mb": 0.9,
+      "output_mb": 0.9,
+      "heavy_modules_after_job": [
+        "PIL",
+        "cv2",
+        "joblib",
+        "librosa",
+        "noisereduce",
+        "numpy",
+        "pydub",
+        "scipy",
+        "soundfile",
+        "torch"
+      ]
+    },
+    {
+      "scenario": "image.clarity_12mp",
+      "import_sec": 3.933,
+      "idle": {
+        "rss_mb": 264.5,
+        "private_mb": 1203.9,
+        "threads": 34,
+        "handles": 389,
+        "python_threads": 1
+      },
+      "heavy_modules_after_import": [
+        "PIL",
+        "joblib",
+        "librosa",
+        "noisereduce",
+        "numpy",
+        "pydub",
+        "scipy",
+        "soundfile",
+        "torch"
+      ],
+      "latency_sec": 0.544,
+      "error": null,
+      "peak_rss_mb": 589.5,
+      "peak_private_mb": 1523.4,
+      "peak_vram_delta_mb": 0.0,
+      "post": {
+        "rss_mb": 303.4,
+        "private_mb": 1236.7,
+        "threads": 55,
+        "handles": 586,
+        "python_threads": 1
+      },
+      "post_rss_delta_mb": 38.9,
+      "post_private_delta_mb": 32.8,
+      "thread_delta": 21,
+      "handle_delta": 197,
+      "model_resident_after": false,
+      "process_write_mb": 1.9,
+      "output_mb": 1.9,
+      "heavy_modules_after_job": [
+        "PIL",
+        "cv2",
+        "joblib",
+        "librosa",
+        "noisereduce",
+        "numpy",
+        "pydub",
+        "scipy",
+        "soundfile",
+        "torch"
+      ]
+    },
+    {
+      "scenario": "image.color_12mp",
+      "import_sec": 3.87,
+      "idle": {
+        "rss_mb": 264.4,
+        "private_mb": 1203.5,
+        "threads": 34,
+        "handles": 389,
+        "python_threads": 1
+      },
+      "heavy_modules_after_import": [
+        "PIL",
+        "joblib",
+        "librosa",
+        "noisereduce",
+        "numpy",
+        "pydub",
+        "scipy",
+        "soundfile",
+        "torch"
+      ],
+      "latency_sec": 0.69,
+      "error": null,
+      "peak_rss_mb": 1039.4,
+      "peak_private_mb": 1980.4,
+      "peak_vram_delta_mb": 0.0,
+      "post": {
+        "rss_mb": 290.0,
+        "private_mb": 1223.8,
+        "threads": 34,
+        "handles": 531,
+        "python_threads": 1
+      },
+      "post_rss_delta_mb": 25.6,
+      "post_private_delta_mb": 20.3,
+      "thread_delta": 0,
+      "handle_delta": 142,
+      "model_resident_after": false,
+      "process_write_mb": 1.8,
+      "output_mb": 1.8,
+      "heavy_modules_after_job": [
+        "PIL",
+        "cv2",
+        "joblib",
+        "librosa",
+        "noisereduce",
+        "numpy",
+        "pydub",
+        "scipy",
+        "soundfile",
+        "torch"
+      ]
+    },
+    {
+      "scenario": "image.cutout_12mp",
+      "import_sec": 2.899,
+      "idle": {
+        "rss_mb": 264.8,
+        "private_mb": 1203.9,
+        "threads": 34,
+        "handles": 389,
+        "python_threads": 1
+      },
+      "heavy_modules_after_import": [
+        "PIL",
+        "joblib",
+        "librosa",
+        "noisereduce",
+        "numpy",
+        "pydub",
+        "scipy",
+        "soundfile",
+        "torch"
+      ],
+      "latency_sec": 17.324,
+      "error": null,
+      "peak_rss_mb": 4917.4,
+      "peak_private_mb": 10909.2,
+      "peak_vram_delta_mb": 0.0,
+      "post": {
+        "rss_mb": 281.5,
+        "private_mb": 1304.7,
+        "threads": 49,
+        "handles": 575,
+        "python_threads": 1
+      },
+      "post_rss_delta_mb": 16.7,
+      "post_private_delta_mb": 100.8,
+      "thread_delta": 15,
+      "handle_delta": 186,
+      "model_resident_after": false,
+      "process_write_mb": 2.4,
+      "output_mb": 2.4,
+      "heavy_modules_after_job": [
+        "PIL",
+        "joblib",
+        "librosa",
+        "noisereduce",
+        "numba",
+        "numpy",
+        "onnxruntime",
+        "pydub",
+        "rembg",
+        "scipy",
+        "soundfile",
+        "torch"
+      ]
+    },
+    {
+      "scenario": "inspect.image_12mp",
+      "import_sec": 3.372,
+      "idle": {
+        "rss_mb": 265.3,
+        "private_mb": 1204.4,
+        "threads": 34,
+        "handles": 389,
+        "python_threads": 1
+      },
+      "heavy_modules_after_import": [
+        "PIL",
+        "joblib",
+        "librosa",
+        "noisereduce",
+        "numpy",
+        "pydub",
+        "scipy",
+        "soundfile",
+        "torch"
+      ],
+      "latency_sec": 0.084,
+      "error": null,
+      "peak_rss_mb": 328.5,
+      "peak_private_mb": 1265.9,
+      "peak_vram_delta_mb": 0.0,
+      "post": {
+        "rss_mb": 287.3,
+        "private_mb": 1224.5,
+        "threads": 34,
+        "handles": 414,
+        "python_threads": 1
+      },
+      "post_rss_delta_mb": 22.0,
+      "post_private_delta_mb": 20.1,
+      "thread_delta": 0,
+      "handle_delta": 25,
+      "model_resident_after": false,
+      "process_write_mb": 0.0,
+      "output_mb": 0.0,
+      "heavy_modules_after_job": [
+        "PIL",
+        "joblib",
+        "librosa",
+        "noisereduce",
+        "numpy",
+        "pydub",
+        "scipy",
+        "soundfile",
+        "torch"
+      ]
+    },
+    {
+      "scenario": "inspect.audio_10min",
+      "import_sec": 2.738,
+      "idle": {
+        "rss_mb": 264.9,
+        "private_mb": 1204.0,
+        "threads": 34,
+        "handles": 388,
+        "python_threads": 1
+      },
+      "heavy_modules_after_import": [
+        "PIL",
+        "joblib",
+        "librosa",
+        "noisereduce",
+        "numpy",
+        "pydub",
+        "scipy",
+        "soundfile",
+        "torch"
+      ],
+      "latency_sec": 1.18,
+      "error": null,
+      "peak_rss_mb": 334.3,
+      "peak_private_mb": 1304.9,
+      "peak_vram_delta_mb": 0.0,
+      "post": {
+        "rss_mb": 286.1,
+        "private_mb": 1254.9,
+        "threads": 34,
+        "handles": 413,
+        "python_threads": 1
+      },
+      "post_rss_delta_mb": 21.3,
+      "post_private_delta_mb": 50.9,
+      "thread_delta": 0,
+      "handle_delta": 25,
+      "model_resident_after": false,
+      "process_write_mb": 0.0,
+      "output_mb": 0.0,
+      "heavy_modules_after_job": [
+        "PIL",
+        "joblib",
+        "librosa",
+        "noisereduce",
+        "numpy",
+        "pydub",
+        "scipy",
+        "soundfile",
+        "torch"
+      ]
+    },
+    {
+      "scenario": "audio.lufs_60min",
+      "import_sec": 2.703,
+      "idle": {
+        "rss_mb": 264.8,
+        "private_mb": 1203.8,
+        "threads": 34,
+        "handles": 388,
+        "python_threads": 1
+      },
+      "heavy_modules_after_import": [
+        "PIL",
+        "joblib",
+        "librosa",
+        "noisereduce",
+        "numpy",
+        "pydub",
+        "scipy",
+        "soundfile",
+        "torch"
+      ],
+      "latency_sec": 52.362,
+      "error": null,
+      "peak_rss_mb": 3248.7,
+      "peak_private_mb": 4191.4,
+      "peak_vram_delta_mb": 0.0,
+      "post": {
+        "rss_mb": 286.4,
+        "private_mb": 1255.0,
+        "threads": 34,
+        "handles": 413,
+        "python_threads": 1
+      },
+      "post_rss_delta_mb": 21.6,
+      "post_private_delta_mb": 51.2,
+      "thread_delta": 0,
+      "handle_delta": 25,
+      "model_resident_after": false,
+      "process_write_mb": 0.0,
+      "output_mb": 0.0,
+      "heavy_modules_after_job": [
+        "PIL",
+        "joblib",
+        "librosa",
+        "noisereduce",
+        "numpy",
+        "pydub",
+        "scipy",
+        "soundfile",
+        "torch"
+      ]
+    },
+    {
+      "scenario": "audio.normalize_60min",
+      "import_sec": 7.872,
+      "idle": {
+        "rss_mb": 264.7,
+        "private_mb": 1203.8,
+        "threads": 34,
+        "handles": 388,
+        "python_threads": 1
+      },
+      "heavy_modules_after_import": [
+        "PIL",
+        "joblib",
+        "librosa",
+        "noisereduce",
+        "numpy",
+        "pydub",
+        "scipy",
+        "soundfile",
+        "torch"
+      ],
+      "latency_sec": 338.471,
+      "error": null,
+      "peak_rss_mb": 7888.1,
+      "peak_private_mb": 22390.6,
+      "peak_vram_delta_mb": 0.0,
+      "post": {
+        "rss_mb": 130.6,
+        "private_mb": 1255.9,
+        "threads": 33,
+        "handles": 413,
+        "python_threads": 1
+      },
+      "post_rss_delta_mb": -134.1,
+      "post_private_delta_mb": 52.1,
+      "thread_delta": -1,
+      "handle_delta": 25,
+      "model_resident_after": false,
+      "process_write_mb": 659.2,
+      "output_mb": 659.2,
+      "heavy_modules_after_job": [
+        "PIL",
+        "joblib",
+        "librosa",
+        "noisereduce",
+        "numpy",
+        "pydub",
+        "scipy",
+        "soundfile",
+        "torch"
+      ]
+    }
+  ],
+  "startup": {
+    "scenario": "startup",
+    "import_sec": 6.441,
+    "idle": {
+      "rss_mb": 265.3,
+      "private_mb": 1204.4,
+      "threads": 34,
+      "handles": 388,
+      "python_threads": 1
+    },
+    "heavy_modules_after_import": [
+      "PIL",
+      "joblib",
+      "librosa",
+      "noisereduce",
+      "numpy",
+      "pydub",
+      "scipy",
+      "soundfile",
+      "torch"
+    ]
+  },
+  "import_offenders": [
+    {
+      "module": "app",
+      "depth": 0,
+      "cumulative_ms": 3358.0
+    },
+    {
+      "module": "ai_processor",
+      "depth": 1,
+      "cumulative_ms": 2959.4
+    },
+    {
+      "module": "noisereduce",
+      "depth": 2,
+      "cumulative_ms": 2880.4
+    },
+    {
+      "module": "flask",
+      "depth": 1,
+      "cumulative_ms": 174.5
+    },
+    {
+      "module": "flask.json",
+      "depth": 2,
+      "cumulative_ms": 94.3
+    },
+    {
+      "module": "flask.app",
+      "depth": 2,
+      "cumulative_ms": 77.7
+    },
+    {
+      "module": "numpy",
+      "depth": 2,
+      "cumulative_ms": 68.7
+    },
+    {
+      "module": "agent_processor",
+      "depth": 1,
+      "cumulative_ms": 58.4
+    },
+    {
+      "module": "agent_skills",
+      "depth": 2,
+      "cumulative_ms": 40.2
+    },
+    {
+      "module": "logger",
+      "depth": 1,
+      "cumulative_ms": 20.7
+    },
+    {
+      "module": "psycopg2",
+      "depth": 2,
+      "cumulative_ms": 19.4
+    },
+    {
+      "module": "PIL.Image",
+      "depth": 1,
+      "cumulative_ms": 17.4
+    },
+    {
+      "module": "audio_processor",
+      "depth": 1,
+      "cumulative_ms": 17.0
+    },
+    {
+      "module": "pydub",
+      "depth": 2,
+      "cumulative_ms": 15.9
+    },
+    {
+      "module": "zipfile",
+      "depth": 1,
+      "cumulative_ms": 15.8
+    }
+  ],
+  "server": {
+    "ready_sec": 11.8,
+    "resources_route_ms": 6.3,
+    "processes": {
+      "18852": {
+        "rss_mb": 4.1,
+        "private_mb": 0.8,
+        "threads": 3,
+        "handles": 56
+      },
+      "26804": {
+        "rss_mb": 275.9,
+        "private_mb": 1214.0,
+        "threads": 34,
+        "handles": 419
+      },
+      "16896": {
+        "rss_mb": 4.1,
+        "private_mb": 0.9,
+        "threads": 3,
+        "handles": 60
+      },
+      "4324": {
+        "rss_mb": 270.1,
+        "private_mb": 1208.3,
+        "threads": 36,
+        "handles": 401
+      }
+    },
+    "total_rss_mb": 554.2,
+    "total_private_mb": 2424.0
+  }
+}

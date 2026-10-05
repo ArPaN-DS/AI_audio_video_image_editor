@@ -15,13 +15,79 @@ document.addEventListener('DOMContentLoaded', () => {
         btnCloseShortcuts.addEventListener('click', () => modalShortcuts.classList.remove('active'));
     }
 
+    // Dialog behaviour for every `.modal-overlay`: focus moves in on open and back on close,
+    // Tab stays inside, Esc or a backdrop click closes.
+    const dialogs = Array.from(document.querySelectorAll('.modal-overlay'));
+    const focusableIn = root => Array.from(root.querySelectorAll(
+        'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    )).filter(element => element.offsetParent !== null);
+    const openDialog = () => dialogs.find(dialog => dialog.classList.contains('active')) || null;
+    dialogs.forEach(dialog => {
+        let returnFocus = null;
+        if (typeof MutationObserver !== 'undefined') {
+            new MutationObserver(() => {
+                const active = dialog.classList.contains('active');
+                if (active && !dialog.contains(document.activeElement)) {
+                    returnFocus = document.activeElement;
+                    (dialog.querySelector('.modal-close') || focusableIn(dialog)[0])?.focus();
+                } else if (!active && returnFocus) {
+                    if (dialog.contains(document.activeElement) || document.activeElement === document.body) returnFocus.focus?.();
+                    returnFocus = null;
+                }
+            }).observe(dialog, { attributes: true, attributeFilter: ['class'] });
+        }
+        dialog.addEventListener('mousedown', event => {
+            if (event.target === dialog) dialog.classList.remove('active');
+        });
+    });
+
+    const copilotDrawer = document.getElementById('aiAgentDrawer');
+    const copilotToggle = document.getElementById('btnToggleAiAgent');
+
     // Keybindings listener
     window.addEventListener('keydown', (e) => {
-        // Ignore keybindings if user is typing in input or textarea
-        const activeTag = document.activeElement ? document.activeElement.tagName.toLowerCase() : '';
-        if (activeTag === 'input' || activeTag === 'textarea' || activeTag === 'select') {
+        if (e.defaultPrevented) return;
+
+        const dialog = openDialog();
+        if (e.key === 'Escape') {
+            if (dialog) {
+                e.preventDefault();
+                dialog.classList.remove('active');
+            } else if (copilotDrawer?.classList.contains('open')) {
+                e.preventDefault();
+                copilotDrawer.classList.remove('open');
+                copilotToggle?.focus();
+            }
             return;
         }
+        if (dialog) {
+            // Keep keyboard focus inside the open dialog; suspend editing shortcuts.
+            if (e.key === 'Tab') {
+                const items = focusableIn(dialog);
+                if (!items.length) return;
+                const first = items[0];
+                const last = items[items.length - 1];
+                if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+                else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+                else if (!dialog.contains(document.activeElement)) { e.preventDefault(); first.focus(); }
+            }
+            return;
+        }
+        if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+        // Ignore keybindings if user is typing in input or textarea
+        const active = document.activeElement;
+        const activeTag = active ? active.tagName.toLowerCase() : '';
+        if (activeTag === 'input' || activeTag === 'textarea' || activeTag === 'select' || active?.isContentEditable) {
+            return;
+        }
+        // Let focused buttons, links and tabs keep their native Space / Enter behaviour.
+        if ((e.code === 'Space' || e.key === 'Enter')
+            && active?.closest?.('button, a[href], summary, [role="tab"], [role="switch"]')) {
+            return;
+        }
+        // Editing shortcuts stay off while focus is inside Copilot.
+        if (copilotDrawer?.contains(active)) return;
 
         // Space -> Play/Pause
         if (e.code === 'Space') {
@@ -49,7 +115,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         if (e.code === 'KeyK') {
             e.preventDefault();
-            if (window.videoStudio) window.videoStudio.setPlayState(false);
+            if (window.videoStudio) window.videoStudio.preview.pause();
         }
         if (e.code === 'KeyL') {
             e.preventDefault();

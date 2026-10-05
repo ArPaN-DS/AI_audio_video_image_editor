@@ -1,0 +1,21 @@
+    <meta name="color-scheme" content="light dark">
+    <meta name="app-product-name" content="{{ brand.product }}">
+    <meta name="app-assistant-name" content="{{ brand.assistant }}">
+    <!-- Display names come from one config (branding.py); scripts read window.APP_BRAND -->
+    <script>window.APP_BRAND = {{ brand | tojson }};</script>
+    <!-- No-FOUC theme: resolve the saved / OS theme before first paint -->
+    <script>
+        (function () {
+            try {
+                var t = localStorage.getItem('theme');
+                if (t !== 'light' && t !== 'dark') {
+                    t = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+                }
+                document.documentElement.setAttribute('data-theme', t);
+            } catch (e) { document.documentElement.setAttribute('data-theme', 'dark'); }
+        })();
+    </script>
+    <meta name="theme-color" content="#F4F5F7" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#0C0E13" media="(prefers-color-scheme: dark)">
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='brand-mark.svg') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='tokens.css') }}">

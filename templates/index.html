@@ -4,527 +4,537 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="color-scheme" content="light dark">
-    <!-- No-FOUC theme: apply saved / preferred theme before first paint -->
-    <script>
-        (function () {
-            try {
-                var t = localStorage.getItem('theme');
-                if (!t) t = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-                document.documentElement.setAttribute('data-theme', t);
-            } catch (e) { document.documentElement.setAttribute('data-theme', 'light'); }
-        })();
-    </script>
-    <title>Audio Cutter Pro — Professional Audio Editor</title>
-    <meta name="description"
-        content="Free online audio cutter. Cut, trim, fade, normalize and export audio instantly. No signup required.">
+    {% include '_head.html' %}
+    <title>Audio Editor — {{ brand.product }}</title>
+    <meta name="description" content="Cut, trim, fade and clean up audio on your own computer. Nothing is uploaded.">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='processing_overlay.css') }}">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <script src="https://unpkg.com/wavesurfer.js@7"></script>
-    <script src="https://unpkg.com/wavesurfer.js@7/dist/plugins/regions.min.js"></script>
-    <script src="https://unpkg.com/wavesurfer.js@7/dist/plugins/timeline.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='voiceover.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='separation.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='vendor/fontawesome/css/all.min.css') }}">
+    <script src="{{ url_for('static', filename='vendor/wavesurfer/wavesurfer.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='vendor/wavesurfer/regions.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='vendor/wavesurfer/timeline.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='vendor/jszip/jszip.min.js') }}"></script>
     <script src="{{ url_for('static', filename='theme.js') }}" defer></script>
 </head>
 
-<body>
+<body class="audio-body">
 
-    <!-- ─── HEADER ─── -->
-    <header>
-        <div class="logo-container">
-            <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo">
-            <h1>Audio Cutter <span class="pro-badge">PRO</span></h1>
-        </div>
-        <nav class="page-nav">
-            <a href="/" class="page-nav-link" title="Studio Hub"><i class="fas fa-th-large"></i> Hub</a>
-            <a href="/audio" class="page-nav-link active"><i class="fas fa-music"></i> Audio</a>
-            <a href="/video" class="page-nav-link"><i class="fas fa-film"></i> Video</a>
-            <a href="/image" class="page-nav-link"><i class="fas fa-image"></i> Image</a>
-        </nav>
+    <a class="skip-link" href="#main">Skip to content</a>
+
+    <header class="app-header">
+        {% include '_app_nav.html' %}
         <div class="header-actions">
-            <button id="newFileBtn" class="header-btn hidden" title="Load a different file">
-                <i class="fas fa-folder-open"></i>
+            <button type="button" id="newFileBtn" class="header-btn hidden" title="Open a different file" aria-label="Open a different file">
+                <i class="fas fa-folder-open" aria-hidden="true"></i>
             </button>
-            <button id="themeToggle" class="header-btn" title="Switch to dark theme" aria-label="Switch to dark theme">
-                <i class="fas fa-moon"></i>
+            <button type="button" id="themeToggle" class="header-btn" title="Switch theme" aria-label="Switch theme">
+                <i class="fas fa-moon" aria-hidden="true"></i>
             </button>
-            <button id="helpBtn" class="header-btn" title="Show all keyboard shortcuts">
-                <i class="fas fa-keyboard"></i>
+            <button type="button" id="helpBtn" class="header-btn" title="Keyboard shortcuts (?)" aria-label="Keyboard shortcuts" aria-haspopup="dialog" aria-controls="shortcutsOverlay">
+                <i class="fas fa-keyboard" aria-hidden="true"></i>
             </button>
-            <button id="mobileMenuBtn" class="header-btn mobile-menu-btn" title="Open Navigation Menu" aria-label="Open Navigation Menu">
-                <i class="fas fa-bars"></i>
+            <button type="button" id="mobileMenuBtn" class="header-btn mobile-menu-btn" aria-label="Open navigation">
+                <i class="fas fa-bars" aria-hidden="true"></i>
             </button>
         </div>
     </header>
 
-    <!-- ─── MOBILE NAVIGATION DRAWER ─── -->
-    <div id="mobileNavDrawer" class="mobile-nav-drawer hidden">
-        <div class="mobile-nav-backdrop" id="mobileNavBackdrop"></div>
-        <div class="mobile-nav-content">
-            <div class="mobile-nav-header">
-                <div class="logo-container">
-                    <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo">
-                    <span class="mobile-nav-title">Media Studio</span>
+    {% include '_mobile_navigation.html' %}
+
+    <main id="main" class="container audio-main" tabindex="-1">
+        <div class="card audio-workspace">
+
+            <div id="editor-interface" class="editor-pre-upload">
+
+                <!-- Page heading (empty state only) -->
+                <div class="audio-pagehead">
+                    <h1 class="audio-title">Audio editor</h1>
+                    <p class="audio-lede">Cut, clean up and export audio. Files are processed on this computer and never uploaded.</p>
                 </div>
-                <button id="closeMobileNav" class="close-btn" aria-label="Close Navigation Menu">&times;</button>
-            </div>
-            <nav class="mobile-nav-links">
-                <a href="/" class="mobile-nav-link"><i class="fas fa-th-large"></i> Hub</a>
-                <a href="/audio" class="mobile-nav-link active"><i class="fas fa-music"></i> Audio Editor</a>
-                <a href="/video" class="mobile-nav-link"><i class="fas fa-film"></i> Video Editor</a>
-                <a href="/image" class="mobile-nav-link"><i class="fas fa-image"></i> Image Editor</a>
-                <a href="/studio" class="mobile-nav-link pro-link"><i class="fas fa-sliders-h"></i> Pro Studio</a>
-            </nav>
-        </div>
-    </div>
 
-    <!-- ─── MAIN ─── -->
-    <div class="container">
-        <div class="card">
-
-            <!-- ─── EDITOR INTERFACE ─── -->
-            <div id="editor-interface">
-
-                <!-- FILE INFO BAR (Hidden until audio is loaded) -->
+                <!-- File info bar (shown once audio is loaded) -->
                 <div class="file-info-bar hidden" id="fileInfoBar">
                     <div class="file-info-left">
-                        <div class="file-detail">
-                            <i class="fas fa-file-audio"></i>
-                            <span id="fileName">—</span>
-                        </div>
-                        <div class="file-detail">
-                            <i class="fas fa-clock"></i>
-                            <span id="fileDuration">—</span>
-                        </div>
-                        <div class="file-detail">
-                            <i class="fas fa-weight-hanging"></i>
-                            <span id="fileSize">—</span>
+                        <span class="file-glyph" aria-hidden="true"><i class="fas fa-wave-square"></i></span>
+                        <div class="file-info-text">
+                            <div class="file-detail file-detail-name">
+                                <span class="sr-only">File: </span><span id="fileName">—</span>
+                            </div>
+                            <div class="file-meta">
+                                <span class="file-detail"><span class="sr-only">Duration: </span><span id="fileDuration">—</span></span>
+                                <span class="file-meta-sep" aria-hidden="true">·</span>
+                                <span class="file-detail"><span class="sr-only">Size: </span><span id="fileSize">—</span></span>
+                            </div>
                         </div>
                     </div>
-                    <button id="removeAudioBtn" class="remove-audio-btn"
-                        title="Remove this audio and load a different file">
-                        <i class="fas fa-times"></i> Remove
+                    <button type="button" id="removeAudioBtn" class="remove-audio-btn"
+                        title="Close this file and open a different one">
+                        <i class="fas fa-xmark" aria-hidden="true"></i><span>Close file</span>
                     </button>
                 </div>
 
-                <!-- WAVEFORM VIEWPORT (Upload dropzone before upload, Waveform after upload) -->
-                <div id="waveform-container">
-                    <div id="waveformPlaceholder" class="waveform-placeholder" style="padding: 0; width: 100%;">
-                        <!-- TABS -->
-                        <div class="tabs" style="width: 100%; margin-bottom: 12px;">
-                            <button class="tab-btn active" id="btnTabUpload">
-                                <i class="fas fa-upload"></i> Upload File
+                <!-- Waveform stage: drop zone before a file is loaded, waveform after -->
+                <section id="waveform-container" aria-label="Waveform">
+                    <div id="waveformPlaceholder" class="waveform-placeholder">
+                        <div class="tabs" role="tablist" aria-label="Audio source">
+                            <button type="button" class="tab-btn active" id="btnTabUpload" role="tab" aria-selected="true" aria-controls="uploadSection">
+                                <i class="fas fa-folder-open" aria-hidden="true"></i> Open file
                             </button>
-                            <button class="tab-btn" id="btnTabRecord">
-                                <i class="fas fa-microphone"></i> Record Audio
+                            <button type="button" class="tab-btn" id="btnTabRecord" role="tab" aria-selected="false" aria-controls="recordSection">
+                                <i class="fas fa-microphone" aria-hidden="true"></i> Record
                             </button>
                         </div>
 
-                        <!-- UPLOAD AREA -->
-                        <div class="upload-area" id="uploadSection" style="width: 100%;">
-                            <div class="upload-icon"><i class="fas fa-cloud-upload-alt"></i></div>
-                            <p class="upload-title">Drop your Audio or Video file here</p>
-                            <p class="upload-subtitle">Supports MP3, WAV, OGG, FLAC, M4A, MP4, MKV and more</p>
-                            <input type="file" id="fileInput" accept="audio/*,video/*">
+                        <div class="upload-area" id="uploadSection" role="tabpanel" aria-labelledby="btnTabUpload">
+                            <div class="upload-icon" aria-hidden="true"><i class="fas fa-file-audio"></i></div>
+                            <p class="upload-title">Drop an audio or video file here</p>
+                            <p class="upload-subtitle">or <span class="upload-link">choose a file</span> from your computer</p>
+                            <p class="upload-formats">MP3, WAV, OGG, FLAC, M4A, MP4, MKV and more</p>
+                            <input type="file" id="fileInput" accept="audio/*,video/*" aria-label="Choose an audio or video file">
                         </div>
 
-                        <!-- RECORD AREA -->
-                        <div class="record-area hidden" id="recordSection" style="width: 100%;">
-                            <button id="recordBtn" class="record-circle">
-                                <i class="fas fa-microphone"></i>
+                        <div class="record-area hidden" id="recordSection" role="tabpanel" aria-labelledby="btnTabRecord">
+                            <button type="button" id="recordBtn" class="record-circle" aria-label="Start recording">
+                                <i class="fas fa-microphone" aria-hidden="true"></i>
                             </button>
-                            <p id="recordStatus">Click the red button to start recording from your microphone</p>
-                            <button id="stopRecordBtn" class="stop-btn hidden">
-                                <i class="fas fa-stop"></i> Stop & Edit
+                            <p id="recordStatus" role="status" aria-live="polite">Record from your microphone. Your browser will ask for permission first.</p>
+                            <button type="button" id="stopRecordBtn" class="stop-btn hidden">
+                                <i class="fas fa-stop" aria-hidden="true"></i> Stop and edit
                             </button>
                         </div>
                     </div>
                     <div id="waveform"></div>
                     <div id="wave-timeline"></div>
-                    <div class="waveform-hint">
-                        <i class="fas fa-hand-pointer"></i> Double-click the waveform to add a cut region · Drag region
-                        edges to resize
-                    </div>
-                </div>
+                </section>
 
-                <!-- TRANSPORT CONTROLS -->
-                <div class="transport-bar">
-                    <!-- Left: Playback -->
+                <!-- Capabilities (empty state only) -->
+                <ul class="audio-capabilities" aria-label="What you can do here">
+                    <li><i class="fas fa-scissors" aria-hidden="true"></i>Cut and merge regions</li>
+                    <li><i class="fas fa-wind" aria-hidden="true"></i>Remove noise</li>
+                    <li><i class="fas fa-volume-xmark" aria-hidden="true"></i>Find pauses and speech</li>
+                    <li><i class="fas fa-closed-captioning" aria-hidden="true"></i>Transcribe</li>
+                    <li><i class="fas fa-drum" aria-hidden="true"></i>Detect beats</li>
+                    <li><i class="fas fa-file-export" aria-hidden="true"></i>Export MP3 or WAV</li>
+                </ul>
+
+                <!-- Transport -->
+                <div class="transport-bar" role="toolbar" aria-label="Playback">
                     <div class="transport-left">
-                        <button id="playBtn" class="play-btn" title="Play or Pause your audio">
-                            <i class="fas fa-play" id="playIcon"></i>
+                        <button type="button" id="playBtn" class="play-btn" title="Play or pause (Space)" aria-label="Play or pause">
+                            <i class="fas fa-play" id="playIcon" aria-hidden="true"></i>
                         </button>
-                        <div class="time-display">
+                        <div class="time-display" aria-label="Playback position">
                             <span id="currentTime">0:00</span>
-                            <span class="time-separator">/</span>
+                            <span class="time-separator" aria-hidden="true">/</span>
                             <span id="totalTime">0:00</span>
                         </div>
                     </div>
 
-                    <!-- Center: Zoom -->
                     <div class="transport-center">
-                        <i class="fas fa-search-minus"></i>
-                        <input type="range" id="zoomSlider" min="0" max="200" value="0" class="styled-range">
-                        <i class="fas fa-search-plus"></i>
-                        <span class="tooltip-trigger">
-                            <i class="fas fa-info-circle info-icon"></i>
-                            <span class="tooltip">Zoom into the waveform to make precise cuts. Drag right to zoom in,
-                                left for full view.</span>
+                        <i class="fas fa-magnifying-glass-minus transport-glyph" aria-hidden="true"></i>
+                        <input type="range" id="zoomSlider" min="0" max="200" value="0" class="styled-range"
+                            aria-label="Zoom waveform" title="Zoom in to place cuts precisely">
+                        <i class="fas fa-magnifying-glass-plus transport-glyph" aria-hidden="true"></i>
+                    </div>
+
+                    <div class="transport-right">
+                        <div class="control-group control-volume">
+                            <button type="button" id="muteBtn" class="mini-btn" title="Mute preview (M)" aria-label="Mute preview">
+                                <i class="fas fa-volume-up" id="volumeIcon" aria-hidden="true"></i>
+                            </button>
+                            <input type="range" id="volumeSlider" min="0" max="100" value="80"
+                                class="styled-range volume-range" aria-label="Preview volume"
+                                aria-describedby="previewOnlyNote" title="Preview volume. Doesn't change the exported file.">
+                        </div>
+                        <div class="control-group control-speed">
+                            <label for="speedControl" class="sr-only">Playback speed</label>
+                            <div class="select-wrap">
+                                <select id="speedControl" class="styled-select" aria-describedby="previewOnlyNote"
+                                    title="Playback speed. Doesn't change the exported file.">
+                                    <option value="0.5">0.5×</option>
+                                    <option value="0.75">0.75×</option>
+                                    <option value="1" selected>1×</option>
+                                    <option value="1.25">1.25×</option>
+                                    <option value="1.5">1.5×</option>
+                                    <option value="2">2×</option>
+                                </select>
+                                <i class="fas fa-chevron-down" aria-hidden="true"></i>
+                            </div>
+                        </div>
+                    </div>
+                    <span id="previewOnlyNote" class="sr-only">Affects preview only. The exported file is unchanged.</span>
+                </div>
+
+                <p class="waveform-hint">
+                    Double-click the waveform to add a region. Drag a region to move it, or drag its edges to resize.
+                </p>
+
+                <!-- Regions -->
+                <section class="region-manager" id="regionManager" aria-labelledby="regionHeading">
+                    <div class="region-header">
+                        <h2 class="panel-title" id="regionHeading">
+                            Regions
+                            <span class="region-count-badge" id="regionCount">0</span>
+                        </h2>
+                        <div class="region-actions-header">
+                            <button type="button" id="undoBtn" class="btn-outline" title="Undo (Ctrl+Z)" disabled>
+                                <i class="fas fa-rotate-left" aria-hidden="true"></i><span>Undo</span>
+                            </button>
+                            <button type="button" id="clearAllBtn" class="btn-outline btn-danger-outline"
+                                title="Remove all regions. You can undo this.">
+                                <i class="fas fa-trash-can" aria-hidden="true"></i><span>Clear all</span>
+                            </button>
+                            <button type="button" id="addRegionBtn" class="btn-small"
+                                title="Add a region at the playhead">
+                                <i class="fas fa-plus" aria-hidden="true"></i><span>Add region</span>
+                            </button>
+                        </div>
+                    </div>
+                    <p class="panel-sub">The parts you keep. Each region is exported; select one and press Delete to remove it, or double-click its name to rename it.</p>
+                    <div id="regionList" aria-live="polite"></div>
+                </section>
+
+                <!-- Tools -->
+                <section class="ai-tools-panel" aria-labelledby="toolsHeading">
+                    <div class="ai-panel-header">
+                        <div class="ai-panel-title-text">
+                            <h2 class="panel-title" id="toolsHeading">Tools</h2>
+                            <p>Analyze and clean up the loaded audio. Results appear as markers on the waveform.</p>
+                        </div>
+                        <span class="ai-cpu-badge">
+                            <i class="fas fa-lock" aria-hidden="true"></i> Runs on this computer
                         </span>
                     </div>
 
-                    <!-- Right: Volume & Speed -->
-                    <div class="transport-right">
-                        <div class="control-group">
-                            <button id="muteBtn" class="mini-btn" title="Click to mute or unmute">
-                                <i class="fas fa-volume-up" id="volumeIcon"></i>
-                            </button>
-                            <input type="range" id="volumeSlider" min="0" max="100" value="80"
-                                class="styled-range volume-range" title="Drag to adjust preview volume">
-                            <span class="tooltip-trigger">
-                                <i class="fas fa-info-circle info-icon"></i>
-                                <span class="tooltip">Adjust how loud the audio plays in your browser. This does NOT
-                                    change the exported file volume.</span>
-                            </span>
-                        </div>
-                        <div class="control-group">
-                            <i class="fas fa-tachometer-alt"></i>
-                            <select id="speedControl" class="styled-select" title="Change playback speed">
-                                <option value="0.5">0.5×</option>
-                                <option value="0.75">0.75×</option>
-                                <option value="1" selected>1×</option>
-                                <option value="1.25">1.25×</option>
-                                <option value="1.5">1.5×</option>
-                                <option value="2">2×</option>
-                            </select>
-                            <span class="tooltip-trigger">
-                                <i class="fas fa-info-circle info-icon"></i>
-                                <span class="tooltip">Play audio faster or slower to find the right cut point. Does NOT
-                                    affect the exported file speed.</span>
-                            </span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- REGION MANAGER -->
-                <div class="region-manager" id="regionManager">
-                    <div class="region-header">
-                        <h4>
-                            <i class="fas fa-cut"></i> Cut Regions
-                            <span class="region-count-badge" id="regionCount">0</span>
-                            <span class="tooltip-trigger">
-                                <i class="fas fa-info-circle info-icon"></i>
-                                <span class="tooltip">Regions are the parts of your audio you want to keep. You can add
-                                    multiple regions to extract several clips at once. Click a region to select it,
-                                    press Delete to remove it. Double-click a region name to rename it.</span>
-                            </span>
-                        </h4>
-                        <div class="region-actions-header">
-                            <button id="undoBtn" class="btn-outline" title="Undo last action (Ctrl+Z)" disabled>
-                                <i class="fas fa-undo"></i> Undo
-                            </button>
-                            <button id="clearAllBtn" class="btn-outline btn-danger-outline"
-                                title="Remove all regions (can undo)">
-                                <i class="fas fa-trash-alt"></i> Clear All
-                            </button>
-                            <button id="addRegionBtn" class="btn-small"
-                                title="Add a new cut region at the current playback position">
-                                <i class="fas fa-plus"></i> Add Region
-                            </button>
-                        </div>
-                    </div>
-                    <div id="regionList"></div>
-                </div>
-
-                <!-- ─── AI TOOLS PANEL ─── -->
-                <div class="ai-tools-panel">
-                    <div class="ai-panel-header">
-                        <div class="ai-panel-title">
-                            <div class="ai-panel-icon-wrap">
-                                <i class="fas fa-robot"></i>
-                            </div>
-                            <div class="ai-panel-title-text">
-                                <h5>AI Audio Assistants</h5>
-                                <p>Enhance, cut, and analyze your audio using advanced machine learning models.</p>
-                            </div>
-                        </div>
-                        <div class="ai-cpu-badge">
-                            <i class="fas fa-shield-halved"></i> 100% Private & Local
-                        </div>
-                    </div>
-                    
                     <div class="ai-tools-container">
-                        <!-- Card 1: Clean & Enhance -->
-                        <div class="ai-tool-card">
-                            <div class="ai-tool-card-header">
-                                <div class="ai-tool-card-icon-wrap clean-prep">
-                                    <i class="fas fa-magic"></i>
-                                </div>
-                                <div class="ai-tool-card-info">
-                                    <h6>Clean & Prep Audio</h6>
-                                    <p>Enhance clarity and clean up raw files</p>
-                                </div>
-                            </div>
-                            <div class="ai-tool-card-desc">
-                                Remove background noise and hums, or instantly locate and trim silent sections at the start and end.
-                            </div>
+                        <div class="ai-tool-card" role="group" aria-labelledby="toolGroupClean">
+                            <h3 class="ai-tool-group-title" id="toolGroupClean">Clean up</h3>
                             <div class="ai-tool-actions-row">
                                 <button type="button" class="ai-tool-btn" id="aiDenoiseBtn">
-                                    <span class="ai-btn-icon"><i class="fas fa-wind"></i></span>
-                                    <div class="ai-btn-texts">
-                                        <strong>Remove Noise</strong>
-                                        <span class="ai-btn-desc">Clean background hiss</span>
-                                    </div>
-                                </button>
-                                <button type="button" class="ai-tool-btn" id="aiTrimBtn">
-                                    <span class="ai-btn-icon"><i class="fas fa-crop-alt"></i></span>
-                                    <div class="ai-btn-texts">
-                                        <strong>Trim Silent Edges</strong>
-                                        <span class="ai-btn-desc">Detect trim start/end</span>
-                                    </div>
-                                </button>
-                            </div>
-                        </div>
-
-                        <!-- Card 2: Find Cuts & Speech -->
-                        <div class="ai-tool-card">
-                            <div class="ai-tool-card-header">
-                                <div class="ai-tool-card-icon-wrap split-segment">
-                                    <i class="fas fa-scissors"></i>
-                                </div>
-                                <div class="ai-tool-card-info">
-                                    <h6>Find Pauses & Speech</h6>
-                                    <p>Locate natural divisions & voices</p>
-                                </div>
-                            </div>
-                            <div class="ai-tool-card-desc">
-                                Find silent pauses to split your audio cleanly, or isolate sections where people are actively speaking.
-                            </div>
-                            <div class="ai-tool-actions-row">
-                                <button type="button" class="ai-tool-btn" id="aiSilenceBtn">
-                                    <span class="ai-btn-icon"><i class="fas fa-volume-mute"></i></span>
-                                    <div class="ai-btn-texts">
-                                        <strong>Find Silent Pauses</strong>
-                                        <span class="ai-btn-desc">Create regions at gaps</span>
-                                    </div>
-                                </button>
-                                <button type="button" class="ai-tool-btn" id="aiAutoTrimSilenceBtn" style="border-color: rgba(236, 72, 153, 0.4);">
-                                    <span class="ai-btn-icon" style="color: #ec4899;"><i class="fas fa-bolt"></i></span>
-                                    <div class="ai-btn-texts">
-                                        <strong>Auto-Trim Silence</strong>
-                                        <span class="ai-btn-desc">Jump-cut dead pauses (>1s)</span>
-                                    </div>
-                                </button>
-                                <button type="button" class="ai-tool-btn" id="aiVadBtn">
-                                    <span class="ai-btn-icon"><i class="fas fa-comments"></i></span>
-                                    <div class="ai-btn-texts">
-                                        <strong>Find Speaking Voices</strong>
-                                        <span class="ai-btn-desc">Isolate vocal sections</span>
-                                    </div>
-                                </button>
-                                <button type="button" class="ai-tool-btn" id="aiTranscribeBtn">
-                                     <span class="ai-btn-icon"><i class="fas fa-file-audio"></i></span>
-                                     <div class="ai-btn-texts">
-                                         <strong>Transcribe Audio</strong>
-                                         <span class="ai-btn-desc">Convert speech to text</span>
-                                     </div>
-                                 </button>
-                            </div>
-                        </div>
-
-                        <!-- Card 3: Music Rhythms -->
-                        <div class="ai-tool-card">
-                            <div class="ai-tool-card-header">
-                                <div class="ai-tool-card-icon-wrap rhythm-music">
-                                    <i class="fas fa-music"></i>
-                                </div>
-                                <div class="ai-tool-card-info">
-                                    <h6>Music Rhythm Finder</h6>
-                                    <p>Track tempo and musical beats</p>
-                                </div>
-                            </div>
-                            <div class="ai-tool-card-desc">
-                                Calculate the speed (BPM) of a track and snap your cut boundaries perfectly to the nearest musical beat.
-                            </div>
-                            <div class="ai-tool-actions-row">
-                                <button type="button" class="ai-tool-btn" id="aiBeatBtn">
-                                    <span class="ai-btn-icon"><i class="fas fa-drum"></i></span>
-                                    <div class="ai-btn-texts">
-                                        <strong>Music Beat Finder</strong>
-                                        <span class="ai-btn-desc">Detect tempo & beats</span>
-                                    </div>
-                                </button>
-                                <button type="button" class="ai-tool-btn" id="aiFillerWordsBtn">
-                                    <span class="ai-btn-icon"><i class="fas fa-quote-left"></i></span>
-                                    <div class="ai-btn-texts">
-                                        <strong>Filler Word Cutter</strong>
-                                        <span class="ai-btn-desc">Auto-cut 'um' & 'uh'</span>
-                                    </div>
+                                    <span class="ai-btn-icon" aria-hidden="true"><i class="fas fa-wind"></i></span>
+                                    <span class="ai-btn-texts">
+                                        <strong>Remove noise</strong>
+                                        <span class="ai-btn-desc">Reduce hiss, hum and background noise</span>
+                                    </span>
                                 </button>
                                 <button type="button" class="ai-tool-btn" id="aiEnhanceSpeechBtn">
-                                    <span class="ai-btn-icon"><i class="fas fa-microphone-lines"></i></span>
-                                    <div class="ai-btn-texts">
-                                        <strong>Speech Studio AI</strong>
-                                        <span class="ai-btn-desc">De-echo & voice polish</span>
-                                    </div>
+                                    <span class="ai-btn-icon" aria-hidden="true"><i class="fas fa-microphone-lines"></i></span>
+                                    <span class="ai-btn-texts">
+                                        <strong>Enhance speech</strong>
+                                        <span class="ai-btn-desc">Reduce room echo and even out voice</span>
+                                    </span>
+                                </button>
+                                <button type="button" class="ai-tool-btn" id="aiTrimBtn">
+                                    <span class="ai-btn-icon" aria-hidden="true"><i class="fas fa-crop-simple"></i></span>
+                                    <span class="ai-btn-texts">
+                                        <strong>Trim silent edges</strong>
+                                        <span class="ai-btn-desc">Find where sound starts and ends</span>
+                                    </span>
+                                </button>
+                                <button type="button" class="ai-tool-btn" id="aiAutoTrimSilenceBtn">
+                                    <span class="ai-btn-icon" aria-hidden="true"><i class="fas fa-forward-fast"></i></span>
+                                    <span class="ai-btn-texts">
+                                        <strong>Remove long pauses</strong>
+                                        <span class="ai-btn-desc">Cut gaps over 1 s and download the result</span>
+                                    </span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="ai-tool-card" role="group" aria-labelledby="toolGroupFind">
+                            <h3 class="ai-tool-group-title" id="toolGroupFind">Find and mark</h3>
+                            <div class="ai-tool-actions-row">
+                                <button type="button" class="ai-tool-btn" id="aiSilenceBtn">
+                                    <span class="ai-btn-icon" aria-hidden="true"><i class="fas fa-volume-xmark"></i></span>
+                                    <span class="ai-btn-texts">
+                                        <strong>Find pauses</strong>
+                                        <span class="ai-btn-desc">Mark silent gaps; split the audio at them</span>
+                                    </span>
+                                </button>
+                                <button type="button" class="ai-tool-btn" id="aiVadBtn">
+                                    <span class="ai-btn-icon" aria-hidden="true"><i class="fas fa-comments"></i></span>
+                                    <span class="ai-btn-texts">
+                                        <strong>Find speech</strong>
+                                        <span class="ai-btn-desc">Mark sections where someone is talking</span>
+                                    </span>
+                                </button>
+                                <button type="button" class="ai-tool-btn" id="aiFillerWordsBtn">
+                                    <span class="ai-btn-icon" aria-hidden="true"><i class="fas fa-quote-left"></i></span>
+                                    <span class="ai-btn-texts">
+                                        <strong>Find filler words</strong>
+                                        <span class="ai-btn-desc">Mark “um”, “uh” and similar words</span>
+                                    </span>
+                                </button>
+                                <button type="button" class="ai-tool-btn" id="aiBeatBtn">
+                                    <span class="ai-btn-icon" aria-hidden="true"><i class="fas fa-drum"></i></span>
+                                    <span class="ai-btn-texts">
+                                        <strong>Detect beats</strong>
+                                        <span class="ai-btn-desc">Measure tempo and snap cuts to the beat</span>
+                                    </span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="ai-tool-card" role="group" aria-labelledby="toolGroupConvert">
+                            <h3 class="ai-tool-group-title" id="toolGroupConvert">Transcribe and separate</h3>
+                            <div class="ai-tool-actions-row">
+                                <button type="button" class="ai-tool-btn" id="aiTranscribeBtn">
+                                    <span class="ai-btn-icon" aria-hidden="true"><i class="fas fa-closed-captioning"></i></span>
+                                    <span class="ai-btn-texts">
+                                        <strong>Transcribe</strong>
+                                        <span class="ai-btn-desc">Timed transcript; click a line to jump there</span>
+                                    </span>
                                 </button>
                                 <button type="button" class="ai-tool-btn" id="aiSeparateStemsBtn">
-                                    <span class="ai-btn-icon"><i class="fas fa-sliders-h"></i></span>
-                                    <div class="ai-btn-texts">
-                                        <strong>Vocal / Stem Splitter</strong>
-                                        <span class="ai-btn-desc">Separate vocal & music</span>
-                                    </div>
+                                    <span class="ai-btn-icon" aria-hidden="true"><i class="fas fa-sliders"></i></span>
+                                    <span class="ai-btn-texts">
+                                        <strong>Separate vocals</strong>
+                                        <span class="ai-btn-desc">Split into a vocal track and a music track</span>
+                                    </span>
                                 </button>
                             </div>
                         </div>
                     </div>
 
-                    <!-- AI RESULTS SUB-PANEL -->
-                    <div id="aiResultsPanel" class="ai-results-panel hidden">
+                    <div id="aiResultsPanel" class="ai-results-panel hidden" role="region" aria-labelledby="aiResultsTitle" aria-live="polite">
                         <div class="ai-results-header">
-                            <h6><i class="fas fa-square-poll-horizontal" style="color: var(--ai-accent);"></i> AI Analysis Results</h6>
-                            <button type="button" id="closeAiResults" class="close-results-btn" title="Close results">&times;</button>
+                            <h3 id="aiResultsTitle">Results</h3>
+                            <button type="button" id="closeAiResults" class="close-results-btn" title="Close results and clear markers" aria-label="Close results and clear markers">
+                                <i class="fas fa-xmark" aria-hidden="true"></i>
+                            </button>
                         </div>
-                        <div id="aiResultsContent" class="ai-results-content">
-                            <!-- Dynamic content will be loaded here -->
+                        <div id="aiResultsContent" class="ai-results-content"></div>
+                    </div>
+                </section>
+
+                <!-- Separate (vocals / stems / voice / lyrics) -->
+                <section class="ai-tools-panel separate-panel" id="separatePanel" aria-labelledby="separateHeading">
+                    <div class="ai-panel-header">
+                        <div class="ai-panel-title-text">
+                            <h2 class="panel-title" id="separateHeading">Separate</h2>
+                            <p>Split the loaded audio into parts. Each part can be previewed, downloaded or opened in the editor.</p>
+                        </div>
+                        <span class="ai-cpu-badge">
+                            <i class="fas fa-lock" aria-hidden="true"></i> Runs on this computer
+                        </span>
+                    </div>
+
+                    <div class="tabs separate-modes" role="radiogroup" aria-label="What to separate" id="separateModes">
+                        <button type="button" class="tab-btn active" role="radio" aria-checked="true" data-mode="vocals">
+                            <i class="fas fa-microphone" aria-hidden="true"></i> Vocals + instrumental
+                        </button>
+                        <button type="button" class="tab-btn" role="radio" aria-checked="false" tabindex="-1" data-mode="4stem">
+                            <i class="fas fa-layer-group" aria-hidden="true"></i> 4 stems
+                        </button>
+                        <button type="button" class="tab-btn" role="radio" aria-checked="false" tabindex="-1" data-mode="voice">
+                            <i class="fas fa-user" aria-hidden="true"></i> Voice only
+                        </button>
+                        <button type="button" class="tab-btn" role="radio" aria-checked="false" tabindex="-1" data-mode="lyrics">
+                            <i class="fas fa-align-left" aria-hidden="true"></i> Lyrics
+                        </button>
+                    </div>
+                    <p class="panel-sub separate-mode-desc" id="separateModeDesc">Two tracks: the singing voice and everything else, for karaoke or remixing.</p>
+
+                    <div class="separate-controls">
+                        <label class="separate-format" for="separateFormat">
+                            <span>Format</span>
+                            <select id="separateFormat">
+                                <option value="wav" selected>WAV (lossless)</option>
+                                <option value="mp3">MP3 (smaller)</option>
+                            </select>
+                        </label>
+                        <button type="button" class="ai-action-btn" id="separateRunBtn">
+                            <i class="fas fa-sliders" aria-hidden="true"></i> <span>Separate</span>
+                        </button>
+                    </div>
+                    <p class="separate-quality-note" id="separateQualityNote">Checking which separation quality is available…</p>
+
+                    <div class="separate-progress hidden" id="separateProgress" role="status" aria-live="polite">
+                        <progress aria-labelledby="separateProgressText"></progress>
+                        <span id="separateProgressText">Separating… this takes about half the length of the audio.</span>
+                    </div>
+
+                    <div class="separate-results hidden" id="separateResults" aria-live="polite"></div>
+                </section>
+
+                <!-- Voiceover (text to speech): self-contained panel, see initVoiceoverPanel() -->
+                <section class="voiceover-panel" id="voiceoverPanel" aria-labelledby="voiceoverHeading">
+                    <h2 class="panel-title" id="voiceoverHeading">Voiceover</h2>
+                    <p class="panel-sub">Turn a script into spoken audio. Speech is created on this computer.</p>
+                    <form id="voiceoverForm" class="voiceover-form" novalidate>
+                        <div class="voiceover-field">
+                            <label for="voiceoverText" class="voiceover-label">Script</label>
+                            <textarea id="voiceoverText" class="voiceover-text" rows="5" maxlength="5000"
+                                aria-describedby="voiceoverCount" placeholder="Type or paste the words to read aloud"></textarea>
+                            <span id="voiceoverCount" class="voiceover-hint" aria-live="polite">0 / 5,000 characters</span>
+                        </div>
+                        <div class="voiceover-row">
+                            <div class="voiceover-field">
+                                <label for="voiceoverVoice" class="voiceover-label">Voice</label>
+                                <select id="voiceoverVoice" class="voiceover-select" disabled>
+                                    <option value="">Loading voices…</option>
+                                </select>
+                            </div>
+                            <div class="voiceover-field">
+                                <label for="voiceoverSpeed" class="voiceover-label">Speed <span id="voiceoverSpeedValue">1.0x</span></label>
+                                <input type="range" id="voiceoverSpeed" class="voiceover-range" min="0.5" max="2" step="0.05" value="1"
+                                    aria-valuetext="1.0 times">
+                            </div>
+                            <div class="voiceover-field">
+                                <label for="voiceoverFormat" class="voiceover-label">File type</label>
+                                <select id="voiceoverFormat" class="voiceover-select">
+                                    <option value="wav">WAV</option>
+                                    <option value="mp3">MP3</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="voiceover-actions">
+                            <button type="submit" id="voiceoverGenerateBtn" class="btn btn-primary" disabled>Generate voiceover</button>
+                            <span id="voiceoverStatus" class="voiceover-hint" role="status" aria-live="polite"></span>
+                        </div>
+                    </form>
+                    <div id="voiceoverResult" class="voiceover-result hidden">
+                        <audio id="voiceoverAudio" controls preload="metadata" aria-label="Voiceover preview"></audio>
+                        <div class="voiceover-actions">
+                            <button type="button" id="voiceoverOpenBtn" class="btn btn-secondary">Open in editor</button>
+                            <a id="voiceoverDownload" class="btn btn-ghost" download="voiceover.wav" href="#">Download</a>
                         </div>
                     </div>
-                </div>
+                </section>
 
-                <!-- ─── EXPORT PANEL ─── -->
-                <form id="cutForm">
+                <!-- Export -->
+                <form id="cutForm" aria-labelledby="exportHeading">
                     <div class="export-panel">
+                        <h2 class="panel-title" id="exportHeading">Export</h2>
 
-                        <!-- EFFECTS -->
-                        <div class="export-section">
-                            <h5>
-                                <i class="fas fa-magic"></i> Effects
-                                <span class="tooltip-trigger">
-                                    <i class="fas fa-info-circle info-icon"></i>
-                                    <span class="tooltip">Optional audio effects applied to your exported file. Click
-                                        any card to enable/disable it.</span>
-                                </span>
-                            </h5>
+                        <fieldset class="export-section">
+                            <legend class="export-label">Effects</legend>
                             <div class="effect-grid">
                                 <label class="effect-option">
                                     <input type="checkbox" name="fade_in" value="true">
-                                    <div class="effect-card">
-                                        <i class="fas fa-volume-up"></i>
-                                        <span>Fade In</span>
-                                        <small>Audio starts quiet and gradually gets louder — prevents harsh
-                                            starts</small>
-                                    </div>
+                                    <span class="effect-card">
+                                        <span class="effect-check" aria-hidden="true"><i class="fas fa-check"></i></span>
+                                        <span class="effect-text">
+                                            <span>Fade in</span>
+                                            <small>Ease in from silence</small>
+                                        </span>
+                                    </span>
                                 </label>
                                 <label class="effect-option">
                                     <input type="checkbox" name="fade_out" value="true">
-                                    <div class="effect-card">
-                                        <i class="fas fa-volume-down"></i>
-                                        <span>Fade Out</span>
-                                        <small>Audio gradually gets quieter at the end — smooth ending</small>
-                                    </div>
+                                    <span class="effect-card">
+                                        <span class="effect-check" aria-hidden="true"><i class="fas fa-check"></i></span>
+                                        <span class="effect-text">
+                                            <span>Fade out</span>
+                                            <small>Ease out to silence</small>
+                                        </span>
+                                    </span>
                                 </label>
                                 <label class="effect-option">
                                     <input type="checkbox" name="normalize" value="true">
-                                    <div class="effect-card">
-                                        <i class="fas fa-balance-scale"></i>
-                                        <span>Normalize</span>
-                                        <small>Makes quiet audio louder and loud audio even — perfect volume</small>
-                                    </div>
+                                    <span class="effect-card">
+                                        <span class="effect-check" aria-hidden="true"><i class="fas fa-check"></i></span>
+                                        <span class="effect-text">
+                                            <span>Normalize</span>
+                                            <small>Bring loudness to a consistent level</small>
+                                        </span>
+                                    </span>
                                 </label>
                                 <label class="effect-option">
                                     <input type="checkbox" name="reverse" value="true">
-                                    <div class="effect-card">
-                                        <i class="fas fa-undo"></i>
-                                        <span>Reverse</span>
-                                        <small>Plays the audio backwards — great for creative effects</small>
-                                    </div>
+                                    <span class="effect-card">
+                                        <span class="effect-check" aria-hidden="true"><i class="fas fa-check"></i></span>
+                                        <span class="effect-text">
+                                            <span>Reverse</span>
+                                            <small>Play the audio backwards</small>
+                                        </span>
+                                    </span>
                                 </label>
                             </div>
-                        </div>
+                        </fieldset>
 
-                        <!-- FORMAT -->
-                        <div class="export-section">
-                            <h5>
-                                <i class="fas fa-file-export"></i> Output Format
-                                <span class="tooltip-trigger">
-                                    <i class="fas fa-info-circle info-icon"></i>
-                                    <span class="tooltip">Choose the file type for your download. MP3 is smaller and
-                                        works everywhere. WAV is studio quality but larger.</span>
-                                </span>
-                            </h5>
+                        <fieldset class="export-section">
+                            <legend class="export-label">Format</legend>
                             <div class="format-grid">
                                 <label class="format-option">
                                     <input type="radio" name="format" value="mp3" checked>
-                                    <div class="format-card">
+                                    <span class="format-card">
                                         <strong>MP3</strong>
-                                        <span>Smaller file, great for sharing</span>
-                                    </div>
+                                        <span>Smaller, universal</span>
+                                    </span>
                                 </label>
                                 <label class="format-option">
                                     <input type="radio" name="format" value="wav">
-                                    <div class="format-card">
+                                    <span class="format-card">
                                         <strong>WAV</strong>
-                                        <span>Best quality, no compression</span>
-                                    </div>
+                                        <span>Lossless, larger</span>
+                                    </span>
                                 </label>
                             </div>
+                        </fieldset>
 
-                            <!-- EXPORT MODE -->
-                            <div class="format-grid" id="exportModeGroup" style="display:none; margin-top:12px;">
-                                <label class="format-option">
-                                    <input type="radio" name="export_mode" value="merged" checked>
-                                    <div class="format-card">
-                                        <strong>Merge All</strong>
-                                        <span>Combine regions into one file</span>
-                                    </div>
-                                </label>
-                                <label class="format-option">
-                                    <input type="radio" name="export_mode" value="separate">
-                                    <div class="format-card">
-                                        <strong>Separate Files</strong>
-                                        <span>Each region as its own file (ZIP)</span>
-                                    </div>
-                                </label>
-                            </div>
+                        <fieldset class="export-section format-grid export-mode-grid" id="exportModeGroup">
+                            <legend class="export-label">Multiple regions</legend>
+                            <label class="format-option">
+                                <input type="radio" name="export_mode" value="merged" checked>
+                                <span class="format-card">
+                                    <strong>Merge</strong>
+                                    <span>One file, in order</span>
+                                </span>
+                            </label>
+                            <label class="format-option">
+                                <input type="radio" name="export_mode" value="separate">
+                                <span class="format-card">
+                                    <strong>Separate</strong>
+                                    <span>One file each (ZIP)</span>
+                                </span>
+                            </label>
+                        </fieldset>
+
+                        <div class="export-footer">
+                            <button type="submit" id="submitBtn">
+                                <i class="fas fa-download" aria-hidden="true"></i>
+                                <span id="btnText">Export audio</span>
+                            </button>
+                            <p class="export-summary" id="exportSummary" aria-live="polite"></p>
                         </div>
-
-                        <!-- DOWNLOAD BUTTON -->
-                        <button type="submit" id="submitBtn">
-                            <i class="fas fa-download"></i>
-                            <span id="btnText">Download Cut</span>
-                        </button>
                     </div>
                 </form>
             </div>
         </div>
-    </div>
+    </main>
 
-    <!-- SPINNER -->
-    <div id="loadingOverlay" class="hidden">
+    <!-- Loading -->
+    <div id="loadingOverlay" class="hidden" role="status" aria-live="polite">
         <div class="spinner-container">
-            <div class="spinner"></div>
-            <p id="loadingText">Processing your audio...</p>
+            <div class="spinner" aria-hidden="true"></div>
+            <p id="loadingText">Processing audio…</p>
         </div>
     </div>
 
-    <!-- KEYBOARD SHORTCUTS -->
+    <!-- Keyboard shortcuts -->
     <div id="shortcutsOverlay" class="shortcuts-overlay hidden">
-        <div class="shortcuts-panel">
+        <div class="shortcuts-panel" role="dialog" aria-modal="true" aria-labelledby="shortcutsTitle">
             <div class="shortcuts-header">
-                <h3><i class="fas fa-keyboard"></i> Keyboard Shortcuts</h3>
-                <button id="closeShortcuts" class="close-btn">&times;</button>
+                <h3 id="shortcutsTitle">Keyboard shortcuts</h3>
+                <button type="button" id="closeShortcuts" class="close-btn" aria-label="Close" title="Close (Esc)">
+                    <i class="fas fa-xmark" aria-hidden="true"></i>
+                </button>
             </div>
             <div class="shortcuts-list">
-                <div class="shortcut-item"><kbd>Space</kbd><span>Play / Pause audio</span></div>
-                <div class="shortcut-item"><kbd>Double-Click</kbd><span>Add a new cut region on waveform</span></div>
-                <div class="shortcut-item"><kbd>Click Region</kbd><span>Select a region (shows red border)</span></div>
-                <div class="shortcut-item"><kbd>Delete</kbd><span>Remove the selected region</span></div>
-                <div class="shortcut-item"><kbd>Ctrl + Z</kbd><span>Undo last action (add/delete/clear)</span></div>
-                <div class="shortcut-item"><kbd>Drag Edges</kbd><span>Resize a region by dragging its edges</span></div>
-                <div class="shortcut-item"><kbd>← / →</kbd><span>Skip back / forward 5 seconds</span></div>
-                <div class="shortcut-item"><kbd>M</kbd><span>Mute / Unmute preview audio</span></div>
-                <div class="shortcut-item"><kbd>?</kbd><span>Show this help panel</span></div>
+                <p class="shortcuts-group">Playback</p>
+                <div class="shortcut-item"><span>Play or pause</span><kbd>Space</kbd></div>
+                <div class="shortcut-item"><span>Skip back or forward 5 s</span><span class="kbd-set"><kbd>←</kbd><kbd>→</kbd></span></div>
+                <div class="shortcut-item"><span>Mute or unmute preview</span><kbd>M</kbd></div>
+                <p class="shortcuts-group">Regions</p>
+                <div class="shortcut-item"><span>Add a region</span><span class="kbd-text">Double-click waveform</span></div>
+                <div class="shortcut-item"><span>Resize a region</span><span class="kbd-text">Drag its edges</span></div>
+                <div class="shortcut-item"><span>Delete the selected region</span><kbd>Delete</kbd></div>
+                <div class="shortcut-item"><span>Undo</span><span class="kbd-set"><kbd>Ctrl</kbd><kbd>Z</kbd></span></div>
+                <p class="shortcuts-group">General</p>
+                <div class="shortcut-item"><span>Show shortcuts</span><kbd>?</kbd></div>
             </div>
         </div>
     </div>

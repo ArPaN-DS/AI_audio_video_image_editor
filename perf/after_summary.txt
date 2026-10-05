@@ -1,0 +1,8 @@
+# Benchmark: after  (2026-10-05 22:48:58)
+RAM free at start: 2.02 GB / 15.6 GB
+
+
+capability                   latency s  peakRSS peakPriv   VRAM postdRSS postdPriv  thrd  hdld model  error
+audio.normalize_10min            50.38      219      293      0       78       131     1   107    no  
+audio.lufs_60min                 39.99      185      259      0       79       133     1   107    no  
+audio.normalize_60min           798.17      219      293      0       62       131    -2   107    no  

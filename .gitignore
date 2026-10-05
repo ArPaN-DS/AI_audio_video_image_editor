@@ -28,6 +28,9 @@ logs/*
 models/*
 !models/.gitkeep
 
+# ─── Performance benchmarking (never commit) ───
+perf/__pycache__/
+
 # ─── IDE ───
 .vscode/
 .idea/
@@ -48,3 +51,23 @@ github_profile_repo/
 # ─── Misc ───
 *.log
 
+
+# ─── Runtime user data (never commit) ───
+projects/*
+!projects/.gitkeep
+test_media_scratch/
+data/
+memory/
+*.sqlite
+*.sqlite3
+*.db
+*.db-wal
+*.db-shm
+
+# ─── Test & tool artifacts ───
+.pytest_cache/
+.coverage
+htmlcov/
+
+# ─── Copilot personal skills (user-created) ───
+user_skills/

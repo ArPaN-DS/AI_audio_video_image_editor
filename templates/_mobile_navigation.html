@@ -1,0 +1,25 @@
+{%- macro _navlink(href, icon, label, match) -%}
+{%- set _path = request.path -%}
+<a href="{{ href }}" class="mobile-nav-link{% if _path in match %} active{% endif %}"{% if _path in match %} aria-current="page"{% endif %}><i class="fas {{ icon }}" aria-hidden="true"></i> {{ label }}</a>
+{%- endmacro -%}
+<div id="mobileNavDrawer" class="mobile-nav-drawer hidden">
+    <div class="mobile-nav-backdrop" id="mobileNavBackdrop"></div>
+    <div class="mobile-nav-content">
+        <div class="mobile-nav-header">
+            <a href="/" class="app-brand">
+                <img src="{{ url_for('static', filename='brand-mark.svg') }}" alt="" class="app-brand-mark" width="28" height="28">
+                <span class="mobile-nav-title">{{ brand.product }}</span>
+            </a>
+            <button type="button" id="closeMobileNav" class="mobile-nav-close" aria-label="Close navigation"><i class="fas fa-xmark" aria-hidden="true"></i></button>
+        </div>
+        <nav class="mobile-nav-links" aria-label="Workspaces">
+            {{ _navlink('/', 'fa-house', 'Home', ['/']) }}
+            {{ _navlink('/agent', 'fa-comment-dots', brand.assistant, ['/agent', '/chat']) }}
+            <p class="mobile-nav-section">Editors</p>
+            {{ _navlink('/studio', 'fa-layer-group', 'Studio', ['/studio']) }}
+            {{ _navlink('/audio', 'fa-wave-square', 'Audio', ['/audio']) }}
+            {{ _navlink('/video', 'fa-film', 'Video', ['/video']) }}
+            {{ _navlink('/image', 'fa-image', 'Image', ['/image']) }}
+        </nav>
+    </div>
+</div>

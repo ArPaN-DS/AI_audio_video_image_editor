@@ -1,0 +1,16 @@
+{%- macro _navlink(href, icon, label, match) -%}
+{%- set _path = request.path -%}
+<a href="{{ href }}" class="page-nav-link{% if _path in match %} active{% endif %}"{% if _path in match %} aria-current="page"{% endif %} title="{{ label }}"><i class="fas {{ icon }}" aria-hidden="true"></i><span class="nav-label">{{ label }}</span></a>
+{%- endmacro -%}
+<a href="/" class="app-brand" aria-label="{{ brand.product }} home">
+    <img src="{{ url_for('static', filename='brand-mark.svg') }}" alt="" class="app-brand-mark" width="28" height="28">
+    <span class="app-brand-name">{{ brand.product }}</span>
+</a>
+<nav class="page-nav" aria-label="Workspaces">
+    {{ _navlink('/', 'fa-house', 'Home', ['/']) }}
+    {{ _navlink('/agent', 'fa-comment-dots', brand.assistant, ['/agent', '/chat']) }}
+    {{ _navlink('/studio', 'fa-layer-group', 'Studio', ['/studio']) }}
+    {{ _navlink('/audio', 'fa-wave-square', 'Audio', ['/audio']) }}
+    {{ _navlink('/video', 'fa-film', 'Video', ['/video']) }}
+    {{ _navlink('/image', 'fa-image', 'Image', ['/image']) }}
+</nav>

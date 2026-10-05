@@ -1,12 +1,12 @@
 <p align="center">
-  <img src="static/logo.png" alt="Audio Cutter Pro Logo" width="80">
+  <img src="static/brand-mark.svg" alt="App Logo" width="80">
 </p>
 
-<h1 align="center">🎵 Audio Cutter Pro <span>+ 🎬 Video + 🖼️ Image Editor</span></h1>
+<h1 align="center">🎵 Audio, Video & Image Studio</h1>
 
 <p align="center">
-  <strong>A professional-grade, browser-based audio, video &amp; image studio built with Flask, WaveSurfer.js &amp; FFmpeg</strong><br>
-  Cut audio • Edit video • Retouch images • Add text &amp; music • Extract audio • Export — all from your browser. No signup. No cloud.
+  <strong>A local, private, all-in-one multimedia editor with built-in AI assistant — no subscriptions, no cloud uploads, no accounts required</strong><br>
+  Edit audio • Edit video • Edit images • AI-assisted workflows • Transcribe • Denoise • Separate stems • All offline, on your own machine
 </p>
 
 <p align="center">
@@ -14,137 +14,101 @@
   <a href="https://github.com/ArPaN-DS/Audio_Cutter/network/members"><img src="https://img.shields.io/github/forks/ArPaN-DS/Audio_Cutter?style=for-the-badge&logo=github&color=4CAF50&labelColor=1a1a2e" alt="GitHub Forks"></a>
   <a href="https://github.com/ArPaN-DS/Audio_Cutter/issues"><img src="https://img.shields.io/github/issues/ArPaN-DS/Audio_Cutter?style=for-the-badge&color=FF6B6B&labelColor=1a1a2e" alt="Open Issues"></a>
   <a href="https://github.com/ArPaN-DS/Audio_Cutter/blob/main/LICENSE"><img src="https://img.shields.io/github/license/ArPaN-DS/Audio_Cutter?style=for-the-badge&color=blue&labelColor=1a1a2e" alt="MIT License"></a>
-  <img src="https://img.shields.io/badge/Python-3.9+-3776AB?style=for-the-badge&logo=python&logoColor=white&labelColor=1a1a2e" alt="Python 3.9+">
+  <img src="https://img.shields.io/badge/Python-3.9+-3776AB?style=for-the-badge&logo=python&logoColor=white&labelColor=1a1a2e" alt="Python 3.11+">
   <a href="https://github.com/ArPaN-DS/Audio_Cutter/actions"><img src="https://img.shields.io/github/actions/workflow/status/ArPaN-DS/Audio_Cutter/ci.yml?style=for-the-badge&label=CI&labelColor=1a1a2e" alt="CI Status"></a>
   <a href="https://github.com/ArPaN-DS/Audio_Cutter/commits/main"><img src="https://img.shields.io/github/last-commit/ArPaN-DS/Audio_Cutter?style=for-the-badge&labelColor=1a1a2e" alt="Last Commit"></a>
 </p>
 
 ---
 
-## ✨ Why Audio Cutter Pro?
+## ✨ Why This App?
 
-> **No subscriptions. No uploads to third-party servers. No account required.**
-> Your audio files never leave your machine — everything is processed locally on your own server.
+> **100% Private. Zero Cloud. No Subscriptions.**
+> Your files never leave your machine — everything is processed locally on your own server.
 
-| 🔒 Privacy-First | 🤖 Local AI Tools | ⚡ Feature-Rich | 🌐 Browser-Based |
+| 🔒 Privacy-First | 🤖 AI-Assisted | ⚡ Feature-Rich | 🌐 Browser-Based |
 |:---:|:---:|:---:|:---:|
-| Files stay on your server — never sent to cloud APIs | Silence detection, Transcript generator, auto-trim, BPM, and noise reduction (Runs 100% on CPU, even on resource-constrained devices) | Multi-region cutting, effects, undo/redo, mic recording | Works on any device with a browser — no app install |
+| All files stay on your server — never sent to cloud APIs | Built-in AI assistant for workflow help; local models for transcription, denoising, stem separation | Four dedicated editors (audio/video/image) + quick tools + manual controls | Works on any device with a browser — no app install |
 
 ---
 
-## 🚀 Features
+## 📋 What's Inside
 
-| Feature | Description |
-|---------|-------------|
-| 🎯 **Multi-Region Cutting** | Create unlimited cut regions on the waveform — each independently adjustable |
-| 🔊 **Audio Effects** | Fade In, Fade Out, Normalize (loudness leveling), Reverse |
-| 📤 **Flexible Export** | Export as **MP3** (320kbps) or **WAV** — merged or as separate ZIP files |
-| 🎙️ **Microphone Recording** | Record audio directly from your browser microphone |
-| 🖱️ **Drag & Drop Upload** | Drop your audio or video file directly onto the page |
-| ↩️ **Undo/Redo** | Full undo system (`Ctrl+Z`) for all region operations |
-| ⌨️ **Keyboard Shortcuts** | `Space`, `Delete`, `Ctrl+Z`, `← / →`, `M`, `?` |
-| 📱 **Fully Responsive** | Works on mobile, tablet, and desktop |
-| 🎨 **Premium Design** | Glassmorphism UI — clean, modern, professional |
-| 🤖 **AI-Powered Analysis** | Local silence detection, auto-trim, beat tracking (BPM), voice activity detection (VAD), **speech-to-text transcription** (requires `openai-whisper`), and local noise reduction — runs 100% on CPU |
+### 🎙️ Audio Editor (`/audio`)
+Edit, cut, and enhance audio with waveform precision:
+- Multi-region cutting with drag-and-drop
+- Audio effects (fade, normalize, reverse)
+- Real-time audio analysis (silence detection, BPM detection)
+- Speech-to-text transcription (on-device)
+- Noise reduction and voice isolation
+- Export to MP3 (320kbps) or WAV
+- Full undo/redo history
+- Keyboard shortcuts and responsive design
 
----
+### 🎬 Video Editor (`/video`)
+Build professional videos from a timeline:
+- Multi-clip timeline with drag-to-reorder
+- Per-clip speed control (0.25×–4×)
+- Per-clip audio control (volume, fade, mute)
+- Text overlays with custom styling and 9-point positioning
+- Filters and transforms (brightness, saturation, B&W, sepia, rotate)
+- Fade-through-black transitions
+- Canvas presets (original, 16:9, 9:16, 1:1, 720p)
+- Quick tools (extract audio, make GIF, compress, convert, grab frame, mute)
+- Export to MP4 or audio as MP3/WAV
 
-## 🎬 Video Editor
+### 🖼️ Image Editor (`/image`)
+Full-featured image editing, all in your browser (zero upload):
+- Crop & transform (ratio presets, rotate, flip)
+- Adjustments (brightness, contrast, saturation, warmth, blur)
+- Filter presets (B&W, sepia, vintage, cool, warm, vivid, invert)
+- Text & meme text (multiple draggable layers, outline support)
+- Drawing tools (brush, shapes, arrows, any color/size)
+- Paste from clipboard
+- Real super-resolution upscale (2×/4× via learned models)
+- Undo/redo history
+- Export as PNG, JPG, or WebP
 
-A full **audio + video combo editor** lives at **`/video`** — powered entirely by your local FFmpeg install. Built to be a *one-person studio* that's still simple enough for a complete beginner.
-
-**Multi-clip timeline (for full control):**
-
-| Feature | Description |
-|---------|-------------|
-| 🎞️ **Multi-Clip Timeline** | Import multiple videos/audio, drag to reorder, trim clip edges, and split at the playhead |
-| ⏩ **Speed Control** | 0.25× – 4× per clip (video *and* audio stay in sync) |
-| 🔊 **Per-Clip Audio** | Volume, mute, fade in/out — mix video sound with a background music track |
-| 🎨 **Filters & Transforms** | Brightness, contrast, saturation, B&W, sepia, rotate 90° |
-| 🔤 **Text Overlays** | Add captions with custom size, color, 9-point positioning, and timing |
-| 🔀 **Transitions** | Fade-through-black between clips |
-| 📐 **Canvas Presets** | Original, 16:9, 9:16 (Shorts/Reels), 1:1 (square), 720p |
-| 📤 **Flexible Export** | Render to **MP4**, or export the timeline's sound as **MP3/WAV** (audio-only) |
-
-**One-click Quick Tools (no timeline needed — perfect for laymen):**
-
-| Tool | What it does |
-|------|--------------|
-| 🎵 **Extract Audio** | Pull the MP3/WAV soundtrack out of any video |
-| 🖼️ **Make a GIF** | Turn a clip into an optimized animated GIF |
-| 🗜️ **Shrink File Size** | Compress video for easy sharing (light / balanced / strong) |
-| 🔄 **Convert / Resize** | Change format (MP4 / WebM / MKV) and resolution |
-| 📸 **Grab a Frame** | Save any moment as a snapshot image |
-| 🔇 **Mute Video** | Strip the audio track in one click |
-
-> Everything runs locally through FFmpeg — your files never leave your machine.
+### 🤖 AI Assistant
+An interactive AI assistant available throughout the app to help with:
+- Workflow guidance and best practices
+- Feature explanations and shortcuts
+- Custom editing suggestions
+- Memory of conversation context (local only)
 
 ---
 
-## 🖼️ Image Editor
-
-A full image editor lives at **`/image`** — and it's **100% client-side** (HTML Canvas), so your images are *never even uploaded*. Nothing touches the server.
-
-| Feature | Description |
-|---------|-------------|
-| ✂️ **Crop & Transform** | Free crop + ratio presets (1:1, 16:9, 9:16, 4:3, 2:3), rotate, flip H/V |
-| 🎚️ **Adjustments** | Brightness, contrast, saturation, warmth, blur — live sliders |
-| 🎨 **Filter Presets** | B&W, Sepia, Vintage, Cool, Warm, Vivid, Invert — one click |
-| 🔤 **Text & Memes** | Multiple draggable text layers; Impact + outline for classic meme text |
-| ✏️ **Draw & Annotate** | Freehand brush, rectangle, ellipse, line, arrow — any color/size |
-| ↩️ **Undo / Redo** | Full non-destructive history (`Ctrl+Z` / `Ctrl+Y`) |
-| 📋 **Paste Support** | Paste an image straight from your clipboard (`Ctrl+V`) |
-| 🔍 **Increase Quality (Local AI)** | **Real super-resolution** — genuinely upscales 2×/4× and reconstructs pixels, text & edges instead of stretching. The thing other platforms charge a subscription for, running free on your own CPU |
-| 📤 **Export** | PNG, JPG or WEBP with a quality slider |
-
-> Editing runs entirely in your browser (zero upload, complete privacy). The optional **Increase Quality** upscale sends the image only to *your own local server* — never the cloud.
-
-### 🔍 About "Increase Quality" (super-resolution)
-
-Unlike free tools that just bilinear-stretch an image (making text and edges blocky), this uses **learned super-resolution models** via OpenCV's `dnn_superres`:
-
-- **Fast (FSRCNN)** — near-instant, great for most images
-- **Best (EDSR)** — sharpest text & edges, slower on CPU (best for smaller images)
-
-The models download automatically the first time, or you can pre-fetch them:
-
-```bash
-python download_models.py
-```
-
-If the models or OpenCV aren't available, the app **automatically falls back** to high-quality Lanczos + sharpening — so the feature always works.
-
----
-
-## ⚡ Quick Start (5 minutes)
+## ⚡ Quick Start (Windows)
 
 ### Prerequisites
+- **Python 3.11+** → [Download](https://www.python.org/downloads/)
+- **FFmpeg** → [Download](https://ffmpeg.org/download.html) *(optional, but recommended for video/audio features)*
 
-- **Python 3.9+** → [Download](https://www.python.org/downloads/)
-- **FFmpeg** → [Download](https://ffmpeg.org/download.html) *(required for audio processing)*
-
-### Installation
+### Installation & Run
 
 ```bash
-# 1. Clone the repository
+# Clone the repository
 git clone https://github.com/ArPaN-DS/Audio_Cutter.git
 cd Audio_Cutter
 
-# 2. Create and activate a virtual environment
-python -m venv venv
+# Option A: Automatic (Windows)
+# Simply double-click run.bat
+# It will set up the venv, install dependencies, and start the server
 
-# Windows
+# Option B: Manual
+# 1. Create and activate virtual environment
+python -m venv venv
 venv\Scripts\activate
 
-# macOS / Linux
-source venv/bin/activate
-
-# 3. Install dependencies
+# 2. Install dependencies
 pip install -r requirements.txt
 
-# 4. Configure environment
-cp .env.example .env
+# 3. Configure environment
+copy .env.example .env
 # Edit .env and set your FLASK_SECRET_KEY
+
+# 4. (Optional) Download AI models for offline use
+python download_models.py
 
 # 5. Run the app
 python app.py
@@ -152,92 +116,40 @@ python app.py
 
 ### 🎉 Open → [http://localhost:5000](http://localhost:5000)
 
-> 📖 **Need more help?** See the [full setup guide →](docs/SETUP.md)
+> **📖 Need more help?** See the [full setup guide](docs/SETUP.md)
 
 ---
 
-## 🛠️ Tech Stack
+## 📦 Optional Model Packs
 
-| Layer | Technology |
-|-------|-----------|
-| **Backend** | Python 3.9+, Flask 3.x |
-| **Audio Engine** | Pydub + FFmpeg |
-| **Frontend** | HTML5, CSS3, Vanilla JavaScript |
-| **Waveform** | WaveSurfer.js v7 (Regions + Timeline plugins) |
-| **Fonts** | Google Fonts — Inter |
-| **Icons** | Font Awesome 6 |
-| **Logging** | PostgreSQL via psycopg2 (optional) |
+### Speech-to-Text & Image Super-Resolution
+These are **auto-downloaded** on first use, but you can pre-fetch them:
 
----
-
-## ⌨️ Keyboard Shortcuts
-
-| Shortcut | Action |
-|----------|--------|
-| `Space` | Play / Pause |
-| `Double-Click` | Add new region on waveform |
-| `Click Region` | Select a region |
-| `Delete` | Remove selected region |
-| `Ctrl + Z` | Undo last action |
-| `← / →` | Skip back / forward 5 seconds |
-| `M` | Mute / Unmute |
-| `?` | Show shortcuts panel |
-
----
-
-## 📁 Project Structure
-
+```bash
+python download_models.py
 ```
-Audio_Cutter/
-├── app.py                  # Flask backend — routes & audio processing
-├── ai_processor.py         # Local AI processing engine (silence, beats, denoise, speech detection)
-├── logger.py               # PostgreSQL upload logger (optional)
-├── requirements.txt        # Python dependencies
-├── .env.example            # Environment configuration template
-├── CHANGELOG.md            # Version history
-│
-├── static/
-│   ├── style.css           # Design system (1900+ lines)
-│   ├── script.js           # Frontend JS — WaveSurfer, regions, UX (700+ lines)
-│   └── logo.png            # App logo
-│
-├── templates/
-│   └── index.html          # Main HTML template (Jinja2)
-│
-├── .github/
-│   ├── workflows/ci.yml    # GitHub Actions CI — linting
-│   ├── ISSUE_TEMPLATE/     # Bug report & feature request forms
-│   └── PULL_REQUEST_TEMPLATE.md
-│
-├── docs/
-│   ├── SETUP.md            # Detailed setup guide
-│   ├── PRODUCTION.md       # Production deployment guide
-│   ├── USER_MANUAL.md      # End-user documentation
-│   └── CONTRIBUTING.md     # Contribution guidelines
-│
-├── uploads/                # Temporary uploaded files (auto-cleaned)
-├── processed/              # Temporary processed output files
-└── logs/                   # Application logs
+
+### Natural Voiceover (Text-to-Speech)
+Optional TTS pack (~350 MB) — install explicitly:
+
+```bash
+python download_models.py --voice       # Full voiceover pack
+python download_models.py --voice-lite  # Compact variant
+```
+
+### Studio Stems (Vocal/Instrument Separation)
+Optional neural separator (~84 MB + weights) — install explicitly:
+
+```bash
+python download_models.py --stems       # Core separator
+python download_models.py --stems-fine  # Plus 4-model ensemble
 ```
 
 ---
 
-## 📚 Documentation
+## ⚙️ Configuration
 
-| Document | Description |
-|----------|-------------|
-| [📋 Setup Guide](docs/SETUP.md) | Step-by-step setup for beginners |
-| [🏭 Production Guide](docs/PRODUCTION.md) | Deploy to a real server |
-| [📖 User Manual](docs/USER_MANUAL.md) | How to use every feature |
-| [🤝 Contributing](docs/CONTRIBUTING.md) | How to contribute to this project |
-| [📋 Changelog](CHANGELOG.md) | Version history |
-| [🔒 Security](SECURITY.md) | Vulnerability reporting policy |
-
----
-
-## 🔧 Configuration
-
-Copy `.env.example` to `.env` and update values:
+Copy `.env.example` to `.env`:
 
 ```bash
 cp .env.example .env
@@ -245,30 +157,126 @@ cp .env.example .env
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `FLASK_SECRET_KEY` | *(required)* | Session secret key — generate with `python -c "import secrets; print(secrets.token_hex(32))"` |
+| `FLASK_SECRET_KEY` | *(required)* | Session secret — generate with `python -c "import secrets; print(secrets.token_hex(32))"` |
 | `FLASK_PORT` | `5000` | Server port |
-| `DB_PASSWORD` | — | PostgreSQL password (optional logging) |
+| `APP_PRODUCT_NAME` | `"Studio"` | Display name for the app (configured at runtime) |
+| `APP_ASSISTANT_NAME` | `"Assistant"` | Display name for the AI helper (configured at runtime) |
+| `DB_PASSWORD` | — | PostgreSQL password (optional logging backend) |
 
 ---
 
-## 🗺️ Roadmap
+## 🧪 Testing
 
-Planned features for upcoming releases:
+Run the test suite to verify everything works:
 
-- [x] **v1.1** — Waveform zoom controls + speed adjustment (0.5×–2×)
-- [x] **v1.2** — Local AI integrations (Silence detection, auto-trim, BPM, denoise, Whisper transcription)
-- [ ] **v1.3** — Batch file processing (multiple files in one session)
-- [ ] **v1.4** — Audio merge from multiple source files
-- [ ] **v1.5** — Dark / Light mode toggle
-- [ ] **v2.0** — Docker one-command deployment
+```bash
+# Python e2e tests
+python e2e_full_automated_test.py
 
-> 💡 Have an idea? [Open a feature request →](https://github.com/ArPaN-DS/Audio_Cutter/issues/new?template=feature_request.yml)
+# Individual component tests
+python test_media_dsp_correctness.py
+python test_platform_hardening.py
+python test_reasoning_models.py
+python test_identity_guard.py
+
+# Agent evaluation (if offline reasoning is enabled)
+python agent_orchestration_eval.py
+python agent_skills_eval.py
+python slm_eval.py
+
+# JavaScript tests (frontend)
+node agent_chat_robustness_test.js
+node agent_session_test.js
+node agent_skills_ui_test.js
+node image_studio_test.js
+node local_voice_input_test.js
+node studio_agent_test.js
+node studio_playback_test.js
+```
+
+---
+
+## 🛠️ Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| **Backend** | Python 3.11+, Flask 3.x |
+| **Media processing** | FFmpeg (installed separately) plus local audio, video and image processing |
+| **AI features** | Local, on-device models only (optional packs via `download_models.py`) |
+| **Frontend** | HTML5, CSS3, vanilla JavaScript |
+| **Logging** | PostgreSQL via psycopg2 (optional) |
+
+---
+
+## 📁 Project Structure
+
+```
+Audio_Cutter/
+├── app.py                      # Flask backend — routes & request handling
+├── ai_processor.py             # Local AI processing (silence, beats, denoise, transcription)
+├── model_manager.py            # AI model lifecycle & resource governance
+├── agent_*.py                  # AI assistant modules (orchestration, memory, planner)
+├── slm_*.py                    # Local reasoning model (if enabled)
+├── {audio,video,image}_processor.py  # Specialized editors
+├── requirements.txt            # Python dependencies
+├── .env.example                # Environment template
+├── download_models.py          # Optional model pack installer
+├── THIRD_PARTY_NOTICES.md      # Third-party licenses
+│
+├── static/
+│   ├── style.css, *.css        # Design system (glassmorphism)
+│   ├── script.js, *.js         # Frontend logic
+│   ├── vendor/                 # Vendored libraries (Font Awesome, JSZip, wavesurfer)
+│   └── brand-mark.svg          # App logo
+│
+├── templates/
+│   ├── index.html              # Landing/dashboard
+│   ├── audio.html, video.html, image.html  # Editor templates
+│   └── studio.html             # Unified editor interface
+│
+├── docs/
+│   ├── SETUP.md                # Detailed setup guide
+│   ├── STORAGE.md              # Data storage & privacy policy
+│   └── ASSISTANT.md              # AI assistant guide (if applicable)
+│
+├── perf/
+│   └── bench.py, memprobe.py   # Performance benchmarking
+│
+├── uploads/, processed/, logs/ # Runtime data (auto-managed)
+└── models/                     # Downloaded AI models (local cache)
+```
+
+---
+
+## 🔧 Environment & Dependencies
+
+### Minimal Install
+```bash
+pip install -r requirements.txt
+```
+
+All core features work without optional packages. Advanced features gracefully degrade to fallbacks:
+- No neural voice-cleanup pack? → Uses spectral noise reduction
+- No stems pack? → Uses fast signal-processing separation
+- No FFmpeg? → Audio editor still works; video features are limited
+- No voice pack? → Voiceover uses the operating system's built-in voices
+
+### Advanced Options
+For offline reasoning, transcription, or stem separation, see [SETUP.md](docs/SETUP.md).
+
+---
+
+## 📄 License
+
+This project is licensed under the **MIT License** — see the [LICENSE](LICENSE) file for details.
+
+Third-party licenses are documented in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 ---
 
 ## 🤝 Contributing
 
-Contributions are very welcome! Whether it's a bug fix, a new feature, or improved documentation:
+Contributions are welcome! Whether it's a bug fix, feature, or documentation improvement:
 
 1. Fork the repo
 2. Create your branch: `git checkout -b feat/your-feature`
@@ -279,15 +287,8 @@ See [CONTRIBUTING.md](docs/CONTRIBUTING.md) for full guidelines.
 
 ---
 
-## 📄 License
-
-This project is licensed under the **MIT License** — see the [LICENSE](LICENSE) file for details.
-Free to use, modify, and distribute.
-
----
-
 <p align="center">
   Made with ❤️ by <a href="https://github.com/ArPaN-DS"><strong>ArPaN-DS</strong></a>
   <br><br>
-  If this project helped you, please consider giving it a ⭐ — it means a lot!
+  If this project helped you, please consider giving it a ⭐
 </p>

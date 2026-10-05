@@ -1,0 +1,37 @@
+# Benchmark: baseline  (2026-10-05 22:40:44)
+RAM free at start: 4.7 GB / 15.6 GB
+
+startup: import app 6.441 s | idle RSS 265.3 MB | private 1204.4 MB | threads 34 | heavy modules: PIL, joblib, librosa, noisereduce, numpy, pydub, scipy, soundfile, torch
+dev server (reloader parent + child): RSS 554.2 MB, private 2424.0 MB, ready 11.8 s, /api/system/resources 6.3 ms
+
+capability                   latency s  peakRSS peakPriv   VRAM postdRSS postdPriv  thrd  hdld model  error
+audio.lufs_10s                    0.13      318     1287      0       19        48     0    25    no  
+audio.lufs_10min                  5.65      768     1714      0       20        49     0    25    no  
+audio.lufs_10min_mp3             10.50      739     1715      0       19        48     0    25    no  
+audio.normalize_10s               1.13      344     1316      0       18        47     0    25    no  
+audio.normalize_10min            55.74     3548     4775     49     -109        48    -3    25    no  
+audio.eq_10s                      1.23      388     1300      0       98        68     0    74    no  
+audio.eq_10min                    9.93     2148     3060      5       97        67     0    74    no  
+audio.silence_10min              29.90     1042     1949      3      118        85     0    82    no  
+audio.vad_10min                   3.14     1020     1931      0       98        68     0    74    no  
+audio.trim_gaps_10min            18.04     2114     3054      0       19        16     0    25    no  
+audio.denoise_10s                 0.50      419     1392      0       19        48     0    27    no  
+audio.denoise_10min              56.56     1148     1914      0       20        49    -2    32    no  
+audio.duck_10s                    0.19      314     1285      0       20        49     0    25    no  
+audio.speed_10min                 1.42      282     1220      0       18        16     0    25    no  
+stt_10s                          37.86     2057     4503   2201      781      1209     6   215    no  
+stt_10min                       117.16     2045     4759   2361      784      1215     6   220    no  
+video.probe                       0.85      286     1223      0       18        15     0    25    no  
+video.filmstrip_30s               1.90      283     1220     57       18        16     0    25    no  
+video.compress_1080p_30s         17.82      282     1219      0       18        15     0    25    no  
+video.enhance_1080p_30s          15.70      283     1220      0       18        16     0    25    no  
+video.scenes_30s                  5.74      459     1419      0       44        60     0   172    no  
+image.upscale_12mp                3.77      874     1809      0       27        21     0   142    no  
+image.upscale_2mp                 0.85      384     1318      2       26        20     0   142    no  
+image.clarity_12mp                0.54      590     1523      0       39        33    21   197    no  
+image.color_12mp                  0.69     1039     1980      0       26        20     0   142    no  
+image.cutout_12mp                17.32     4917    10909      0       17       101    15   186    no  
+inspect.image_12mp                0.08      328     1266      0       22        20     0    25    no  
+inspect.audio_10min               1.18      334     1305      0       21        51     0    25    no  
+audio.lufs_60min                 52.36     3249     4191      0       22        51     0    25    no  
+audio.normalize_60min           338.47     7888    22391      0     -134        52    -1    25    no  

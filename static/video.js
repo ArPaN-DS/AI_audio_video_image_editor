@@ -1,10 +1,15 @@
 /* ═══════════════════════════════════════
    Video Editor Pro — Timeline engine
-   Audio + Video combo editor · local FFmpeg export
+   Audio + Video combo editor · private local export
    ═══════════════════════════════════════ */
 
 (() => {
     'use strict';
+
+    // User-supplied names/text are always escaped before entering innerHTML.
+    const esc = value => String(value ?? '').replace(/[&<>"']/g, ch => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    })[ch]);
 
     // ─── STATE ───
     const media = {};        // id -> {id, name, url, duration, hasVideo, hasAudio, thumbs, width, height}
@@ -52,13 +57,13 @@
     function showLoading(txt, percent = 30) {
         if (window.ProcessingOverlay) {
             window.ProcessingOverlay.show({
-                title: 'Video Studio Engine',
-                stageText: txt || 'Processing video clips & rendering timeline...',
+                title: 'Working on your video',
+                stageText: txt || 'Processing clips…',
                 category: 'video'
             });
-            window.ProcessingOverlay.updateProgress(percent, txt || 'Working on video project...');
+            window.ProcessingOverlay.updateProgress(percent, txt || 'Working on your video…');
         } else {
-            $('loadingText').textContent = txt || 'Processing...';
+            $('loadingText').textContent = txt || 'Working…';
             $('loadingOverlay').classList.remove('hidden');
         }
     }
@@ -73,16 +78,65 @@
     function toast(msg, type = 'info') {
         document.querySelectorAll('.app-toast').forEach(t => t.remove());
         const el = document.createElement('div');
-        el.className = 'app-toast';
-        const colors = { error: '#e74c3c', warning: '#f39c12', success: '#27ae60', info: '#2c3e50' };
-        el.textContent = msg;
-        el.style.cssText = `position:fixed;bottom:30px;left:50%;transform:translateX(-50%) translateY(20px);
-            background:${colors[type] || colors.info};color:#fff;padding:14px 28px;border-radius:12px;
-            font-size:.88rem;font-weight:600;z-index:99999;box-shadow:0 10px 30px rgba(0,0,0,.25);
-            opacity:0;transition:all .35s cubic-bezier(.16,1,.3,1);`;
+        const icons = { error: 'fa-circle-exclamation', warning: 'fa-triangle-exclamation', success: 'fa-circle-check', info: 'fa-circle-info' };
+        el.className = 'app-toast app-toast-' + (icons[type] ? type : 'info');
+        el.setAttribute('role', type === 'error' ? 'alert' : 'status');
+        const icon = document.createElement('i');
+        icon.className = 'fas ' + (icons[type] || icons.info);
+        icon.setAttribute('aria-hidden', 'true');
+        const text = document.createElement('span');
+        text.textContent = msg;
+        el.append(icon, text);
         document.body.appendChild(el);
-        requestAnimationFrame(() => { el.style.opacity = '1'; el.style.transform = 'translateX(-50%) translateY(0)'; });
-        setTimeout(() => { el.style.opacity = '0'; el.style.transform = 'translateX(-50%) translateY(20px)'; setTimeout(() => el.remove(), 400); }, 3200);
+        requestAnimationFrame(() => el.classList.add('is-visible'));
+        setTimeout(() => { el.classList.remove('is-visible'); setTimeout(() => el.remove(), 260); }, type === 'error' ? 5200 : 3200);
+    }
+
+    // ─── DIALOGS (focus management, Esc to close, Tab stays inside) ───
+    const dialogReturnFocus = {};
+    function openDialog(id) {
+        const ov = $(id); if (!ov) return;
+        if (ov.classList.contains('hidden')) dialogReturnFocus[id] = document.activeElement;
+        ov.classList.remove('hidden');
+        const target = ov.querySelector('.close-btn') || ov.querySelector('button');
+        if (target) requestAnimationFrame(() => target.focus());
+    }
+    function closeDialog(id) {
+        const ov = $(id); if (!ov || ov.classList.contains('hidden')) return;
+        ov.classList.add('hidden');
+        const back = dialogReturnFocus[id];
+        delete dialogReturnFocus[id];
+        if (back && document.contains(back) && typeof back.focus === 'function') back.focus();
+    }
+    function openDialogId() {
+        return ['veShortcutsOverlay', 'veExportOverlay', 'veQuickOverlay'].find(id => $(id) && !$(id).classList.contains('hidden'));
+    }
+    function trapDialogKeys(e) {
+        const id = openDialogId();
+        if (!id) return false;
+        if (e.key === 'Escape') { e.preventDefault(); closeDialog(id); return true; }
+        if (e.key === 'Tab') {
+            const items = [...$(id).querySelectorAll('button:not([disabled]), [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')]
+                .filter(el => el.offsetParent !== null);
+            if (!items.length) return true;
+            const first = items[0], last = items[items.length - 1];
+            if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+            else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+            return true;
+        }
+        return true;   // swallow editor shortcuts while a dialog is open
+    }
+
+    // Mirror the visual .active / .selected state into aria-pressed for toggle buttons.
+    const PRESSABLE = '.ve-seg .ve-chip, .ve-chip[data-toggle], .ve-quick-tool, #vePosGrid button';
+    function syncPressed(el) {
+        el.setAttribute('aria-pressed', (el.classList.contains('active') || el.classList.contains('selected')) ? 'true' : 'false');
+    }
+    function initPressedSync() {
+        document.querySelectorAll(PRESSABLE).forEach(syncPressed);
+        new MutationObserver(muts => muts.forEach(m => {
+            if (m.target.matches && m.target.matches(PRESSABLE)) syncPressed(m.target);
+        })).observe(document.body, { subtree: true, attributes: true, attributeFilter: ['class'] });
     }
 
     // ─── UNDO ───
@@ -106,7 +160,7 @@
     async function uploadFiles(fileList) {
         const files = Array.from(fileList).filter(f =>
             f.type.startsWith('video/') || f.type.startsWith('audio/'));
-        if (!files.length) { toast('Please choose video or audio files.', 'warning'); return; }
+        if (!files.length) { toast('Those files aren’t video or audio. Choose MP4, MOV, MKV, WEBM, MP3 or WAV files.', 'warning'); return; }
 
         hero.classList.add('hidden');
         const veEditor = document.getElementById('veEditor');
@@ -114,17 +168,18 @@
         veEditor.classList.remove('ve-pre-upload');
 
         for (const file of files) {
-            showLoading(`Importing ${file.name}...`);
+            showLoading(`Importing ${file.name}…`);
             const fd = new FormData();
             fd.append('file', file);
             try {
                 const res = await fetch('/video/upload', { method: 'POST', body: fd });
                 const data = await res.json();
-                if (!res.ok) { toast(data.error || 'Upload failed', 'error'); continue; }
+                if (!res.ok) { toast(data.error || `Couldn’t import ${file.name}. Check the file isn’t damaged and try again.`, 'error'); continue; }
+                data.file = file;   // keep the original for tools that re-process the source (captions, enhance)
                 media[data.id] = data;
                 renderMediaLibrary();
             } catch (e) {
-                toast('Upload failed: ' + e.message, 'error');
+                toast(`Couldn’t import ${file.name}: ${e.message}`, 'error');
             }
         }
         hideLoading();
@@ -140,15 +195,15 @@
             const thumb = m.thumbs && m.thumbs.length
                 ? `<img src="${m.thumbs[Math.floor(m.thumbs.length / 2)]}" alt="">`
                 : `<i class="fas fa-file-audio ve-audio-ico"></i>`;
-            const kind = m.has_video ? 'VIDEO' : 'AUDIO';
+            const kind = m.has_video ? 'Video' : 'Audio';
             item.innerHTML = `
                 <div class="ve-media-thumb">${thumb}<span class="ve-media-badge">${fmtTime(m.duration)} · ${kind}</span></div>
                 <div class="ve-media-body">
-                    <div class="ve-media-name" title="${m.name}">${m.name}</div>
+                    <div class="ve-media-name" title="${esc(m.name)}">${esc(m.name)}</div>
                     <div class="ve-media-actions">
-                        <button class="ve-add-clip" data-add="${m.id}"><i class="fas fa-plus"></i> Add</button>
-                        ${m.has_audio ? `<button data-music="${m.id}" title="Use as background music"><i class="fas fa-music"></i> Music</button>` : ''}
-                        ${m.has_video ? `<button data-tools="${m.id}" title="One-click quick tools"><i class="fas fa-wand-magic-sparkles"></i> Tools</button>` : ''}
+                        <button type="button" class="ve-add-clip" data-add="${m.id}" title="Add to the end of the timeline"><i class="fas fa-plus" aria-hidden="true"></i> Add</button>
+                        ${m.has_audio ? `<button type="button" data-music="${m.id}" title="Use as background music"><i class="fas fa-music" aria-hidden="true"></i> Music</button>` : ''}
+                        ${m.has_video ? `<button type="button" data-tools="${m.id}" title="Quick tools: GIF, compress, convert and more" aria-haspopup="dialog"><i class="fas fa-toolbox" aria-hidden="true"></i> Tools</button>` : ''}
                     </div>
                 </div>`;
             mediaList.appendChild(item);
@@ -177,7 +232,7 @@
         rebuildStageVideos();
         renderAll();
         seekTo(startPos);
-        toast(`Added “${m.name}” to timeline`, 'success');
+        toast(`Added “${m.name}” to the timeline`, 'success');
     }
 
     function deleteClip(id) {
@@ -210,12 +265,12 @@
     }
 
     async function detectScenes() {
-        if (!clips.length) { toast('Please add video clips to the timeline first.', 'warning'); return; }
+        if (!clips.length) { toast('Add a video clip to the timeline first, then detect scenes.', 'warning'); return; }
         const sel = (selected && selected.type === 'clip' ? clips.find(x => x.id === selected.id) : null) || clips[0];
         const m = media[sel.source];
-        if (!m) { toast('No valid media selected for scene detection.', 'warning'); return; }
+        if (!m) { toast('That clip’s source file is missing. Import it again and retry.', 'warning'); return; }
 
-        showLoading('AI Scene Detection analyzing video cuts...', 40);
+        showLoading('Looking for scene changes…', 40);
         try {
             const fd = new FormData();
             fd.append('media_id', m.id);
@@ -226,7 +281,7 @@
             if (!apiRes.ok || data.error) { toast(data.error || 'Scene detection failed', 'error'); return; }
 
             const scenes = data.scenes || [];
-            if (!scenes.length) { toast('No distinct scene cuts detected.', 'info'); return; }
+            if (!scenes.length) { toast('No scene changes found in this clip.', 'info'); return; }
 
             snapshot();
             scenes.forEach(sc => {
@@ -236,7 +291,7 @@
                     splitAtPlayhead();
                 }
             });
-            toast(`Detected ${scenes.length} scene cuts!`, 'success');
+            toast(`Found ${scenes.length} scene change${scenes.length === 1 ? '' : 's'}`, 'success');
             renderAll();
         } catch (e) {
             toast('Scene detection failed: ' + e.message, 'error');
@@ -308,6 +363,7 @@
         renderMusicStatus();
         $('veTotalTime').textContent = fmtTime(totalDur());
         stageEmpty.classList.toggle('hidden', clips.length > 0);
+        stage.classList.toggle('is-empty', clips.length === 0);
         seekTo(clamp(playhead, 0, totalDur()));
     }
 
@@ -346,7 +402,7 @@
                 thumbsHtml = '<div class="ve-clip-thumbs">' +
                     m.thumbs.map(u => `<img src="${u}" alt="">`).join('') + '</div>';
             } else {
-                el.style.background = 'linear-gradient(135deg,#0d9488,#14b8a6)';
+                el.classList.add('ve-clip-audio');
             }
             const badges = [];
             if (c.speed !== 1) badges.push(`${c.speed}×`);
@@ -356,7 +412,7 @@
                 ? '<div class="ve-clip-badges">' + badges.map(b => `<span class="ve-clip-badge">${b}</span>`).join('') + '</div>' : '';
 
             el.innerHTML = thumbsHtml + badgeHtml +
-                `<div class="ve-clip-label">${c.name}</div>` +
+                `<div class="ve-clip-label">${esc(c.name)}</div>` +
                 `<div class="ve-handle ve-handle-l"></div><div class="ve-handle ve-handle-r"></div>`;
             trackVideo.appendChild(el);
             attachClipInteractions(el, c);
@@ -373,7 +429,7 @@
             el.style.left = (t.start * pxPerSec) + 'px';
             el.style.width = Math.max(30, (t.end - t.start) * pxPerSec) + 'px';
             el.dataset.id = t.id;
-            el.innerHTML = `<i class="fas fa-font"></i> ${t.text || 'Text'}`;
+            el.innerHTML = `<i class="fas fa-font" aria-hidden="true"></i> ${esc(t.text || 'Text')}`;
             trackText.appendChild(el);
             attachTextInteractions(el, t);
         });
@@ -387,7 +443,7 @@
         const el = document.createElement('div');
         el.className = 've-music-block' + (selected && selected.type === 'music' ? ' selected' : '');
         el.style.width = Math.max(60, dur * pxPerSec) + 'px';
-        el.innerHTML = `<i class="fas fa-music"></i> ${music.name}${music.loop ? ' · loop' : ''}`;
+        el.innerHTML = `<i class="fas fa-music" aria-hidden="true"></i> ${esc(music.name)}${music.loop ? ' · loop' : ''}`;
         el.onclick = selectMusic;
         trackMusic.appendChild(el);
     }
@@ -396,9 +452,9 @@
         const box = $('veMusicStatus');
         if (!box) return;
         if (music) {
-            box.innerHTML = `<i class="fas fa-music"></i><span>“${music.name}” · ${Math.round(music.volume * 100)}% volume${music.loop ? ' · looping' : ''}. Click the orange track to adjust.</span>`;
+            box.innerHTML = `<i class="fas fa-music" aria-hidden="true"></i><span><strong>${esc(music.name)}</strong> · ${Math.round(music.volume * 100)}% volume${music.loop ? ' · looping' : ''}. Select the music track on the timeline to adjust it.</span>`;
         } else {
-            box.innerHTML = `<i class="fas fa-music"></i><span>No music added — import an audio file, then click <strong>“Music”</strong> on it.</span>`;
+            box.innerHTML = `<i class="fas fa-music" aria-hidden="true"></i><span>No music yet. Import an audio file, then choose <strong>Music</strong> on it.</span>`;
         }
     }
 
@@ -573,6 +629,7 @@
         if (playhead >= totalDur() - 0.05) playhead = 0;
         playing = true;
         $('vePlayIcon').className = 'fas fa-pause';
+        $('vePlayBtn').setAttribute('aria-label', 'Pause');
         lastTick = performance.now();
         const active = activeClipId && videoEls[activeClipId];
         if (active) active.play().catch(() => { });
@@ -581,6 +638,7 @@
     function pause() {
         playing = false;
         $('vePlayIcon').className = 'fas fa-play';
+        $('vePlayBtn').setAttribute('aria-label', 'Play');
         if (rafId) cancelAnimationFrame(rafId);
         Object.values(videoEls).forEach(v => v.pause());
     }
@@ -735,7 +793,7 @@
         texts.push(t);
         renderAll();
         selectText(t.id);
-        toast('Text added — edit it on the right', 'success');
+        toast('Text added. Edit it in the inspector.', 'success');
     }
 
     // ═══════════════════════════════════════
@@ -761,9 +819,9 @@
     }
 
     async function doExport(format) {
-        if (!clips.length) { toast('Add at least one clip first.', 'warning'); return; }
-        $('veExportOverlay').classList.add('hidden');
-        showLoading('Rendering your ' + (format === 'mp4' ? 'video' : 'audio') + '... this can take a while.');
+        if (!clips.length) { toast('Add at least one clip to the timeline before exporting.', 'warning'); return; }
+        closeDialog('veExportOverlay');
+        showLoading('Rendering your ' + (format === 'mp4' ? 'video' : 'audio') + '. Longer timelines take a while.');
         try {
             const res = await fetch('/video/export', {
                 method: 'POST',
@@ -772,12 +830,12 @@
             });
             if (!res.ok) {
                 const err = await res.json().catch(() => ({}));
-                toast(err.error || 'Export failed', 'error'); return;
+                toast(err.error || 'Export failed. Check your clips and try again.', 'error'); return;
             }
             downloadBlob(await res.blob(), 'edited_video.' + format);
-            toast('Export complete!', 'success');
+            toast('Export complete. Your file is downloading.', 'success');
         } catch (e) {
-            toast('Export failed: ' + e.message, 'error');
+            toast('Export failed: ' + e.message + '. Try again.', 'error');
         } finally { hideLoading(); }
     }
 
@@ -799,28 +857,28 @@
         $('veQuickFileName').textContent = media[mediaId] ? media[mediaId].name : 'file';
         $('veQuickOptions').classList.add('hidden');
         document.querySelectorAll('.ve-quick-tool').forEach(b => b.classList.remove('selected'));
-        $('veQuickOverlay').classList.remove('hidden');
+        openDialog('veQuickOverlay');
     }
 
     function pickQuickTool(op, btn) {
         quickOp = op;
         document.querySelectorAll('.ve-quick-tool').forEach(b => b.classList.toggle('selected', b === btn));
         // Extract & mute & frame have no options → run immediately
-        if (op === 'extract') { $('veQuickOverlay').classList.add('hidden'); extractAudio(quickMediaId); return; }
+        if (op === 'extract') { closeDialog('veQuickOverlay'); extractAudio(quickMediaId); return; }
         if (op === 'mute' || op === 'frame' || op === 'gif') { runQuick(); return; }
         // compress / convert show options
         $('veQuickOptions').classList.remove('hidden');
         document.querySelectorAll('.ve-quick-opt').forEach(o =>
             o.classList.toggle('hidden', o.dataset.for !== op));
-        $('veRunQuickText').textContent = op === 'compress' ? 'Compress & Download' : 'Convert & Download';
+        $('veRunQuickText').textContent = op === 'compress' ? 'Compress and download' : 'Convert and download';
     }
 
     async function runQuick() {
         const m = media[quickMediaId];
         if (!m || !quickOp) return;
-        $('veQuickOverlay').classList.add('hidden');
-        const labels = { gif: 'Making GIF', compress: 'Compressing', convert: 'Converting', frame: 'Grabbing frame', mute: 'Muting' };
-        showLoading((labels[quickOp] || 'Processing') + '...');
+        closeDialog('veQuickOverlay');
+        const labels = { gif: 'Making a GIF', compress: 'Compressing', convert: 'Converting', frame: 'Saving the frame', mute: 'Removing sound' };
+        showLoading((labels[quickOp] || 'Working') + '…');
         try {
             const fd = new FormData();
             fd.append('media_id', m.id);
@@ -834,16 +892,16 @@
                 fd.append('quality', document.querySelector('#veConvQuality .ve-chip.active').dataset.quality);
             }
             const res = await fetch('/video/quick', { method: 'POST', body: fd });
-            if (!res.ok) { const err = await res.json().catch(() => ({})); toast(err.error || 'Failed', 'error'); return; }
+            if (!res.ok) { const err = await res.json().catch(() => ({})); toast(err.error || 'That tool couldn’t process this file. Try another format or a shorter clip.', 'error'); return; }
             const ext = { gif: 'gif', compress: 'mp4', frame: 'jpg', mute: 'mp4', convert: (document.querySelector('#veConvContainer .ve-chip.active') || {}).dataset?.container || 'mp4' }[quickOp];
             downloadBlob(await res.blob(), m.name.replace(/\.[^.]+$/, '') + '_' + quickOp + '.' + ext);
-            toast('Done!', 'success');
-        } catch (e) { toast('Failed: ' + e.message, 'error'); }
+            toast('Done. Your file is downloading.', 'success');
+        } catch (e) { toast('Couldn’t finish: ' + e.message + '. Try again.', 'error'); }
         finally { hideLoading(); }
     }
 
     function initQuickTools() {
-        $('veCloseQuick').onclick = () => $('veQuickOverlay').classList.add('hidden');
+        $('veCloseQuick').onclick = () => closeDialog('veQuickOverlay');
         document.querySelectorAll('.ve-quick-tool').forEach(b =>
             b.onclick = () => pickQuickTool(b.dataset.op, b));
         $('veRunQuickBtn').onclick = runQuick;
@@ -856,48 +914,64 @@
         });
     }
 
-    async function burnSubtitles() {
+    // Tools that re-process the first video clip's source file and download a new copy.
+    async function processSourceCopy({ endpoint, fields, title, stageText, fileName, doneMsg, failMsg }) {
         const videoClips = clips.filter(c => c.hasVideo);
         if (videoClips.length === 0) {
-            toast('Please add a video clip first.', 'warning'); return;
+            toast('Add a video clip to the timeline first.', 'warning'); return;
         }
-        const firstClip = videoClips[0];
-        const mediaObj = media[firstClip.source];
+        const mediaObj = media[videoClips[0].source];
         if (!mediaObj || !mediaObj.file) {
-            toast('Please load a valid video file.', 'warning'); return;
+            toast('The source file for this clip isn’t available. Import it again, then retry.', 'warning'); return;
         }
 
         if (window.ProcessingOverlay) {
-            window.ProcessingOverlay.show({
-                title: 'AI Subtitle Burner (CapCut Style)',
-                message: 'Transcribing speech & rendering hardcoded subtitles...'
-            });
+            window.ProcessingOverlay.show({ title, stageText, category: 'video' });
         } else {
-            showLoading('Burning subtitles...');
+            showLoading(stageText);
         }
 
         try {
             const fd = new FormData();
             fd.append('file', mediaObj.file);
-            fd.append('style', 'yellow_box');
+            Object.entries(fields || {}).forEach(([k, v]) => fd.append(k, v));
 
-            const res = await fetch('/video/burn-subtitles', { method: 'POST', body: fd });
+            const res = await fetch(endpoint, { method: 'POST', body: fd });
             if (!res.ok) {
-                const e = await res.json().catch(() => ({})); toast(e.error || 'Subtitle burning failed', 'error'); return;
+                const e = await res.json().catch(() => ({})); toast(e.error || failMsg, 'error'); return;
             }
-
-            const blob = await res.blob();
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url; a.download = 'subtitled_video.mp4'; a.click();
-            URL.revokeObjectURL(url);
-            toast('💬 Subtitled video downloaded successfully!', 'success');
+            downloadBlob(await res.blob(), fileName);
+            toast(doneMsg, 'success');
         } catch (e) {
-            toast('Subtitle burning failed: ' + e.message, 'error');
+            toast(failMsg + ' (' + e.message + ')', 'error');
         } finally {
             if (window.ProcessingOverlay) window.ProcessingOverlay.hide();
             else hideLoading();
         }
+    }
+
+    function burnSubtitles() {
+        return processSourceCopy({
+            endpoint: '/video/burn-subtitles',
+            fields: { style: 'yellow_box' },
+            title: 'Adding captions',
+            stageText: 'Transcribing speech and rendering captions…',
+            fileName: 'captioned_video.mp4',
+            doneMsg: 'Captioned copy is downloading.',
+            failMsg: 'Couldn’t add captions. Check the clip has clear speech and try again.',
+        });
+    }
+
+    function enhanceQuality() {
+        return processSourceCopy({
+            endpoint: '/video/enhance-quality',
+            fields: { mode: '1080p' },
+            title: 'Enhancing quality',
+            stageText: 'Reducing noise and sharpening detail…',
+            fileName: 'enhanced_video.mp4',
+            doneMsg: 'Enhanced copy is downloading.',
+            failMsg: 'Couldn’t enhance this video. Try a shorter clip.',
+        });
     }
 
     // ═══════════════════════════════════════
@@ -915,6 +989,22 @@
         ['dragleave', 'drop'].forEach(ev => ua.addEventListener(ev, () => ua.classList.remove('drag-active')));
         ua.addEventListener('drop', e => { e.preventDefault(); uploadFiles(e.dataTransfer.files); });
 
+        // Empty-state browse button + drag-and-drop onto the preview stage
+        if ($('veBrowseBtn')) $('veBrowseBtn').onclick = () => $('veFileInput2').click();
+        const stageCol = stage ? stage.closest('.ve-stage-col') : null;
+        if (stageCol) {
+            let dragDepth = 0;
+            const hasFiles = e => e.dataTransfer && [...(e.dataTransfer.types || [])].includes('Files');
+            stageCol.addEventListener('dragenter', e => { if (!hasFiles(e)) return; e.preventDefault(); dragDepth++; stageCol.classList.add('is-dragover'); });
+            stageCol.addEventListener('dragover', e => { if (!hasFiles(e)) return; e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; });
+            stageCol.addEventListener('dragleave', () => { dragDepth = Math.max(0, dragDepth - 1); if (!dragDepth) stageCol.classList.remove('is-dragover'); });
+            stageCol.addEventListener('drop', e => {
+                if (!hasFiles(e)) return;
+                e.preventDefault(); dragDepth = 0; stageCol.classList.remove('is-dragover');
+                uploadFiles(e.dataTransfer.files);
+            });
+        }
+
         // Transport
         $('vePlayBtn').onclick = togglePlay;
         $('veSkipStartBtn').onclick = () => seekTo(0);
@@ -923,6 +1013,7 @@
         $('veSplitBtn').onclick = splitAtPlayhead;
         if ($('veDetectScenesBtn')) $('veDetectScenesBtn').onclick = detectScenes;
         if ($('veBurnSubtitlesBtn')) $('veBurnSubtitlesBtn').onclick = burnSubtitles;
+        if ($('veEnhanceQualityBtn')) $('veEnhanceQualityBtn').onclick = enhanceQuality;
         $('veAddTextBtn').onclick = addText;
 
         // Zoom
@@ -990,7 +1081,7 @@
 
         // Export modal
         $('veExportBtn').onclick = openExport;
-        $('veCloseExport').onclick = () => $('veExportOverlay').classList.add('hidden');
+        $('veCloseExport').onclick = () => closeDialog('veExportOverlay');
         $('veExportFormatRow').addEventListener('click', e => {
             const b = e.target.closest('.ve-chip'); if (!b) return;
             document.querySelectorAll('#veExportFormatRow .ve-chip').forEach(c => c.classList.toggle('active', c === b));
@@ -1002,8 +1093,14 @@
 
         if ($('veDetectScenesBtn')) $('veDetectScenesBtn').onclick = detectScenes;
         if ($('veBurnSubtitlesBtn')) $('veBurnSubtitlesBtn').onclick = burnSubtitles;
-        $('veHelpBtn').onclick = () => $('veShortcutsOverlay').classList.remove('hidden');
-        $('veCloseShortcuts').onclick = () => $('veShortcutsOverlay').classList.add('hidden');
+        $('veHelpBtn').onclick = () => openDialog('veShortcutsOverlay');
+        $('veCloseShortcuts').onclick = () => closeDialog('veShortcutsOverlay');
+        // Click on the dimmed backdrop closes a dialog
+        ['veShortcutsOverlay', 'veExportOverlay', 'veQuickOverlay'].forEach(id => {
+            const ov = $(id);
+            if (ov) ov.addEventListener('mousedown', e => { if (e.target === ov) closeDialog(id); });
+        });
+        initPressedSync();
 
         // Keyboard
         document.addEventListener('keydown', onKey);
@@ -1012,24 +1109,29 @@
     }
 
     function openExport() {
-        if (!clips.length) { toast('Add at least one clip first.', 'warning'); return; }
+        if (!clips.length) { toast('Add at least one clip to the timeline before exporting.', 'warning'); return; }
         const has = clips.some(c => c.hasVideo);
+        const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
         $('veExportSummary').innerHTML =
-            `<strong>${clips.length}</strong> clip(s) · <strong>${fmtTime(totalDur())}</strong> · ` +
-            `${texts.length} text overlay(s)${music ? ' · background music' : ''}. ` +
-            (has ? 'Choose MP4 for video, or MP3/WAV for audio-only.' : 'This is an audio-only timeline.');
+            `<strong>${plural(clips.length, 'clip')}</strong> · <strong>${fmtTime(totalDur())}</strong> · ` +
+            `${plural(texts.length, 'text overlay')}${music ? ' · background music' : ''}. ` +
+            (has ? 'Choose MP4 for video, or MP3 or WAV for sound only.' : 'This timeline has sound only.');
         // preselect project format
         document.querySelectorAll('#veExportFormatRow .ve-chip').forEach(c =>
             c.classList.toggle('active', c.dataset.fmt === project.format));
-        $('veExportOverlay').classList.remove('hidden');
+        openDialog('veExportOverlay');
     }
 
     function onKey(e) {
+        if (trapDialogKeys(e)) return;
         const tag = (e.target.tagName || '').toLowerCase();
-        if (tag === 'input' || tag === 'textarea') return;
+        if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+        // Let Space/Enter activate the focused button instead of hijacking them.
+        if ((e.key === ' ' || e.key === 'Enter') && (tag === 'button' || tag === 'a')) return;
+        const plainKey = !(e.ctrlKey || e.metaKey || e.altKey);
         if (e.key === ' ') { e.preventDefault(); togglePlay(); }
-        else if (e.key === 's' || e.key === 'S') { e.preventDefault(); splitAtPlayhead(); }
-        else if (e.key === 't' || e.key === 'T') { e.preventDefault(); addText(); }
+        else if (plainKey && (e.key === 's' || e.key === 'S')) { e.preventDefault(); splitAtPlayhead(); }
+        else if (plainKey && (e.key === 't' || e.key === 'T')) { e.preventDefault(); addText(); }
         else if (e.key === 'Delete' || e.key === 'Backspace') {
             if (selected && selected.type === 'clip') deleteClip(selected.id);
             else if (selected && selected.type === 'text') { snapshot(); texts = texts.filter(x => x.id !== selected.id); selected = null; renderAll(); }
@@ -1037,7 +1139,7 @@
         else if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')) { e.preventDefault(); undo(); }
         else if (e.key === 'ArrowLeft') { e.preventDefault(); seekTo(playhead - (e.shiftKey ? 5 : 0.5)); }
         else if (e.key === 'ArrowRight') { e.preventDefault(); seekTo(playhead + (e.shiftKey ? 5 : 0.5)); }
-        else if (e.key === '?') { $('veShortcutsOverlay').classList.toggle('hidden'); }
+        else if (e.key === '?') { openDialog('veShortcutsOverlay'); }
     }
 
     document.addEventListener('DOMContentLoaded', init);

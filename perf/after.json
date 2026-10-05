@@ -1,0 +1,142 @@
+{
+  "label": "after",
+  "system": {
+    "python": "3.11.9",
+    "cpu_count": 16,
+    "ram_total_gb": 15.6,
+    "ram_free_gb_at_start": 2.02,
+    "platform": "win32",
+    "time": "2026-10-05 22:48:58"
+  },
+  "capabilities": [
+    {
+      "scenario": "audio.normalize_10min",
+      "import_sec": 0.345,
+      "idle": {
+        "rss_mb": 50.8,
+        "private_mb": 71.2,
+        "threads": 5,
+        "handles": 201,
+        "python_threads": 1
+      },
+      "heavy_modules_after_import": [
+        "PIL",
+        "numpy",
+        "pydub",
+        "soundfile"
+      ],
+      "latency_sec": 50.385,
+      "error": null,
+      "peak_rss_mb": 218.6,
+      "peak_private_mb": 292.9,
+      "peak_vram_delta_mb": 0.0,
+      "post": {
+        "rss_mb": 128.5,
+        "private_mb": 202.6,
+        "threads": 6,
+        "handles": 308,
+        "python_threads": 1
+      },
+      "post_rss_delta_mb": 77.7,
+      "post_private_delta_mb": 131.4,
+      "thread_delta": 1,
+      "handle_delta": 107,
+      "model_resident_after": false,
+      "process_write_mb": 109.9,
+      "output_mb": 109.9,
+      "heavy_modules_after_job": [
+        "PIL",
+        "numpy",
+        "pydub",
+        "scipy",
+        "soundfile"
+      ]
+    },
+    {
+      "scenario": "audio.lufs_60min",
+      "import_sec": 0.327,
+      "idle": {
+        "rss_mb": 50.8,
+        "private_mb": 71.2,
+        "threads": 5,
+        "handles": 201,
+        "python_threads": 1
+      },
+      "heavy_modules_after_import": [
+        "PIL",
+        "numpy",
+        "pydub",
+        "soundfile"
+      ],
+      "latency_sec": 39.989,
+      "error": null,
+      "peak_rss_mb": 185.2,
+      "peak_private_mb": 259.3,
+      "peak_vram_delta_mb": 0.0,
+      "post": {
+        "rss_mb": 130.0,
+        "private_mb": 203.8,
+        "threads": 6,
+        "handles": 308,
+        "python_threads": 1
+      },
+      "post_rss_delta_mb": 79.1,
+      "post_private_delta_mb": 132.6,
+      "thread_delta": 1,
+      "handle_delta": 107,
+      "model_resident_after": false,
+      "process_write_mb": 0.0,
+      "output_mb": 0.0,
+      "heavy_modules_after_job": [
+        "PIL",
+        "numpy",
+        "pydub",
+        "scipy",
+        "soundfile"
+      ]
+    },
+    {
+      "scenario": "audio.normalize_60min",
+      "import_sec": 0.3,
+      "idle": {
+        "rss_mb": 50.9,
+        "private_mb": 71.2,
+        "threads": 5,
+        "handles": 201,
+        "python_threads": 1
+      },
+      "heavy_modules_after_import": [
+        "PIL",
+        "numpy",
+        "pydub",
+        "soundfile"
+      ],
+      "latency_sec": 798.168,
+      "error": null,
+      "peak_rss_mb": 219.3,
+      "peak_private_mb": 293.2,
+      "peak_vram_delta_mb": 0.0,
+      "post": {
+        "rss_mb": 112.7,
+        "private_mb": 201.9,
+        "threads": 3,
+        "handles": 308,
+        "python_threads": 1
+      },
+      "post_rss_delta_mb": 61.8,
+      "post_private_delta_mb": 130.6,
+      "thread_delta": -2,
+      "handle_delta": 107,
+      "model_resident_after": false,
+      "process_write_mb": 659.2,
+      "output_mb": 659.2,
+      "heavy_modules_after_job": [
+        "PIL",
+        "numpy",
+        "pydub",
+        "scipy",
+        "soundfile"
+      ]
+    }
+  ]
+}

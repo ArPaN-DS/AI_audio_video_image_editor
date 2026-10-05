@@ -4,427 +4,383 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="color-scheme" content="light dark">
-    <!-- No-FOUC theme: apply saved / preferred theme before first paint -->
-    <script>
-        (function () {
-            try {
-                var t = localStorage.getItem('theme');
-                if (!t) t = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-                document.documentElement.setAttribute('data-theme', t);
-            } catch (e) { document.documentElement.setAttribute('data-theme', 'light'); }
-        })();
-    </script>
-    <title>Video Editor — Audio Cutter Pro</title>
-    <meta name="description"
-        content="Free online video editor. Cut, trim, add music and text, apply filters and export — all locally. No signup required.">
+    {% include '_head.html' %}
+    <title>Video Editor — {{ brand.product }}</title>
+    <meta name="description" content="Cut, arrange and caption video, add music and export on your own computer. Nothing is uploaded.">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='video.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='processing_overlay.css') }}">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='vendor/fontawesome/css/all.min.css') }}">
     <script src="{{ url_for('static', filename='theme.js') }}" defer></script>
 </head>
 
 <body class="ve-body">
 
-    <!-- ─── HEADER ─── -->
-    <header>
-        <div class="logo-container">
-            <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo">
-            <h1>Video Editor <span class="pro-badge">PRO</span></h1>
-        </div>
-        <nav class="page-nav">
-            <a href="/" class="page-nav-link" title="Studio Hub"><i class="fas fa-th-large"></i> Hub</a>
-            <a href="/audio" class="page-nav-link"><i class="fas fa-music"></i> Audio</a>
-            <a href="/video" class="page-nav-link active"><i class="fas fa-film"></i> Video</a>
-            <a href="/image" class="page-nav-link"><i class="fas fa-image"></i> Image</a>
-        </nav>
+    <a class="skip-link" href="#main">Skip to content</a>
+
+    <header class="app-header">
+        {% include '_app_nav.html' %}
         <div class="header-actions">
-            <button id="themeToggle" class="header-btn" title="Switch to dark theme" aria-label="Switch to dark theme">
-                <i class="fas fa-moon"></i>
+            <button type="button" id="themeToggle" class="header-btn" title="Switch theme" aria-label="Switch theme">
+                <i class="fas fa-moon" aria-hidden="true"></i>
             </button>
-            <button id="veHelpBtn" class="header-btn" title="Show all keyboard shortcuts">
-                <i class="fas fa-keyboard"></i>
+            <button type="button" id="veHelpBtn" class="header-btn" title="Keyboard shortcuts (?)" aria-label="Keyboard shortcuts" aria-haspopup="dialog">
+                <i class="fas fa-keyboard" aria-hidden="true"></i>
             </button>
-            <button id="mobileMenuBtn" class="header-btn mobile-menu-btn" title="Open Navigation Menu" aria-label="Open Navigation Menu">
-                <i class="fas fa-bars"></i>
+            <button type="button" id="mobileMenuBtn" class="header-btn mobile-menu-btn" aria-label="Open navigation">
+                <i class="fas fa-bars" aria-hidden="true"></i>
             </button>
         </div>
     </header>
 
-    <!-- ─── MOBILE NAVIGATION DRAWER ─── -->
-    <div id="mobileNavDrawer" class="mobile-nav-drawer hidden">
-        <div class="mobile-nav-backdrop" id="mobileNavBackdrop"></div>
-        <div class="mobile-nav-content">
-            <div class="mobile-nav-header">
-                <div class="logo-container">
-                    <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo">
-                    <span class="mobile-nav-title">Media Studio</span>
-                </div>
-                <button id="closeMobileNav" class="close-btn" aria-label="Close Navigation Menu">&times;</button>
-            </div>
-            <nav class="mobile-nav-links">
-                <a href="/" class="mobile-nav-link"><i class="fas fa-th-large"></i> Hub</a>
-                <a href="/audio" class="mobile-nav-link"><i class="fas fa-music"></i> Audio Editor</a>
-                <a href="/video" class="mobile-nav-link active"><i class="fas fa-film"></i> Video Editor</a>
-                <a href="/image" class="mobile-nav-link"><i class="fas fa-image"></i> Image Editor</a>
-                <a href="/studio" class="mobile-nav-link pro-link"><i class="fas fa-sliders-h"></i> Pro Studio</a>
-            </nav>
-        </div>
-    </div>
+    {% include '_mobile_navigation.html' %}
 
-    <!-- ─── UPLOAD HERO (hidden to allow full-screen editor layout) ─── -->
-    <div class="ve-hero hidden" id="veHero">
-        <div class="card ve-hero-card">
+    <main class="ve-main" id="main" tabindex="-1">
+        <h1 class="sr-only">Video editor</h1>
+
+        <!-- Legacy upload hero: kept hidden; its file input and drop area are still wired by video.js -->
+        <div class="ve-hero hidden" id="veHero">
             <div class="upload-area" id="veUploadArea">
-                <div class="upload-icon"><i class="fas fa-clapperboard"></i></div>
-                <p class="upload-title">Drop your Video or Audio files here</p>
-                <p class="upload-subtitle">MP4, MKV, MOV, WEBM, MP3, WAV and more · Multiple files supported ·
-                    Everything stays on your machine</p>
+                <p class="upload-title">Import video or audio</p>
+                <label class="sr-only" for="veFileInput">Choose video or audio files</label>
                 <input type="file" id="veFileInput" accept="video/*,audio/*" multiple>
             </div>
         </div>
-    </div>
 
-    <!-- ─── EDITOR ─── -->
-    <div class="ve-editor" id="veEditor">
+        <!-- ─── EDITOR ─── -->
+        <div class="ve-editor" id="veEditor">
 
-        <div class="ve-workspace">
+            <div class="ve-workspace">
 
-            <!-- LEFT: MEDIA LIBRARY -->
-            <aside class="ve-panel ve-media-panel">
-                <div class="ve-panel-header">
-                    <h4><i class="fas fa-photo-film"></i> Media</h4>
-                    <button id="veAddMediaBtn" class="btn-small" title="Import more files">
-                        <i class="fas fa-plus"></i> Import
-                    </button>
-                    <input type="file" id="veFileInput2" accept="video/*,audio/*" multiple class="hidden-input">
-                </div>
-                <div class="ve-media-list" id="veMediaList"></div>
-            </aside>
+                <!-- LEFT: MEDIA LIBRARY -->
+                <aside class="ve-panel ve-media-panel" aria-labelledby="veMediaTitle">
+                    <div class="ve-panel-header">
+                        <h2 id="veMediaTitle">Media</h2>
+                        <button type="button" id="veAddMediaBtn" class="ve-btn ve-btn-sm" title="Import video or audio files">
+                            <i class="fas fa-plus" aria-hidden="true"></i> Import
+                        </button>
+                        <input type="file" id="veFileInput2" accept="video/*,audio/*" multiple class="hidden-input" tabindex="-1" aria-hidden="true">
+                    </div>
+                    <div class="ve-media-list" id="veMediaList" aria-live="polite"></div>
+                    <p class="ve-media-empty" id="veMediaEmpty">Imported files appear here. Choose <strong>Add</strong> on a file to place it on the timeline.</p>
+                </aside>
 
-            <!-- CENTER: PREVIEW STAGE -->
-            <section class="ve-stage-col">
-                <div class="ve-stage-wrap" id="veStageWrap">
-                    <div class="ve-stage" id="veStage">
-                        <div class="ve-stage-videos" id="veStageVideos"></div>
-                        <div class="ve-stage-texts" id="veStageTexts"></div>
-                        <div class="ve-stage-empty" id="veStageEmpty" style="cursor: pointer; line-height: 1.5;">
-                            <div style="font-size: 3rem; color: #6366f1; margin-bottom: 12px; line-height: 1;"><i class="fas fa-clapperboard"></i></div>
-                            <p style="font-size: 1.1rem; font-weight: 600; margin: 0 0 6px 0; line-height: 1.4; color: #ffffff;">Drop your Video or Audio files here</p>
-                            <p style="font-size: 0.85rem; opacity: 0.7; margin: 0 0 16px 0; line-height: 1.4; color: #cccccc;">Supports MP4, MKV, MOV, WEBM, MP3, WAV and more</p>
-                            <button class="btn-small" type="button" style="padding: 8px 18px; font-size: 0.9rem;" onclick="document.getElementById('veFileInput2').click()">
-                                <i class="fas fa-folder-open"></i> Browse Files
+                <!-- CENTER: PREVIEW STAGE -->
+                <section class="ve-stage-col" aria-label="Preview">
+                    <div class="ve-stage-wrap" id="veStageWrap">
+                        <div class="ve-stage is-empty" id="veStage">
+                            <div class="ve-stage-videos" id="veStageVideos"></div>
+                            <div class="ve-stage-texts" id="veStageTexts"></div>
+                            <div class="ve-stage-empty" id="veStageEmpty">
+                                <span class="ve-empty-icon" aria-hidden="true"><i class="fas fa-film"></i></span>
+                                <p class="ve-empty-title">Start with your footage</p>
+                                <p class="ve-empty-text">Drop video or audio files here, or browse your computer.</p>
+                                <button type="button" class="ve-btn ve-btn-primary" id="veBrowseBtn">
+                                    <i class="fas fa-arrow-up-from-bracket" aria-hidden="true"></i> Browse files
+                                </button>
+                                <p class="ve-empty-meta">MP4, MOV, MKV, WEBM, MP3, WAV · Files stay on this computer</p>
+                            </div>
+                            <div class="ve-drop-hint" aria-hidden="true"><span>Drop to import</span></div>
+                        </div>
+                    </div>
+                    <div class="ve-transport" role="group" aria-label="Playback">
+                        <button type="button" id="veSkipStartBtn" class="mini-btn" title="Jump to start" aria-label="Jump to start">
+                            <i class="fas fa-backward-step" aria-hidden="true"></i>
+                        </button>
+                        <button type="button" id="vePlayBtn" class="play-btn" title="Play / pause (Space)" aria-label="Play">
+                            <i class="fas fa-play" id="vePlayIcon" aria-hidden="true"></i>
+                        </button>
+                        <button type="button" id="veSkipEndBtn" class="mini-btn" title="Jump to end" aria-label="Jump to end">
+                            <i class="fas fa-forward-step" aria-hidden="true"></i>
+                        </button>
+                        <div class="time-display" aria-label="Playhead position">
+                            <span id="veCurrentTime">0:00.0</span>
+                            <span class="time-separator" aria-hidden="true">/</span>
+                            <span id="veTotalTime">0:00.0</span>
+                        </div>
+                        <div class="ve-transport-right">
+                            <button type="button" id="veExportBtn" class="ve-export-btn" aria-haspopup="dialog">
+                                <i class="fas fa-download" aria-hidden="true"></i> <span class="ve-export-label">Export</span>
                             </button>
                         </div>
                     </div>
-                </div>
-                <div class="ve-transport">
-                    <button id="veSkipStartBtn" class="mini-btn" title="Jump to start">
-                        <i class="fas fa-backward-step"></i>
-                    </button>
-                    <button id="vePlayBtn" class="play-btn" title="Play / Pause (Space)">
-                        <i class="fas fa-play" id="vePlayIcon"></i>
-                    </button>
-                    <button id="veSkipEndBtn" class="mini-btn" title="Jump to end">
-                        <i class="fas fa-forward-step"></i>
-                    </button>
-                    <div class="time-display">
-                        <span id="veCurrentTime">0:00.0</span>
-                        <span class="time-separator">/</span>
-                        <span id="veTotalTime">0:00.0</span>
+                </section>
+
+                <!-- RIGHT: INSPECTOR -->
+                <aside class="ve-panel ve-inspector" id="veInspector" aria-label="Inspector">
+                    <!-- PROJECT (default) -->
+                    <div class="ve-inspector-pane" id="paneProject">
+                        <div class="ve-panel-header">
+                            <h2>Project</h2>
+                        </div>
+                        <div class="ve-prop-group">
+                            <span class="ve-label" id="veAspectLabel">Canvas</span>
+                            <div class="ve-chip-row ve-seg" id="veAspectRow" role="group" aria-labelledby="veAspectLabel">
+                                <button type="button" class="ve-chip active" data-res="original" title="Keep the source size">Original</button>
+                                <button type="button" class="ve-chip" data-res="1080p" title="Landscape 16:9">16:9</button>
+                                <button type="button" class="ve-chip" data-res="vertical" title="Vertical 9:16">9:16</button>
+                                <button type="button" class="ve-chip" data-res="square" title="Square 1:1">1:1</button>
+                                <button type="button" class="ve-chip" data-res="720p" title="Landscape at 720p">720p</button>
+                            </div>
+                        </div>
+                        <div class="ve-prop-group">
+                            <span class="ve-label" id="veTransitionLabel">Transition between clips</span>
+                            <div class="ve-chip-row ve-seg" id="veTransitionRow" role="group" aria-labelledby="veTransitionLabel">
+                                <button type="button" class="ve-chip active" data-tr="none">None</button>
+                                <button type="button" class="ve-chip" data-tr="fadeblack">Fade through black</button>
+                            </div>
+                        </div>
+                        <div class="ve-prop-group">
+                            <span class="ve-label" id="veFormatLabel">Export format</span>
+                            <div class="ve-chip-row ve-seg" id="veFormatRow" role="group" aria-labelledby="veFormatLabel">
+                                <button type="button" class="ve-chip active" data-fmt="mp4" title="Video">MP4</button>
+                                <button type="button" class="ve-chip" data-fmt="mp3" title="Audio only">MP3</button>
+                                <button type="button" class="ve-chip" data-fmt="wav" title="Audio only, uncompressed">WAV</button>
+                            </div>
+                            <small class="ve-hint">MP3 and WAV export only the sound of your timeline.</small>
+                        </div>
+                        <div class="ve-prop-group" id="veMusicGroup">
+                            <span class="ve-label">Background music</span>
+                            <div id="veMusicStatus" class="ve-music-status">
+                                <i class="fas fa-music" aria-hidden="true"></i>
+                                <span>No music yet. Import an audio file, then choose <strong>Music</strong> on it.</span>
+                            </div>
+                        </div>
                     </div>
-                    <div class="ve-transport-right">
-                        <button id="veExportBtn" class="ve-export-btn">
-                            <i class="fas fa-download"></i> Export
+
+                    <!-- CLIP -->
+                    <div class="ve-inspector-pane hidden" id="paneClip">
+                        <div class="ve-panel-header">
+                            <h2>Clip</h2>
+                            <button type="button" class="ve-icon-btn ve-icon-btn-danger" id="veDeleteClipBtn" title="Remove clip (Delete)" aria-label="Remove clip">
+                                <i class="fas fa-trash-can" aria-hidden="true"></i>
+                            </button>
+                        </div>
+                        <div class="ve-prop-group">
+                            <span class="ve-label" id="veSpeedLabel">Speed <span class="ve-value" id="veSpeedVal">1×</span></span>
+                            <div class="ve-chip-row ve-seg" id="veSpeedRow" role="group" aria-labelledby="veSpeedLabel">
+                                <button type="button" class="ve-chip" data-speed="0.25">0.25×</button>
+                                <button type="button" class="ve-chip" data-speed="0.5">0.5×</button>
+                                <button type="button" class="ve-chip active" data-speed="1">1×</button>
+                                <button type="button" class="ve-chip" data-speed="1.5">1.5×</button>
+                                <button type="button" class="ve-chip" data-speed="2">2×</button>
+                                <button type="button" class="ve-chip" data-speed="4">4×</button>
+                            </div>
+                        </div>
+                        <div class="ve-prop-group">
+                            <label class="ve-label" for="veClipVolume">Volume <span class="ve-value" id="veClipVolVal">100%</span></label>
+                            <div class="ve-slider-row">
+                                <button type="button" id="veClipMuteBtn" class="mini-btn" title="Mute clip audio" aria-label="Mute clip audio">
+                                    <i class="fas fa-volume-high" aria-hidden="true"></i>
+                                </button>
+                                <input type="range" id="veClipVolume" class="styled-range" min="0" max="200" value="100">
+                            </div>
+                        </div>
+                        <div class="ve-prop-group">
+                            <span class="ve-label">Fades and rotation</span>
+                            <div class="ve-chip-row">
+                                <button type="button" class="ve-chip" id="veFadeInBtn" data-toggle><i class="fas fa-arrow-trend-up" aria-hidden="true"></i> Fade in</button>
+                                <button type="button" class="ve-chip" id="veFadeOutBtn" data-toggle><i class="fas fa-arrow-trend-down" aria-hidden="true"></i> Fade out</button>
+                                <button type="button" class="ve-chip" id="veRotateBtn"><i class="fas fa-rotate-right" aria-hidden="true"></i> Rotate 90°</button>
+                            </div>
+                        </div>
+                        <div class="ve-prop-group">
+                            <span class="ve-label">Color</span>
+                            <div class="ve-chip-row">
+                                <button type="button" class="ve-chip" id="veGrayscaleBtn" data-toggle>Black and white</button>
+                                <button type="button" class="ve-chip" id="veSepiaBtn" data-toggle>Sepia</button>
+                                <button type="button" class="ve-chip ve-chip-quiet" id="veResetFiltersBtn"><i class="fas fa-rotate-left" aria-hidden="true"></i> Reset</button>
+                            </div>
+                            <div class="ve-mini-slider">
+                                <label for="veBrightness">Brightness</label>
+                                <input type="range" id="veBrightness" class="styled-range" min="-50" max="50" value="0">
+                            </div>
+                            <div class="ve-mini-slider">
+                                <label for="veContrast">Contrast</label>
+                                <input type="range" id="veContrast" class="styled-range" min="50" max="200" value="100">
+                            </div>
+                            <div class="ve-mini-slider">
+                                <label for="veSaturation">Saturation</label>
+                                <input type="range" id="veSaturation" class="styled-range" min="0" max="250" value="100">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TEXT -->
+                    <div class="ve-inspector-pane hidden" id="paneText">
+                        <div class="ve-panel-header">
+                            <h2>Text</h2>
+                            <button type="button" class="ve-icon-btn ve-icon-btn-danger" id="veDeleteTextBtn" title="Remove text (Delete)" aria-label="Remove text">
+                                <i class="fas fa-trash-can" aria-hidden="true"></i>
+                            </button>
+                        </div>
+                        <div class="ve-prop-group">
+                            <label class="ve-label" for="veTextContent">Content</label>
+                            <textarea id="veTextContent" class="ve-textarea" rows="2" placeholder="Type your text"></textarea>
+                        </div>
+                        <div class="ve-prop-group">
+                            <label class="ve-label" for="veTextSize">Size and color</label>
+                            <div class="ve-slider-row">
+                                <input type="range" id="veTextSize" class="styled-range" min="16" max="160" value="48">
+                                <input type="color" id="veTextColor" class="ve-color-input" value="#FFFFFF" aria-label="Text color">
+                            </div>
+                            <div class="ve-chip-row ve-row-gap">
+                                <button type="button" class="ve-chip active" id="veTextBgBtn" data-toggle><i class="fas fa-square" aria-hidden="true"></i> Background</button>
+                            </div>
+                        </div>
+                        <div class="ve-prop-group">
+                            <span class="ve-label" id="vePosLabel">Position</span>
+                            <div class="ve-pos-grid" id="vePosGrid" role="group" aria-labelledby="vePosLabel">
+                                <button type="button" data-pos="tl" aria-label="Top left"></button><button type="button" data-pos="tc" aria-label="Top center"></button><button type="button" data-pos="tr" aria-label="Top right"></button>
+                                <button type="button" data-pos="ml" aria-label="Middle left"></button><button type="button" data-pos="mc" aria-label="Center"></button><button type="button" data-pos="mr" aria-label="Middle right"></button>
+                                <button type="button" data-pos="bl" aria-label="Bottom left"></button><button type="button" data-pos="bc" class="active" aria-label="Bottom center"></button><button type="button" data-pos="br" aria-label="Bottom right"></button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- MUSIC -->
+                    <div class="ve-inspector-pane hidden" id="paneMusic">
+                        <div class="ve-panel-header">
+                            <h2>Music</h2>
+                            <button type="button" class="ve-icon-btn ve-icon-btn-danger" id="veDeleteMusicBtn" title="Remove music" aria-label="Remove music">
+                                <i class="fas fa-trash-can" aria-hidden="true"></i>
+                            </button>
+                        </div>
+                        <div class="ve-prop-group">
+                            <span class="ve-label">Track</span>
+                            <div class="ve-music-status" id="veMusicName"><i class="fas fa-music" aria-hidden="true"></i><span>—</span></div>
+                        </div>
+                        <div class="ve-prop-group">
+                            <label class="ve-label" for="veMusicVolume">Volume <span class="ve-value" id="veMusicVolVal">60%</span></label>
+                            <input type="range" id="veMusicVolume" class="styled-range" min="0" max="200" value="60">
+                        </div>
+                        <div class="ve-prop-group">
+                            <span class="ve-label">Options</span>
+                            <div class="ve-chip-row">
+                                <button type="button" class="ve-chip" id="veMusicLoopBtn" data-toggle><i class="fas fa-repeat" aria-hidden="true"></i> Loop to fit video</button>
+                            </div>
+                        </div>
+                    </div>
+                </aside>
+            </div>
+
+            <!-- ─── TIMELINE ─── -->
+            <section class="ve-timeline-area" aria-label="Timeline">
+                <div class="ve-timeline-toolbar">
+                    <div class="ve-tl-left" role="toolbar" aria-label="Timeline tools">
+                        <button type="button" id="veUndoBtn" class="btn-outline ve-tl-icon" title="Undo (Ctrl+Z)" aria-label="Undo" disabled>
+                            <i class="fas fa-arrow-rotate-left" aria-hidden="true"></i>
                         </button>
+                        <button type="button" id="veSplitBtn" class="btn-outline" title="Split clip at playhead (S)">
+                            <i class="fas fa-scissors" aria-hidden="true"></i> Split
+                        </button>
+                        <button type="button" id="veAddTextBtn" class="btn-outline" title="Add text at the playhead (T)">
+                            <i class="fas fa-font" aria-hidden="true"></i> Add text
+                        </button>
+                        <span class="ve-tl-divider" aria-hidden="true"></span>
+                        <button type="button" id="veDetectScenesBtn" class="btn-outline" title="Find scene changes and split the clip at each one">
+                            <i class="fas fa-clapperboard" aria-hidden="true"></i> Detect scenes
+                        </button>
+                        <button type="button" id="veBurnSubtitlesBtn" class="btn-outline" title="Transcribe speech and download a copy with captions burned in">
+                            <i class="fas fa-closed-captioning" aria-hidden="true"></i> Add captions
+                        </button>
+                        <button type="button" id="veEnhanceQualityBtn" class="btn-outline" title="Reduce noise and sharpen, then download an enhanced copy">
+                            <i class="fas fa-wand-magic-sparkles" aria-hidden="true"></i> Enhance quality
+                        </button>
+                    </div>
+                    <div class="ve-tl-right">
+                        <i class="fas fa-magnifying-glass-minus" aria-hidden="true"></i>
+                        <input type="range" id="veZoom" class="styled-range ve-zoom-range" min="8" max="160" value="40" aria-label="Timeline zoom">
+                        <i class="fas fa-magnifying-glass-plus" aria-hidden="true"></i>
+                    </div>
+                </div>
+                <div class="ve-timeline-scroll" id="veTimelineScroll">
+                    <div class="ve-timeline-inner" id="veTimelineInner">
+                        <div class="ve-ruler" id="veRuler" title="Click or drag to move the playhead"></div>
+                        <div class="ve-track ve-track-text" id="veTrackText" data-label="Text" data-empty="Text overlays appear here. Press T to add one."></div>
+                        <div class="ve-track ve-track-video" id="veTrackVideo" data-label="Video" data-empty="Choose Add on a file in Media to build your timeline"></div>
+                        <div class="ve-track ve-track-music" id="veTrackMusic" data-label="Music" data-empty="Background music appears here"></div>
+                        <div class="ve-playhead" id="vePlayhead">
+                            <div class="ve-playhead-cap"></div>
+                        </div>
                     </div>
                 </div>
             </section>
-
-            <!-- RIGHT: INSPECTOR -->
-            <aside class="ve-panel ve-inspector" id="veInspector">
-                <!-- PROJECT (default) -->
-                <div class="ve-inspector-pane" id="paneProject">
-                    <div class="ve-panel-header">
-                        <h4><i class="fas fa-sliders"></i> Project</h4>
-                    </div>
-                    <div class="ve-prop-group">
-                        <label>Canvas</label>
-                        <div class="ve-chip-row" id="veAspectRow">
-                            <button class="ve-chip active" data-res="original">Original</button>
-                            <button class="ve-chip" data-res="1080p">16:9</button>
-                            <button class="ve-chip" data-res="vertical">9:16</button>
-                            <button class="ve-chip" data-res="square">1:1</button>
-                            <button class="ve-chip" data-res="720p">720p</button>
-                        </div>
-                    </div>
-                    <div class="ve-prop-group">
-                        <label>Transition between clips</label>
-                        <div class="ve-chip-row" id="veTransitionRow">
-                            <button class="ve-chip active" data-tr="none">None</button>
-                            <button class="ve-chip" data-tr="fadeblack">Fade through black</button>
-                        </div>
-                    </div>
-                    <div class="ve-prop-group">
-                        <label>Export format</label>
-                        <div class="ve-chip-row" id="veFormatRow">
-                            <button class="ve-chip active" data-fmt="mp4"><i class="fas fa-film"></i> MP4</button>
-                            <button class="ve-chip" data-fmt="mp3"><i class="fas fa-music"></i> MP3 (audio)</button>
-                            <button class="ve-chip" data-fmt="wav"><i class="fas fa-wave-square"></i> WAV (audio)</button>
-                        </div>
-                        <small class="ve-hint">MP3 / WAV renders only the sound of your timeline — the
-                            audio-video combo becomes a pure audio file.</small>
-                    </div>
-                    <div class="ve-prop-group" id="veMusicGroup">
-                        <label>Background music</label>
-                        <div id="veMusicStatus" class="ve-music-status">
-                            <i class="fas fa-music"></i>
-                            <span>No music added — import an audio file, then click <strong>“Use as
-                                    music”</strong>.</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- CLIP -->
-                <div class="ve-inspector-pane hidden" id="paneClip">
-                    <div class="ve-panel-header">
-                        <h4><i class="fas fa-film"></i> Clip</h4>
-                        <button class="btn-outline btn-danger-outline" id="veDeleteClipBtn" title="Remove clip (Delete)">
-                            <i class="fas fa-trash-alt"></i>
-                        </button>
-                    </div>
-                    <div class="ve-prop-group">
-                        <label>Speed <span class="ve-value" id="veSpeedVal">1×</span></label>
-                        <div class="ve-chip-row" id="veSpeedRow">
-                            <button class="ve-chip" data-speed="0.25">0.25×</button>
-                            <button class="ve-chip" data-speed="0.5">0.5×</button>
-                            <button class="ve-chip active" data-speed="1">1×</button>
-                            <button class="ve-chip" data-speed="1.5">1.5×</button>
-                            <button class="ve-chip" data-speed="2">2×</button>
-                            <button class="ve-chip" data-speed="4">4×</button>
-                        </div>
-                    </div>
-                    <div class="ve-prop-group">
-                        <label>Volume <span class="ve-value" id="veClipVolVal">100%</span></label>
-                        <div class="ve-slider-row">
-                            <button id="veClipMuteBtn" class="mini-btn" title="Mute clip audio">
-                                <i class="fas fa-volume-up"></i>
-                            </button>
-                            <input type="range" id="veClipVolume" class="styled-range" min="0" max="200" value="100">
-                        </div>
-                    </div>
-                    <div class="ve-prop-group">
-                        <label>Fades &amp; Rotation</label>
-                        <div class="ve-chip-row">
-                            <button class="ve-chip" id="veFadeInBtn"><i class="fas fa-arrow-trend-up"></i> Fade
-                                in</button>
-                            <button class="ve-chip" id="veFadeOutBtn"><i class="fas fa-arrow-trend-down"></i> Fade
-                                out</button>
-                            <button class="ve-chip" id="veRotateBtn"><i class="fas fa-rotate-right"></i> Rotate
-                                90°</button>
-                        </div>
-                    </div>
-                    <div class="ve-prop-group">
-                        <label>Color filters</label>
-                        <div class="ve-chip-row">
-                            <button class="ve-chip" id="veGrayscaleBtn">B&amp;W</button>
-                            <button class="ve-chip" id="veSepiaBtn">Sepia</button>
-                            <button class="ve-chip" id="veResetFiltersBtn"><i class="fas fa-rotate-left"></i>
-                                Reset</button>
-                        </div>
-                        <div class="ve-mini-slider">
-                            <span>Brightness</span>
-                            <input type="range" id="veBrightness" class="styled-range" min="-50" max="50" value="0">
-                        </div>
-                        <div class="ve-mini-slider">
-                            <span>Contrast</span>
-                            <input type="range" id="veContrast" class="styled-range" min="50" max="200" value="100">
-                        </div>
-                        <div class="ve-mini-slider">
-                            <span>Saturation</span>
-                            <input type="range" id="veSaturation" class="styled-range" min="0" max="250" value="100">
-                        </div>
-                    </div>
-                </div>
-
-                <!-- TEXT -->
-                <div class="ve-inspector-pane hidden" id="paneText">
-                    <div class="ve-panel-header">
-                        <h4><i class="fas fa-font"></i> Text</h4>
-                        <button class="btn-outline btn-danger-outline" id="veDeleteTextBtn" title="Remove text (Delete)">
-                            <i class="fas fa-trash-alt"></i>
-                        </button>
-                    </div>
-                    <div class="ve-prop-group">
-                        <label>Content</label>
-                        <textarea id="veTextContent" class="ve-textarea" rows="2"
-                            placeholder="Your text here..."></textarea>
-                    </div>
-                    <div class="ve-prop-group">
-                        <label>Size &amp; Color</label>
-                        <div class="ve-slider-row">
-                            <input type="range" id="veTextSize" class="styled-range" min="16" max="160" value="48">
-                            <input type="color" id="veTextColor" class="ve-color-input" value="#FFFFFF">
-                        </div>
-                        <div class="ve-chip-row" style="margin-top:8px;">
-                            <button class="ve-chip active" id="veTextBgBtn"><i class="fas fa-square"></i>
-                                Background</button>
-                        </div>
-                    </div>
-                    <div class="ve-prop-group">
-                        <label>Position</label>
-                        <div class="ve-pos-grid" id="vePosGrid">
-                            <button data-pos="tl"></button><button data-pos="tc"></button><button
-                                data-pos="tr"></button>
-                            <button data-pos="ml"></button><button data-pos="mc"></button><button
-                                data-pos="mr"></button>
-                            <button data-pos="bl"></button><button data-pos="bc" class="active"></button><button
-                                data-pos="br"></button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- MUSIC -->
-                <div class="ve-inspector-pane hidden" id="paneMusic">
-                    <div class="ve-panel-header">
-                        <h4><i class="fas fa-music"></i> Music</h4>
-                        <button class="btn-outline btn-danger-outline" id="veDeleteMusicBtn" title="Remove music">
-                            <i class="fas fa-trash-alt"></i>
-                        </button>
-                    </div>
-                    <div class="ve-prop-group">
-                        <label>Track</label>
-                        <div class="ve-music-status" id="veMusicName"><i class="fas fa-music"></i><span>—</span></div>
-                    </div>
-                    <div class="ve-prop-group">
-                        <label>Volume <span class="ve-value" id="veMusicVolVal">60%</span></label>
-                        <input type="range" id="veMusicVolume" class="styled-range" min="0" max="200" value="60">
-                    </div>
-                    <div class="ve-prop-group">
-                        <label>Options</label>
-                        <div class="ve-chip-row">
-                            <button class="ve-chip" id="veMusicLoopBtn"><i class="fas fa-repeat"></i> Loop to fit
-                                video</button>
-                        </div>
-                    </div>
-                </div>
-            </aside>
         </div>
-
-        <!-- ─── TIMELINE ─── -->
-        <section class="ve-timeline-area">
-            <div class="ve-timeline-toolbar">
-                <div class="ve-tl-left">
-                    <button id="veUndoBtn" class="btn-outline" title="Undo (Ctrl+Z)" disabled>
-                        <i class="fas fa-undo"></i>
-                    </button>
-                    <button id="veSplitBtn" class="btn-outline" title="Split clip at playhead (S)">
-                        <i class="fas fa-scissors"></i> Split
-                    </button>
-                    <button id="veDetectScenesBtn" class="btn-outline" title="AI Auto-Detect Scene Cuts" style="background: rgba(139, 92, 246, 0.15); border-color: rgba(139, 92, 246, 0.4);">
-                        <i class="fas fa-wand-magic-sparkles"></i> Auto-Detect Scenes
-                    </button>
-                    <button id="veBurnSubtitlesBtn" class="btn-outline" title="Burn AI Hardcoded Subtitles (CapCut style)" style="background: rgba(236, 72, 153, 0.15); border-color: rgba(236, 72, 153, 0.4);">
-                        <i class="fas fa-closed-captioning"></i> Burn AI Subtitles
-                    </button>
-                    <button id="veEnhanceQualityBtn" class="btn-outline" title="AI Video Quality Polish &amp; Denoise" style="background: rgba(16, 185, 129, 0.15); border-color: rgba(16, 185, 129, 0.4);">
-                        <i class="fas fa-sparkles"></i> Enhance Video Quality
-                    </button>
-                    <button id="veAddTextBtn" class="btn-outline" title="Add a text overlay at the playhead (T)">
-                        <i class="fas fa-font"></i> Add Text
-                    </button>
-                </div>
-                <div class="ve-tl-right">
-                    <i class="fas fa-search-minus"></i>
-                    <input type="range" id="veZoom" class="styled-range ve-zoom-range" min="8" max="160" value="40">
-                    <i class="fas fa-search-plus"></i>
-                </div>
-            </div>
-            <div class="ve-timeline-scroll" id="veTimelineScroll">
-                <div class="ve-timeline-inner" id="veTimelineInner">
-                    <div class="ve-ruler" id="veRuler"></div>
-                    <div class="ve-track ve-track-text" id="veTrackText" data-empty="Text overlays appear here — click “Add Text”"></div>
-                    <div class="ve-track ve-track-video" id="veTrackVideo" data-empty="Click “＋ Add” on a media item to build your timeline"></div>
-                    <div class="ve-track ve-track-music" id="veTrackMusic" data-empty="Background music appears here"></div>
-                    <div class="ve-playhead" id="vePlayhead">
-                        <div class="ve-playhead-cap"></div>
-                    </div>
-                </div>
-            </div>
-        </section>
-    </div>
+    </main>
 
     <!-- QUICK TOOLS MODAL -->
     <div id="veQuickOverlay" class="shortcuts-overlay hidden">
-        <div class="shortcuts-panel ve-quick-panel">
+        <div class="shortcuts-panel ve-quick-panel" role="dialog" aria-modal="true" aria-labelledby="veQuickTitle">
             <div class="shortcuts-header">
-                <h3><i class="fas fa-wand-magic-sparkles"></i> Quick Tools — <span id="veQuickFileName">file</span></h3>
-                <button id="veCloseQuick" class="close-btn">&times;</button>
+                <div class="ve-dialog-titles">
+                    <h3 id="veQuickTitle">Quick tools</h3>
+                    <p class="ve-dialog-sub" id="veQuickFileName">file</p>
+                </div>
+                <button type="button" id="veCloseQuick" class="close-btn" aria-label="Close" title="Close (Esc)"><i class="fas fa-xmark" aria-hidden="true"></i></button>
             </div>
             <div class="ve-quick-body">
-                <p class="ve-hint" style="margin-bottom:16px;">One-click tools — no timeline needed. Pick a tool, and
-                    your file downloads when it's ready.</p>
+                <p class="ve-hint ve-quick-intro">Each tool saves a new file. Your timeline isn't changed.</p>
                 <div class="ve-quick-grid" id="veQuickGrid">
-                    <button class="ve-quick-tool" data-op="gif">
-                        <i class="fas fa-images"></i>
+                    <button type="button" class="ve-quick-tool" data-op="gif">
+                        <i class="fas fa-images" aria-hidden="true"></i>
                         <strong>Make a GIF</strong>
-                        <span>First 5 seconds → animated GIF</span>
+                        <span>First 5 seconds as an animated GIF</span>
                     </button>
-                    <button class="ve-quick-tool" data-op="compress">
-                        <i class="fas fa-compress"></i>
-                        <strong>Shrink File Size</strong>
-                        <span>Compress for easy sharing</span>
+                    <button type="button" class="ve-quick-tool" data-op="compress">
+                        <i class="fas fa-compress" aria-hidden="true"></i>
+                        <strong>Compress</strong>
+                        <span>Smaller file for sharing</span>
                     </button>
-                    <button class="ve-quick-tool" data-op="convert">
-                        <i class="fas fa-right-left"></i>
-                        <strong>Convert / Resize</strong>
-                        <span>Change format &amp; resolution</span>
+                    <button type="button" class="ve-quick-tool" data-op="convert">
+                        <i class="fas fa-right-left" aria-hidden="true"></i>
+                        <strong>Convert</strong>
+                        <span>Change format and resolution</span>
                     </button>
-                    <button class="ve-quick-tool" data-op="extract">
-                        <i class="fas fa-file-audio"></i>
-                        <strong>Extract Audio</strong>
-                        <span>Get the MP3 soundtrack</span>
+                    <button type="button" class="ve-quick-tool" data-op="extract">
+                        <i class="fas fa-file-audio" aria-hidden="true"></i>
+                        <strong>Extract audio</strong>
+                        <span>Save the soundtrack as MP3</span>
                     </button>
-                    <button class="ve-quick-tool" data-op="frame">
-                        <i class="fas fa-camera"></i>
-                        <strong>Grab a Frame</strong>
-                        <span>Save a snapshot image</span>
+                    <button type="button" class="ve-quick-tool" data-op="frame">
+                        <i class="fas fa-camera" aria-hidden="true"></i>
+                        <strong>Save a frame</strong>
+                        <span>Still image at the playhead</span>
                     </button>
-                    <button class="ve-quick-tool" data-op="mute">
-                        <i class="fas fa-volume-xmark"></i>
-                        <strong>Mute Video</strong>
-                        <span>Remove the sound track</span>
+                    <button type="button" class="ve-quick-tool" data-op="mute">
+                        <i class="fas fa-volume-xmark" aria-hidden="true"></i>
+                        <strong>Remove sound</strong>
+                        <span>Copy of the video without audio</span>
                     </button>
                 </div>
 
                 <!-- Per-tool options -->
                 <div id="veQuickOptions" class="ve-quick-options hidden">
                     <div class="ve-quick-opt" data-for="compress">
-                        <label>Compression strength</label>
-                        <div class="ve-chip-row">
-                            <button class="ve-chip" data-level="light">Light</button>
-                            <button class="ve-chip active" data-level="balanced">Balanced</button>
-                            <button class="ve-chip" data-level="strong">Strong (smallest)</button>
+                        <span class="ve-label">Compression</span>
+                        <div class="ve-chip-row ve-seg">
+                            <button type="button" class="ve-chip" data-level="light">Light</button>
+                            <button type="button" class="ve-chip active" data-level="balanced">Balanced</button>
+                            <button type="button" class="ve-chip" data-level="strong">Smallest</button>
                         </div>
                     </div>
                     <div class="ve-quick-opt hidden" data-for="convert">
-                        <label>Format</label>
-                        <div class="ve-chip-row" id="veConvContainer">
-                            <button class="ve-chip active" data-container="mp4">MP4</button>
-                            <button class="ve-chip" data-container="webm">WebM</button>
-                            <button class="ve-chip" data-container="mkv">MKV</button>
+                        <span class="ve-label">Format</span>
+                        <div class="ve-chip-row ve-seg" id="veConvContainer">
+                            <button type="button" class="ve-chip active" data-container="mp4">MP4</button>
+                            <button type="button" class="ve-chip" data-container="webm">WebM</button>
+                            <button type="button" class="ve-chip" data-container="mkv">MKV</button>
                         </div>
-                        <label style="margin-top:12px;">Resolution</label>
-                        <div class="ve-chip-row" id="veConvQuality">
-                            <button class="ve-chip" data-quality="original">Original</button>
-                            <button class="ve-chip active" data-quality="720p">720p</button>
-                            <button class="ve-chip" data-quality="480p">480p</button>
-                            <button class="ve-chip" data-quality="360p">360p</button>
+                        <span class="ve-label ve-label-spaced">Resolution</span>
+                        <div class="ve-chip-row ve-seg" id="veConvQuality">
+                            <button type="button" class="ve-chip" data-quality="original">Original</button>
+                            <button type="button" class="ve-chip active" data-quality="720p">720p</button>
+                            <button type="button" class="ve-chip" data-quality="480p">480p</button>
+                            <button type="button" class="ve-chip" data-quality="360p">360p</button>
                         </div>
                     </div>
-                    <button id="veRunQuickBtn" class="ve-export-btn ve-export-btn-big">
-                        <i class="fas fa-play"></i> <span id="veRunQuickText">Run</span>
+                    <button type="button" id="veRunQuickBtn" class="ve-export-btn ve-export-btn-big">
+                        <i class="fas fa-download" aria-hidden="true"></i> <span id="veRunQuickText">Run</span>
                     </button>
                 </div>
             </div>
@@ -433,54 +389,55 @@
 
     <!-- EXPORT MODAL -->
     <div id="veExportOverlay" class="shortcuts-overlay hidden">
-        <div class="shortcuts-panel">
+        <div class="shortcuts-panel ve-export-panel" role="dialog" aria-modal="true" aria-labelledby="veExportTitle">
             <div class="shortcuts-header">
-                <h3><i class="fas fa-download"></i> Export</h3>
-                <button id="veCloseExport" class="close-btn">&times;</button>
+                <h3 id="veExportTitle">Export</h3>
+                <button type="button" id="veCloseExport" class="close-btn" aria-label="Close" title="Close (Esc)"><i class="fas fa-xmark" aria-hidden="true"></i></button>
             </div>
             <div class="ve-export-body">
                 <p class="ve-export-summary" id="veExportSummary"></p>
-                <div class="ve-prop-group">
-                    <label>Format</label>
-                    <div class="ve-chip-row" id="veExportFormatRow">
-                        <button class="ve-chip active" data-fmt="mp4"><i class="fas fa-film"></i> MP4 video</button>
-                        <button class="ve-chip" data-fmt="mp3"><i class="fas fa-music"></i> MP3 audio</button>
-                        <button class="ve-chip" data-fmt="wav"><i class="fas fa-wave-square"></i> WAV audio</button>
+                <div class="ve-prop-group ve-prop-plain">
+                    <span class="ve-label" id="veExportFormatLabel">Format</span>
+                    <div class="ve-chip-row ve-seg" id="veExportFormatRow" role="group" aria-labelledby="veExportFormatLabel">
+                        <button type="button" class="ve-chip active" data-fmt="mp4">MP4 video</button>
+                        <button type="button" class="ve-chip" data-fmt="mp3">MP3 audio</button>
+                        <button type="button" class="ve-chip" data-fmt="wav">WAV audio</button>
                     </div>
                 </div>
-                <button id="veStartExportBtn" class="ve-export-btn ve-export-btn-big">
-                    <i class="fas fa-download"></i> <span id="veExportBtnText">Render &amp; Download</span>
+                <button type="button" id="veStartExportBtn" class="ve-export-btn ve-export-btn-big">
+                    <i class="fas fa-download" aria-hidden="true"></i> <span id="veExportBtnText">Export and download</span>
                 </button>
-                <small class="ve-hint">Rendering happens locally with FFmpeg — longer timelines take longer.</small>
+                <small class="ve-hint ve-hint-center">Rendering runs on this computer. Longer timelines take longer.</small>
             </div>
         </div>
     </div>
 
-    <!-- SPINNER -->
-    <div id="loadingOverlay" class="hidden">
+    <!-- SPINNER (fallback when the processing overlay is unavailable) -->
+    <div id="loadingOverlay" class="hidden" role="status" aria-live="polite">
         <div class="spinner-container">
             <div class="spinner"></div>
-            <p id="loadingText">Processing...</p>
+            <p id="loadingText">Working…</p>
         </div>
     </div>
 
     <!-- KEYBOARD SHORTCUTS -->
     <div id="veShortcutsOverlay" class="shortcuts-overlay hidden">
-        <div class="shortcuts-panel">
+        <div class="shortcuts-panel" role="dialog" aria-modal="true" aria-labelledby="veShortcutsTitle">
             <div class="shortcuts-header">
-                <h3><i class="fas fa-keyboard"></i> Keyboard Shortcuts</h3>
-                <button id="veCloseShortcuts" class="close-btn">&times;</button>
+                <h3 id="veShortcutsTitle">Keyboard shortcuts</h3>
+                <button type="button" id="veCloseShortcuts" class="close-btn" aria-label="Close" title="Close (Esc)"><i class="fas fa-xmark" aria-hidden="true"></i></button>
             </div>
             <div class="shortcuts-list">
-                <div class="shortcut-item"><kbd>Space</kbd><span>Play / Pause preview</span></div>
-                <div class="shortcut-item"><kbd>S</kbd><span>Split clip at the playhead</span></div>
-                <div class="shortcut-item"><kbd>T</kbd><span>Add text overlay at the playhead</span></div>
-                <div class="shortcut-item"><kbd>Delete</kbd><span>Remove selected clip / text</span></div>
-                <div class="shortcut-item"><kbd>Ctrl + Z</kbd><span>Undo last action</span></div>
-                <div class="shortcut-item"><kbd>← / →</kbd><span>Step back / forward 0.5s (Shift = 5s)</span></div>
-                <div class="shortcut-item"><kbd>Drag Edges</kbd><span>Trim a clip on the timeline</span></div>
-                <div class="shortcut-item"><kbd>Drag Clip</kbd><span>Reorder clips on the timeline</span></div>
-                <div class="shortcut-item"><kbd>?</kbd><span>Show this help panel</span></div>
+                <div class="shortcut-item"><span>Play or pause</span><kbd>Space</kbd></div>
+                <div class="shortcut-item"><span>Split clip at the playhead</span><kbd>S</kbd></div>
+                <div class="shortcut-item"><span>Add text at the playhead</span><kbd>T</kbd></div>
+                <div class="shortcut-item"><span>Remove selected clip or text</span><kbd>Delete</kbd></div>
+                <div class="shortcut-item"><span>Undo</span><span class="kbd-combo"><kbd>Ctrl</kbd><kbd>Z</kbd></span></div>
+                <div class="shortcut-item"><span>Step back or forward 0.5 s</span><span class="kbd-combo"><kbd>←</kbd><kbd>→</kbd></span></div>
+                <div class="shortcut-item"><span>Step 5 s</span><span class="kbd-combo"><kbd>Shift</kbd><kbd>←</kbd><kbd>→</kbd></span></div>
+                <div class="shortcut-item"><span>Trim a clip</span><span class="shortcut-gesture">Drag its edges</span></div>
+                <div class="shortcut-item"><span>Reorder clips</span><span class="shortcut-gesture">Drag a clip</span></div>
+                <div class="shortcut-item"><span>Show this panel</span><kbd>?</kbd></div>
             </div>
         </div>
     </div>

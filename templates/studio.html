@@ -1,458 +1,564 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Universal Media Studio — Pro & Personal Audio, Video & Image Editor</title>
-    <meta name="description" content="Professional & personal browser-based audio, video & image studio with AI stem separation, non-linear video editing, and client canvas retouching.">
-    
-    <!-- Google Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-    
-    <!-- Font Awesome Icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    
-    <!-- WaveSurfer.js v7 -->
-    <script src="https://unpkg.com/wavesurfer.js@7"></script>
-    <script src="https://unpkg.com/wavesurfer.js@7/dist/plugins/regions.min.js"></script>
-    <script src="https://unpkg.com/wavesurfer.js@7/dist/plugins/timeline.min.js"></script>
-    
-    <!-- Custom CSS -->
-    <link rel="stylesheet" href="/static/processing_overlay.css">
-    <link rel="stylesheet" href="/static/studio.css">
+    {% include '_head.html' %}
+    <title>Studio — {{ brand.product }}</title>
+    <meta name="description" content="Multitrack editor for video, audio, images and text with project save and load. Runs on your own computer.">
+
+    <!-- Local icon system -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='vendor/fontawesome/css/all.min.css') }}">
+
+    <!-- Local waveform runtime -->
+    <script src="{{ url_for('static', filename='vendor/wavesurfer/wavesurfer.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='vendor/wavesurfer/regions.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='vendor/wavesurfer/timeline.min.js') }}"></script>
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='processing_overlay.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='studio.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='agent_skills.css') }}">
 </head>
-<body class="studio-body mode-pro">
+<body class="studio-body mode-pro" data-workspace="combo">
+    <a class="skip-link" href="#main">Skip to content</a>
 
-    <!-- Top Navigation Header -->
+    {% include '_mobile_navigation.html' %}
+
+    <!-- App bar -->
     <header class="studio-header">
-        <div class="header-left">
-            <a href="/" class="brand-logo" title="Back to Hub">
-                <img src="/static/logo.png" alt="Studio Logo" class="logo-icon">
-                <span class="logo-text">MEDIA STUDIO <span class="badge-pro">PRO</span></span>
-            </a>
-            
-            <div class="workspace-tabs" id="workspaceTabs">
-                <button class="ws-tab active" data-workspace="combo"><i class="fa-solid fa-layer-group"></i> Master Studio</button>
-                <button class="ws-tab" data-workspace="video"><i class="fa-solid fa-film"></i> Video</button>
-                <button class="ws-tab" data-workspace="audio"><i class="fa-solid fa-waveform"></i> Audio</button>
-                <button class="ws-tab" data-workspace="image"><i class="fa-solid fa-image"></i> Image & Graphics</button>
-            </div>
-        </div>
-
-        <div class="header-center">
-            <div class="mode-toggle-container" title="Switch between Personal 1-Click view & Pro Studio controls">
-                <span class="mode-label"><i class="fa-solid fa-wand-magic-sparkles"></i> Personal</span>
-                <label class="switch">
-                    <input type="checkbox" id="modeToggleCheck" checked>
-                    <span class="slider round"></span>
-                </label>
-                <span class="mode-label active-pro"><i class="fa-solid fa-sliders"></i> Pro Studio</span>
-            </div>
-        </div>
-
-        <div class="header-right">
-            <div class="project-actions">
-                <button class="btn btn-secondary btn-sm" id="btnNewProject" title="New Blank Project"><i class="fa-solid fa-file"></i> New</button>
-                <button class="btn btn-secondary btn-sm" id="btnOpenProject" title="Open .aviproject"><i class="fa-solid fa-folder-open"></i> Open</button>
-                <button class="btn btn-secondary btn-sm" id="btnSaveProject" title="Save .aviproject"><i class="fa-solid fa-floppy-disk"></i> Save</button>
-                <input type="file" id="inputProjectFile" accept=".aviproject,.json" style="display:none;">
-            </div>
-            
-            <button class="btn btn-primary btn-sm btn-export" id="btnMasterExport">
-                <i class="fa-solid fa-download"></i> Export Master
+        <div class="studio-header-start">
+            <button type="button" class="header-btn mobile-menu-btn" id="mobileMenuBtn" aria-label="Open navigation" title="Navigation">
+                <i class="fa-solid fa-bars" aria-hidden="true"></i>
             </button>
-            
-            <button class="btn-icon" id="btnShortcutsHelp" title="Keyboard Shortcuts (?)">
-                <i class="fa-solid fa-keyboard"></i>
+            <a href="/" class="app-brand studio-brand" aria-label="{{ brand.product }} home" title="Home">
+                <img src="{{ url_for('static', filename='brand-mark.svg') }}" alt="" class="app-brand-mark" width="28" height="28">
+                <span class="app-brand-name">{{ brand.product }}</span>
+            </a>
+            <span class="app-brand-context studio-context">Studio</span>
+        </div>
+
+        <div class="workspace-tabs" id="workspaceTabs" role="group" aria-label="Workspace">
+            <button type="button" class="ws-tab active" data-workspace="combo" aria-pressed="true" title="Multitrack — video, captions and audio on one timeline">
+                <i class="fa-solid fa-layer-group" aria-hidden="true"></i><span class="ws-label">Multitrack</span>
+            </button>
+            <button type="button" class="ws-tab" data-workspace="video" aria-pressed="false" title="Video">
+                <i class="fa-solid fa-film" aria-hidden="true"></i><span class="ws-label">Video</span>
+            </button>
+            <button type="button" class="ws-tab" data-workspace="audio" aria-pressed="false" title="Audio">
+                <i class="fa-solid fa-wave-square" aria-hidden="true"></i><span class="ws-label">Audio</span>
+            </button>
+            <button type="button" class="ws-tab" data-workspace="image" aria-pressed="false" title="Image">
+                <i class="fa-solid fa-image" aria-hidden="true"></i><span class="ws-label">Image</span>
+            </button>
+        </div>
+
+        <div class="studio-header-end">
+            <div class="project-actions" role="group" aria-label="Project">
+                <button type="button" class="bar-btn" id="btnNewProject" title="New project">
+                    <i class="fa-solid fa-file-circle-plus" aria-hidden="true"></i><span class="bar-label">New</span>
+                </button>
+                <button type="button" class="bar-btn" id="btnOpenProject" title="Open a .aviproject file">
+                    <i class="fa-solid fa-folder-open" aria-hidden="true"></i><span class="bar-label">Open</span>
+                </button>
+                <button type="button" class="bar-btn" id="btnSaveProject" title="Save as .aviproject">
+                    <i class="fa-solid fa-floppy-disk" aria-hidden="true"></i><span class="bar-label">Save</span>
+                </button>
+                <input type="file" id="inputProjectFile" accept=".aviproject,.json" hidden>
+            </div>
+
+            <span class="bar-divider" aria-hidden="true"></span>
+
+            <button type="button" class="header-btn bar-icon" id="btnShortcutsHelp" aria-label="Keyboard shortcuts" title="Keyboard shortcuts (?)">
+                <i class="fa-solid fa-keyboard" aria-hidden="true"></i>
+            </button>
+            <button type="button" class="header-btn bar-icon" id="themeToggle" aria-label="Switch theme" title="Switch theme">
+                <i class="fa-solid fa-moon" aria-hidden="true"></i>
+            </button>
+            <button type="button" class="btn btn-secondary bar-copilot" id="btnToggleAiAgent" aria-controls="aiAgentDrawer" aria-expanded="false" title="{{ brand.assistant }}">
+                <i class="fa-solid fa-comment-dots" aria-hidden="true"></i><span class="bar-label">{{ brand.assistant }}</span>
+            </button>
+            <button type="button" class="btn btn-primary bar-export" id="btnMasterExport" aria-haspopup="dialog" title="Export">
+                <i class="fa-solid fa-arrow-up-from-bracket" aria-hidden="true"></i><span class="bar-label">Export</span>
             </button>
         </div>
     </header>
 
-    <!-- Main Studio App Workspace Grid -->
-    <main class="studio-main" id="studioMain">
+    <main class="studio-main" id="main" tabindex="-1">
 
-        <!-- Left Sidebar: Media Bin, AI Magic Tools, Layers -->
-        <aside class="studio-panel panel-left" id="panelLeft">
+        <!-- Left: media, tools, layers -->
+        <aside class="studio-panel panel-left" id="panelLeft" aria-label="Media and tools">
             <div class="panel-header">
-                <div class="tab-buttons">
-                    <button class="panel-tab active" data-target="#tabMediaBin"><i class="fa-solid fa-photo-film"></i> Media Bin</button>
-                    <button class="panel-tab" data-target="#tabAiTools"><i class="fa-solid fa-brain"></i> AI Tools</button>
-                    <button class="panel-tab" data-target="#tabLayers"><i class="fa-solid fa-layer-group"></i> Layers</button>
+                <div class="tab-buttons" role="tablist" aria-label="Media and tools">
+                    <button type="button" class="panel-tab active" role="tab" id="tabBtnMedia" aria-selected="true" aria-controls="tabMediaBin" data-target="#tabMediaBin">Media</button>
+                    <button type="button" class="panel-tab" role="tab" id="tabBtnTools" aria-selected="false" aria-controls="tabAiTools" tabindex="-1" data-target="#tabAiTools">Tools</button>
+                    <button type="button" class="panel-tab" role="tab" id="tabBtnLayers" aria-selected="false" aria-controls="tabLayers" tabindex="-1" data-target="#tabLayers">Layers</button>
                 </div>
             </div>
 
             <div class="panel-body">
-                <!-- Media Bin Tab -->
-                <div class="tab-content active" id="tabMediaBin">
-                    <div class="dropzone-mini" id="mediaDropzone">
-                        <i class="fa-solid fa-cloud-arrow-up drop-icon"></i>
-                        <p>Drag & Drop files here or <span class="browse-link">Browse</span></p>
-                        <span class="supported-formats">Video, Audio, Image (MP4, MP3, WAV, PNG, JPG, WEBP)</span>
-                        <input type="file" id="mediaFileInput" multiple accept="video/*,audio/*,image/*" style="display:none;">
+                <!-- Media -->
+                <div class="tab-content active" id="tabMediaBin" role="tabpanel" aria-labelledby="tabBtnMedia">
+                    <div class="dropzone-mini" id="mediaDropzone" role="button" tabindex="0" aria-describedby="mediaFormats">
+                        <i class="fa-solid fa-arrow-up-from-bracket drop-icon" aria-hidden="true"></i>
+                        <p class="drop-title">Drop files or <span class="browse-link">browse</span></p>
+                        <span class="supported-formats" id="mediaFormats">MP4, MOV, MP3, WAV, PNG, JPG, WebP</span>
+                        <input type="file" id="mediaFileInput" multiple accept="video/*,audio/*,image/*" hidden>
                     </div>
 
-                    <div class="media-bin-list" id="mediaBinList">
-                        <!-- Media items dynamically populated -->
+                    <div class="media-bin-list" id="mediaBinList" aria-label="Imported media">
                         <div class="empty-bin-msg">
-                            <i class="fa-solid fa-photo-film"></i>
-                            <p>No media files imported yet.</p>
+                            <p class="empty-title">No media yet</p>
+                            <p>Imported files appear here. Use <strong>Add</strong> or double-click a file to place it on the timeline.</p>
                         </div>
                     </div>
                 </div>
 
-                <!-- AI Tools Tab -->
-                <div class="tab-content" id="tabAiTools">
-                    <div class="ai-tool-group">
-                        <h4 class="group-title"><i class="fa-solid fa-microphone-lines"></i> Speech & Audio AI</h4>
-                        <button class="ai-action-btn" id="btnAiTranscribe"><i class="fa-solid fa-closed-captioning"></i> Auto Speech-to-Text (Whisper)</button>
-                        <button class="ai-action-btn" id="btnAiStemSeparation"><i class="fa-solid fa-music"></i> 4-Stem Demixer (Vocals/Drums/Bass)</button>
-                        <button class="ai-action-btn" id="btnAiDenoise"><i class="fa-solid fa-wand-magic-sparkles"></i> Neural Noise Reduction</button>
-                        <button class="ai-action-btn" id="btnAiAutoTrim"><i class="fa-solid fa-scissors"></i> Auto-Trim Silence Gaps</button>
-                        <button class="ai-action-btn" id="btnAiAutoDuck"><i class="fa-solid fa-sliders"></i> Auto-Duck Background Music</button>
-                    </div>
+                <!-- Tools -->
+                <div class="tab-content" id="tabAiTools" role="tabpanel" aria-labelledby="tabBtnTools">
+                    <label class="setting-switch" for="modeToggleCheck">
+                        <span class="setting-text">
+                            <span class="setting-title">Quick actions bar</span>
+                            <span class="setting-hint">Common one-step edits under the preview</span>
+                        </span>
+                        <input type="checkbox" id="modeToggleCheck" role="switch">
+                        <span class="switch-track" aria-hidden="true"></span>
+                    </label>
 
-                    <div class="ai-tool-group">
-                        <h4 class="group-title"><i class="fa-solid fa-video"></i> Video & Motion AI</h4>
-                        <button class="ai-action-btn" id="btnAiBurnSubs"><i class="fa-solid fa-align-center"></i> Auto Animated Subtitles</button>
-                        <button class="ai-action-btn" id="btnAiSmartReframe"><i class="fa-solid fa-mobile-screen-button"></i> Smart Reframe (9:16 Crop)</button>
-                        <button class="ai-action-btn" id="btnAiSceneDetect"><i class="fa-solid fa-clapperboard"></i> Scene Cut Detection</button>
-                    </div>
+                    <section class="ai-tool-group" aria-labelledby="toolsAudioTitle">
+                        <h2 class="group-title" id="toolsAudioTitle">Speech and audio</h2>
+                        <button type="button" class="ai-action-btn" id="btnAiTranscribe" data-copilot-prompt="Transcribe the speech in this file with timestamps">
+                            <i class="fa-solid fa-closed-captioning" aria-hidden="true"></i><span>Transcribe speech</span><i class="fa-solid fa-comment-dots tool-route" aria-hidden="true" title="Opens in {{ brand.assistant }}"></i>
+                        </button>
+                        <button type="button" class="ai-action-btn" id="btnAiStemSeparation">
+                            <i class="fa-solid fa-music" aria-hidden="true"></i><span>Separate stems</span>
+                        </button>
+                        <button type="button" class="ai-action-btn" id="btnAiDenoise">
+                            <i class="fa-solid fa-volume-low" aria-hidden="true"></i><span>Reduce noise</span>
+                        </button>
+                        <button type="button" class="ai-action-btn" id="btnAiAutoTrim" data-copilot-prompt="Remove the silent gaps from this audio">
+                            <i class="fa-solid fa-scissors" aria-hidden="true"></i><span>Remove silences</span><i class="fa-solid fa-comment-dots tool-route" aria-hidden="true" title="Opens in {{ brand.assistant }}"></i>
+                        </button>
+                        <button type="button" class="ai-action-btn" id="btnAiAutoDuck" data-copilot-prompt="Lower the background music whenever someone is speaking">
+                            <i class="fa-solid fa-sliders" aria-hidden="true"></i><span>Duck music under speech</span><i class="fa-solid fa-comment-dots tool-route" aria-hidden="true" title="Opens in {{ brand.assistant }}"></i>
+                        </button>
+                    </section>
 
-                    <div class="ai-tool-group">
-                        <h4 class="group-title"><i class="fa-solid fa-image"></i> Image & Vision AI</h4>
-                        <button class="ai-action-btn" id="btnAiRemoveBg"><i class="fa-solid fa-person-circle-minus"></i> 1-Click Background Remover</button>
-                        <button class="ai-action-btn" id="btnAiUpscale"><i class="fa-solid fa-expand"></i> 2x / 4x AI Super-Resolution</button>
-                        <button class="ai-action-btn" id="btnAiPhotoClarity"><i class="fa-solid fa-sun"></i> Auto Photo Clarity & HDR</button>
-                    </div>
+                    <section class="ai-tool-group" aria-labelledby="toolsVideoTitle">
+                        <h2 class="group-title" id="toolsVideoTitle">Video</h2>
+                        <button type="button" class="ai-action-btn" id="btnAiBurnSubs" data-copilot-prompt="Transcribe this video and burn the captions into it">
+                            <i class="fa-solid fa-align-center" aria-hidden="true"></i><span>Burn in captions</span><i class="fa-solid fa-comment-dots tool-route" aria-hidden="true" title="Opens in {{ brand.assistant }}"></i>
+                        </button>
+                        <button type="button" class="ai-action-btn" id="btnAiSmartReframe" data-copilot-prompt="Reframe this video to a 9:16 vertical crop">
+                            <i class="fa-solid fa-mobile-screen-button" aria-hidden="true"></i><span>Reframe to 9:16</span><i class="fa-solid fa-comment-dots tool-route" aria-hidden="true" title="Opens in {{ brand.assistant }}"></i>
+                        </button>
+                        <button type="button" class="ai-action-btn" id="btnAiSceneDetect" data-copilot-prompt="Detect the scene cuts in this video">
+                            <i class="fa-solid fa-clapperboard" aria-hidden="true"></i><span>Detect scene cuts</span><i class="fa-solid fa-comment-dots tool-route" aria-hidden="true" title="Opens in {{ brand.assistant }}"></i>
+                        </button>
+                    </section>
+
+                    <section class="ai-tool-group" aria-labelledby="toolsImageTitle">
+                        <h2 class="group-title" id="toolsImageTitle">Image</h2>
+                        <button type="button" class="ai-action-btn" id="btnAiRemoveBg">
+                            <i class="fa-solid fa-person" aria-hidden="true"></i><span>Remove background</span>
+                        </button>
+                        <button type="button" class="ai-action-btn" id="btnAiUpscale">
+                            <i class="fa-solid fa-up-right-and-down-left-from-center" aria-hidden="true"></i><span>Upscale 2×</span>
+                        </button>
+                        <button type="button" class="ai-action-btn" id="btnAiPhotoClarity" data-copilot-prompt="Improve the clarity and dynamic range of this photo">
+                            <i class="fa-solid fa-sun" aria-hidden="true"></i><span>Enhance photo</span><i class="fa-solid fa-comment-dots tool-route" aria-hidden="true" title="Opens in {{ brand.assistant }}"></i>
+                        </button>
+                    </section>
+
+                    <p class="tools-footnote"><i class="fa-solid fa-comment-dots" aria-hidden="true"></i> Opens {{ brand.assistant }} with the request filled in, ready to review and send.</p>
                 </div>
 
-                <!-- Layers / Regions Tab -->
-                <div class="tab-content" id="tabLayers">
+                <!-- Layers -->
+                <div class="tab-content" id="tabLayers" role="tabpanel" aria-labelledby="tabBtnLayers">
                     <div class="layers-header-controls">
-                        <button class="btn btn-secondary btn-xs" id="btnAddLayerBtn"><i class="fa-solid fa-plus"></i> Add Layer</button>
-                        <button class="btn btn-secondary btn-xs" id="btnGroupLayersBtn"><i class="fa-solid fa-folder-plus"></i> Group</button>
+                        <span class="layers-title">Image layers</span>
+                        <button type="button" class="btn btn-secondary btn-xs" id="btnAddLayerBtn"><i class="fa-solid fa-plus" aria-hidden="true"></i> Add layer</button>
                     </div>
                     <div class="layer-stack-list" id="layerStackList">
                         <div class="empty-layers-msg">
-                            <i class="fa-solid fa-layer-group"></i>
-                            <p>No canvas layers created.</p>
+                            <p class="empty-title">No layers</p>
+                            <p>Add an image from Media to start a layer stack. The top layer draws last.</p>
                         </div>
                     </div>
                 </div>
             </div>
         </aside>
 
-        <!-- Center Viewport Panel: Canvas & Player Monitor -->
-        <section class="studio-panel panel-center" id="panelCenter">
-            <!-- Viewport Bar -->
+        <!-- Center: monitor + timeline -->
+        <section class="studio-panel panel-center" id="panelCenter" aria-label="Preview and timeline">
             <div class="viewport-toolbar">
                 <div class="vp-left">
-                    <span class="viewport-title" id="viewportTitle"><i class="fa-solid fa-display"></i> Master Canvas Monitor</span>
-                    <span class="timecode-display" id="timecodeDisplay">00:00:00:00</span>
+                    <span class="viewport-title" id="viewportTitle">Program</span>
+                    <output class="timecode-display" id="timecodeDisplay" aria-label="Playhead timecode">00:00:00:00</output>
                 </div>
 
-                <div class="vp-center">
-                    <button class="vp-btn" id="btnPrevFrame" title="Previous Frame (←)"><i class="fa-solid fa-step-backward"></i></button>
-                    <button class="vp-btn play-btn" id="btnMasterPlayPause" title="Play/Pause (Space)"><i class="fa-solid fa-play"></i></button>
-                    <button class="vp-btn" id="btnNextFrame" title="Next Frame (→)"><i class="fa-solid fa-step-forward"></i></button>
-                    <button class="vp-btn" id="btnStopPlay" title="Stop"><i class="fa-solid fa-square"></i></button>
+                <div class="vp-center" role="group" aria-label="Transport">
+                    <button type="button" class="vp-btn" id="btnPrevFrame" aria-label="Previous frame" title="Previous frame (←)"><i class="fa-solid fa-backward-step" aria-hidden="true"></i></button>
+                    <button type="button" class="vp-btn play-btn" id="btnMasterPlayPause" aria-label="Play" title="Play / pause (Space)"><i class="fa-solid fa-play" aria-hidden="true"></i></button>
+                    <button type="button" class="vp-btn" id="btnNextFrame" aria-label="Next frame" title="Next frame (→)"><i class="fa-solid fa-forward-step" aria-hidden="true"></i></button>
+                    <button type="button" class="vp-btn" id="btnStopPlay" aria-label="Stop and return to start" title="Stop"><i class="fa-solid fa-stop" aria-hidden="true"></i></button>
                 </div>
 
                 <div class="vp-right">
-                    <select class="select-sm" id="aspectRatioSelect" title="Canvas Aspect Ratio">
-                        <option value="16:9">16:9 (YouTube / TV)</option>
-                        <option value="9:16">9:16 (Shorts / Reels)</option>
-                        <option value="1:1">1:1 (Square Feed)</option>
-                        <option value="4:5">4:5 (Portrait)</option>
-                        <option value="21:9">21:9 (Cinematic)</option>
+                    <label class="sr-only" for="aspectRatioSelect">Preview aspect ratio</label>
+                    <select class="select-sm" id="aspectRatioSelect" title="Preview aspect ratio">
+                        <option value="16:9">16:9 Landscape</option>
+                        <option value="9:16">9:16 Vertical</option>
+                        <option value="1:1">1:1 Square</option>
+                        <option value="4:5">4:5 Portrait</option>
+                        <option value="21:9">21:9 Cinema</option>
                     </select>
-                    <button class="vp-btn" id="btnToggleFullscreen" title="Fullscreen Monitor"><i class="fa-solid fa-expand"></i></button>
+                    <button type="button" class="vp-btn" id="btnToggleFullscreen" aria-label="Full-screen preview" title="Full-screen preview"><i class="fa-solid fa-expand" aria-hidden="true"></i></button>
                 </div>
             </div>
 
-            <!-- Viewport Container -->
-            <div class="viewport-container" id="viewportContainer">
-                <video id="masterVideoPlayer" class="viewport-element active" playsinline crossorigin="anonymous"></video>
-                <canvas id="masterImageCanvas" class="viewport-element"></canvas>
-                
-                <div id="audioWaveformContainer" class="viewport-element audio-waveform-box">
-                    <div id="wavesurferWaveform"></div>
-                    <div id="wavesurferTimeline"></div>
+            <div class="viewport-container" id="viewportContainer" data-workspace="combo">
+                <div class="viewport-frame">
+                    <video id="masterVideoPlayer" class="viewport-element active" playsinline crossorigin="anonymous"></video>
+                    <canvas id="masterImageCanvas" class="viewport-element"></canvas>
+
+                    <div id="audioWaveformContainer" class="viewport-element audio-waveform-box">
+                        <div id="wavesurferWaveform"></div>
+                        <div id="wavesurferTimeline"></div>
+                    </div>
+
+                    <canvas id="textOverlayCanvas" class="overlay-interactive-canvas"></canvas>
+
+                    <div class="viewport-empty" aria-hidden="true">
+                        <i class="fa-solid fa-photo-film" aria-hidden="true"></i>
+                        <p class="viewport-empty-title">Nothing to preview yet</p>
+                        <p>Import a file in Media, then add it to the timeline.</p>
+                    </div>
                 </div>
-
-                <!-- Overlay Text / Subtitle Interactive Canvas -->
-                <canvas id="textOverlayCanvas" class="overlay-interactive-canvas"></canvas>
             </div>
 
-            <!-- Personal Quick Tools Bar (Visible in Personal Mode) -->
-            <div class="personal-quick-bar" id="personalQuickBar">
-                <span class="quick-title"><i class="fa-solid fa-wand-magic-sparkles"></i> 1-Click Magic Tools:</span>
-                <button class="quick-chip" id="chipRemoveBg"><i class="fa-solid fa-scissors"></i> Cut Background</button>
-                <button class="quick-chip" id="chipEnhanceAudio"><i class="fa-solid fa-wand-magic-sparkles"></i> Clean Voice</button>
-                <button class="quick-chip" id="chipMakeGif"><i class="fa-solid fa-file-image"></i> Make GIF</button>
-                <button class="quick-chip" id="chipMemeText"><i class="fa-solid fa-quote-left"></i> Meme Text</button>
-                <button class="quick-chip" id="chipCompress"><i class="fa-solid fa-compress"></i> Shrink File</button>
+            <!-- Quick actions (personal mode) -->
+            <div class="personal-quick-bar" id="personalQuickBar" role="group" aria-label="Quick actions">
+                <span class="quick-title">Quick actions</span>
+                <button type="button" class="quick-chip" id="chipRemoveBg"><i class="fa-solid fa-person" aria-hidden="true"></i> Remove background</button>
+                <button type="button" class="quick-chip" id="chipEnhanceAudio" data-copilot-prompt="Clean up the voice and remove background noise"><i class="fa-solid fa-microphone-lines" aria-hidden="true"></i> Clean up voice</button>
+                <button type="button" class="quick-chip" id="chipMakeGif" data-copilot-prompt="Convert this clip to an animated GIF"><i class="fa-solid fa-file-image" aria-hidden="true"></i> Convert to GIF</button>
+                <button type="button" class="quick-chip" id="chipMemeText" data-proxy-click="btnTlAddTextTrack"><i class="fa-solid fa-font" aria-hidden="true"></i> Add caption</button>
+                <button type="button" class="quick-chip" id="chipCompress" data-copilot-prompt="Compress this file to a smaller size while keeping good quality"><i class="fa-solid fa-compress" aria-hidden="true"></i> Compress</button>
             </div>
 
-            <!-- Bottom NLE Timeline Workspace -->
+            <!-- Timeline -->
             <div class="timeline-workspace" id="timelineWorkspace">
-                <!-- Timeline Header Bar -->
-                <div class="timeline-toolbar">
+                <div class="timeline-toolbar" role="toolbar" aria-label="Timeline">
                     <div class="tl-left">
-                        <button class="tl-btn" id="btnTlSplit" title="Split Clip at Playhead (S)"><i class="fa-solid fa-scissors"></i> Split</button>
-                        <button class="tl-btn" id="btnTlDelete" title="Delete Selected Clip (Del)"><i class="fa-solid fa-trash"></i> Delete</button>
-                        <button class="tl-btn" id="btnTlDuplicate" title="Duplicate Clip (Ctrl+D)"><i class="fa-solid fa-clone"></i> Duplicate</button>
-                        <button class="tl-btn" id="btnTlAddTextTrack" title="Add Subtitle/Text Track"><i class="fa-solid fa-font"></i> + Text Track</button>
-                        <button class="tl-btn" id="btnTlAddAudioTrack" title="Add Audio Track"><i class="fa-solid fa-music"></i> + Audio Track</button>
+                        <button type="button" class="tl-btn" id="btnTlSplit" title="Split the selected clip at the playhead (S)"><i class="fa-solid fa-scissors" aria-hidden="true"></i><span class="tl-label-text">Split</span></button>
+                        <button type="button" class="tl-btn" id="btnTlDelete" title="Delete the selected clip (Delete)"><i class="fa-solid fa-trash-can" aria-hidden="true"></i><span class="tl-label-text">Delete</span></button>
+                        <button type="button" class="tl-btn" id="btnTlDuplicate" title="Duplicate the selected clip"><i class="fa-solid fa-clone" aria-hidden="true"></i><span class="tl-label-text">Duplicate</span></button>
+                        <span class="tl-divider" aria-hidden="true"></span>
+                        <button type="button" class="tl-btn" id="btnTlAddTextTrack" title="Add a caption at the playhead"><i class="fa-solid fa-font" aria-hidden="true"></i><span class="tl-label-text">Add caption</span></button>
                     </div>
-
                     <div class="tl-right">
-                        <span class="tl-label"><i class="fa-solid fa-magnet"></i> Snap Grid</span>
-                        <input type="checkbox" id="snapGridCheck" checked>
-                        <i class="fa-solid fa-magnifying-glass-minus"></i>
-                        <input type="range" id="timelineZoomSlider" min="10" max="200" value="50">
-                        <i class="fa-solid fa-magnifying-glass-plus"></i>
+                        <span class="tl-hint">Click the ruler or a track to move the playhead</span>
                     </div>
                 </div>
 
-                <!-- Multitrack Container -->
                 <div class="tracks-scroll-container" id="tracksScrollContainer">
-                    <!-- Playhead Line -->
-                    <div class="timeline-playhead" id="timelinePlayhead">
+                    <div class="timeline-playhead" id="timelinePlayhead" aria-hidden="true">
                         <div class="playhead-head"></div>
                         <div class="playhead-line"></div>
                     </div>
 
-                    <!-- Track Headers + Track Content -->
                     <div class="timeline-tracks-wrapper" id="timelineTracksWrapper">
-                        <!-- Video Track 1 -->
+                        <div class="timeline-ruler">
+                            <div class="ruler-corner">Tracks</div>
+                            <div class="ruler-scale" id="timelineRuler" title="Click to move the playhead"></div>
+                        </div>
+
                         <div class="track-row video-track" data-track-id="v1" data-track-type="video">
                             <div class="track-header">
-                                <span class="track-title"><i class="fa-solid fa-film"></i> Video V1</span>
+                                <span class="track-title" title="Video track V1"><span class="track-badge" aria-hidden="true">V1</span><span class="track-name">Video</span></span>
                                 <div class="track-actions">
-                                    <button class="tr-btn btn-mute-track" title="Mute Track"><i class="fa-solid fa-eye"></i></button>
-                                    <button class="tr-btn btn-lock-track" title="Lock Track"><i class="fa-solid fa-lock-open"></i></button>
+                                    <button type="button" class="tr-btn btn-mute-track" aria-pressed="false" aria-label="Hide video track" title="Hide track">
+                                        <i class="fa-solid fa-eye icon-off" aria-hidden="true"></i><i class="fa-solid fa-eye-slash icon-on" aria-hidden="true"></i>
+                                    </button>
+                                    <button type="button" class="tr-btn btn-lock-track" aria-pressed="false" aria-label="Lock video track" title="Lock track">
+                                        <i class="fa-solid fa-lock-open icon-off" aria-hidden="true"></i><i class="fa-solid fa-lock icon-on" aria-hidden="true"></i>
+                                    </button>
                                 </div>
                             </div>
                             <div class="track-timeline-content" id="trackContentV1"></div>
                         </div>
 
-                        <!-- Subtitle / Text Track 1 -->
                         <div class="track-row text-track" data-track-id="t1" data-track-type="text">
                             <div class="track-header">
-                                <span class="track-title"><i class="fa-solid fa-font"></i> Text / Subs</span>
+                                <span class="track-title" title="Caption track T1"><span class="track-badge" aria-hidden="true">T1</span><span class="track-name">Captions</span></span>
                                 <div class="track-actions">
-                                    <button class="tr-btn btn-mute-track" title="Hide Text"><i class="fa-solid fa-eye"></i></button>
+                                    <button type="button" class="tr-btn btn-mute-track" aria-pressed="false" aria-label="Hide captions" title="Hide captions">
+                                        <i class="fa-solid fa-eye icon-off" aria-hidden="true"></i><i class="fa-solid fa-eye-slash icon-on" aria-hidden="true"></i>
+                                    </button>
                                 </div>
                             </div>
                             <div class="track-timeline-content" id="trackContentT1"></div>
                         </div>
 
-                        <!-- Audio Track 1 -->
                         <div class="track-row audio-track" data-track-id="a1" data-track-type="audio">
                             <div class="track-header">
-                                <span class="track-title"><i class="fa-solid fa-music"></i> Audio A1</span>
+                                <span class="track-title" title="Audio track A1"><span class="track-badge" aria-hidden="true">A1</span><span class="track-name">Audio</span></span>
                                 <div class="track-actions">
-                                    <button class="tr-btn btn-mute-track" title="Mute Track"><i class="fa-solid fa-volume-high"></i></button>
-                                    <button class="tr-btn btn-solo-track" title="Solo Track">S</button>
+                                    <button type="button" class="tr-btn btn-mute-track" aria-pressed="false" aria-label="Mute audio track" title="Mute track">
+                                        <i class="fa-solid fa-volume-high icon-off" aria-hidden="true"></i><i class="fa-solid fa-volume-xmark icon-on" aria-hidden="true"></i>
+                                    </button>
+                                    <button type="button" class="tr-btn btn-solo-track" aria-pressed="false" aria-label="Solo audio track" title="Solo track"><span class="solo-letter" aria-hidden="true">S</span></button>
                                 </div>
                             </div>
                             <div class="track-timeline-content" id="trackContentA1"></div>
                         </div>
                     </div>
+
+                    <p class="timeline-empty">Add a file from Media to start editing. Captions go on T1; press <kbd>S</kbd> to split at the playhead.</p>
                 </div>
             </div>
         </section>
 
-        <!-- Right Inspector / Property Panel -->
-        <aside class="studio-panel panel-right" id="panelRight">
+        <!-- Right: inspector -->
+        <aside class="studio-panel panel-right" id="panelRight" aria-label="Inspector">
             <div class="panel-header">
-                <div class="tab-buttons">
-                    <button class="panel-tab active" data-target="#tabInspector"><i class="fa-solid fa-sliders"></i> Inspector</button>
-                    <button class="panel-tab" data-target="#tabColor"><i class="fa-solid fa-palette"></i> Color & FX</button>
-                    <button class="panel-tab" data-target="#tabAudioEq"><i class="fa-solid fa-sliders"></i> Audio EQ</button>
+                <div class="tab-buttons" role="tablist" aria-label="Inspector">
+                    <button type="button" class="panel-tab active" role="tab" id="tabBtnInspector" aria-selected="true" aria-controls="tabInspector" data-target="#tabInspector">Properties</button>
+                    <button type="button" class="panel-tab" role="tab" id="tabBtnColor" aria-selected="false" aria-controls="tabColor" tabindex="-1" data-target="#tabColor">Color</button>
+                    <button type="button" class="panel-tab" role="tab" id="tabBtnEq" aria-selected="false" aria-controls="tabAudioEq" tabindex="-1" data-target="#tabAudioEq">Audio EQ</button>
                 </div>
             </div>
 
             <div class="panel-body">
-                <!-- Inspector Tab -->
-                <div class="tab-content active" id="tabInspector">
-                    <div class="inspector-section">
-                        <h4 class="section-title"><i class="fa-solid fa-up-down-left-right"></i> Transform & Alignment</h4>
-                        <div class="prop-row">
-                            <label>Position X / Y</label>
-                            <div class="input-group-2">
-                                <input type="number" id="propPosX" value="0">
-                                <input type="number" id="propPosY" value="0">
+                <!-- Properties -->
+                <div class="tab-content active" id="tabInspector" role="tabpanel" aria-labelledby="tabBtnInspector">
+                    <section class="inspector-section" aria-labelledby="secTransform">
+                        <h2 class="section-title" id="secTransform">Transform</h2>
+                        <div class="prop-row prop-inline">
+                            <span class="prop-label" id="lblPosition">Position</span>
+                            <div class="input-group-2" role="group" aria-labelledby="lblPosition">
+                                <label class="num-field"><span class="num-axis">X</span><input type="number" id="propPosX" value="0" aria-label="Position X"></label>
+                                <label class="num-field"><span class="num-axis">Y</span><input type="number" id="propPosY" value="0" aria-label="Position Y"></label>
                             </div>
                         </div>
-                        <div class="prop-row">
-                            <label>Scale (%)</label>
-                            <input type="range" id="propScale" min="10" max="300" value="100">
-                            <span class="range-val" id="valScale">100%</span>
+                        <div class="prop-row prop-range">
+                            <div class="prop-head"><label for="propScale">Scale</label><span class="range-val" id="valScale">100%</span></div>
+                            <input type="range" id="propScale" min="10" max="300" value="100" data-readout="valScale" data-format="percent">
                         </div>
-                        <div class="prop-row">
-                            <label>Rotation (°)</label>
-                            <input type="range" id="propRotation" min="-180" max="180" value="0">
-                            <span class="range-val" id="valRotation">0°</span>
+                        <div class="prop-row prop-range">
+                            <div class="prop-head"><label for="propRotation">Rotation</label><span class="range-val" id="valRotation">0°</span></div>
+                            <input type="range" id="propRotation" min="-180" max="180" value="0" data-readout="valRotation" data-format="degrees">
                         </div>
-                        <div class="prop-row">
-                            <label>Opacity (%)</label>
-                            <input type="range" id="propOpacity" min="0" max="100" value="100">
-                            <span class="range-val" id="valOpacity">100%</span>
+                        <div class="prop-row prop-range">
+                            <div class="prop-head"><label for="propOpacity">Opacity</label><span class="range-val" id="valOpacity">100%</span></div>
+                            <input type="range" id="propOpacity" min="0" max="100" value="100" data-readout="valOpacity" data-format="percent">
                         </div>
-                    </div>
+                    </section>
 
-                    <div class="inspector-section">
-                        <h4 class="section-title"><i class="fa-solid fa-font"></i> Text & Caption Style</h4>
-                        <div class="prop-row">
-                            <label>Content</label>
-                            <textarea id="propTextContent" rows="2" placeholder="Enter caption text..."></textarea>
+                    <fieldset class="inspector-section" id="clipAudioFields" aria-labelledby="secClipAudio" disabled>
+                        <h2 class="section-title" id="secClipAudio">Clip audio</h2>
+                        <div class="prop-row prop-range">
+                            <div class="prop-head"><label for="propClipVolume">Volume</label><span class="range-val" id="valClipVolume">100%</span></div>
+                            <input type="range" id="propClipVolume" min="0" max="200" value="100">
                         </div>
+                        <div class="prop-row prop-range">
+                            <div class="prop-head"><label for="propClipPan">Pan</label><span class="range-val" id="valClipPan">Center</span></div>
+                            <input type="range" id="propClipPan" min="-100" max="100" value="0">
+                        </div>
+                        <p class="prop-hint">Select a video or audio clip on the timeline to adjust its mix.</p>
+                    </fieldset>
+
+                    <fieldset class="inspector-section" id="captionFields" aria-labelledby="secCaption" disabled>
+                        <h2 class="section-title" id="secCaption">Caption</h2>
                         <div class="prop-row">
-                            <label>Font Size</label>
+                            <label class="prop-label" for="propTextContent">Text</label>
+                            <textarea id="propTextContent" rows="2" placeholder="Caption text"></textarea>
+                        </div>
+                        <div class="prop-row prop-inline">
+                            <label class="prop-label" for="propFontSize">Size</label>
                             <input type="number" id="propFontSize" value="32" min="8" max="200">
                         </div>
-                        <div class="prop-row">
-                            <label>Text Color</label>
+                        <div class="prop-row prop-inline">
+                            <label class="prop-label" for="propTextColor">Text color</label>
                             <input type="color" id="propTextColor" value="#ffffff">
                         </div>
-                        <div class="prop-row">
-                            <label>Background Box</label>
+                        <div class="prop-row prop-inline">
+                            <label class="prop-label" for="propTextBgColor">Background</label>
                             <input type="color" id="propTextBgColor" value="#000000">
                         </div>
-                    </div>
+                        <p class="prop-hint">Select a caption on track T1, or use Add caption.</p>
+                    </fieldset>
                 </div>
 
-                <!-- Color & FX Tab -->
-                <div class="tab-content" id="tabColor">
-                    <div class="inspector-section">
-                        <h4 class="section-title"><i class="fa-solid fa-palette"></i> Color Corrections & LUTs</h4>
-                        <div class="prop-row">
-                            <label>Brightness</label>
-                            <input type="range" id="propBrightness" min="-100" max="100" value="0">
+                <!-- Color -->
+                <div class="tab-content" id="tabColor" role="tabpanel" aria-labelledby="tabBtnColor">
+                    <section class="inspector-section" aria-labelledby="secColor">
+                        <h2 class="section-title" id="secColor">Adjustments</h2>
+                        <div class="prop-row prop-range">
+                            <div class="prop-head"><label for="propBrightness">Brightness</label><span class="range-val" id="valBrightness">0</span></div>
+                            <input type="range" id="propBrightness" min="-100" max="100" value="0" data-readout="valBrightness" data-format="signed">
                         </div>
-                        <div class="prop-row">
-                            <label>Contrast</label>
-                            <input type="range" id="propContrast" min="-100" max="100" value="0">
+                        <div class="prop-row prop-range">
+                            <div class="prop-head"><label for="propContrast">Contrast</label><span class="range-val" id="valContrast">0</span></div>
+                            <input type="range" id="propContrast" min="-100" max="100" value="0" data-readout="valContrast" data-format="signed">
                         </div>
-                        <div class="prop-row">
-                            <label>Saturation</label>
-                            <input type="range" id="propSaturation" min="-100" max="100" value="0">
+                        <div class="prop-row prop-range">
+                            <div class="prop-head"><label for="propSaturation">Saturation</label><span class="range-val" id="valSaturation">0</span></div>
+                            <input type="range" id="propSaturation" min="-100" max="100" value="0" data-readout="valSaturation" data-format="signed">
                         </div>
-                        <div class="prop-row">
-                            <label>Preset LUT Filter</label>
+                        <div class="prop-row prop-inline">
+                            <label class="prop-label" for="selectLutFilter">Look</label>
                             <select id="selectLutFilter" class="select-sm">
-                                <option value="none">None (Standard)</option>
-                                <option value="cinematic">Cinematic Teal & Orange</option>
-                                <option value="vintage">Vintage Warm Film</option>
-                                <option value="cyberpunk">Cyberpunk Neon</option>
-                                <option value="bw">B&W High Contrast</option>
+                                <option value="none">None</option>
+                                <option value="cinematic">Teal and orange</option>
+                                <option value="vintage">Warm film</option>
+                                <option value="cyberpunk">Neon</option>
+                                <option value="bw">High-contrast mono</option>
                             </select>
                         </div>
-                    </div>
+                    </section>
                 </div>
 
-                <!-- Audio EQ Tab -->
-                <div class="tab-content" id="tabAudioEq">
-                    <div class="inspector-section">
-                        <h4 class="section-title"><i class="fa-solid fa-sliders"></i> 10-Band Parametric EQ</h4>
+                <!-- Audio EQ -->
+                <div class="tab-content" id="tabAudioEq" role="tabpanel" aria-labelledby="tabBtnEq">
+                    <section class="inspector-section" aria-labelledby="secEq">
+                        <h2 class="section-title" id="secEq">10-band equalizer <span class="section-meta">Hz · ±12 dB</span></h2>
                         <div class="eq-bands-grid" id="eqBandsGrid">
-                            <!-- 10 Sliders generated dynamically -->
+                            <!-- Bands generated by audio_studio.js -->
                         </div>
-                        <div class="prop-row" style="margin-top: 15px;">
-                            <label>Integrated LUFS Meter:</label>
-                            <span class="lufs-val" id="lufsMeterDisplay">-23.0 LUFS</span>
+                    </section>
+                    <section class="inspector-section" aria-labelledby="secLoudness">
+                        <h2 class="section-title" id="secLoudness">Loudness</h2>
+                        <div class="prop-row prop-inline">
+                            <span class="prop-label">Integrated</span>
+                            <output class="lufs-val" id="lufsMeterDisplay">Not measured</output>
                         </div>
-                        <button class="btn btn-secondary btn-sm" id="btnCalculateLufs"><i class="fa-solid fa-chart-simple"></i> Measure LUFS</button>
-                    </div>
+                        <button type="button" class="btn btn-secondary btn-sm btn-block" id="btnCalculateLufs"><i class="fa-solid fa-chart-simple" aria-hidden="true"></i> Measure loudness</button>
+                    </section>
                 </div>
             </div>
         </aside>
 
     </main>
 
-    <!-- Master Export Modal -->
+    <!-- Export dialog -->
     <div class="modal-overlay" id="exportModal">
-        <div class="modal-card">
+        <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="exportModalTitle" aria-describedby="exportModalDesc">
             <div class="modal-header">
-                <h3><i class="fa-solid fa-download"></i> Master Render Export</h3>
-                <button class="modal-close" id="btnCloseExportModal">&times;</button>
+                <h2 id="exportModalTitle">Export</h2>
+                <button type="button" class="modal-close" id="btnCloseExportModal" aria-label="Close"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
             </div>
             <div class="modal-body">
+                <p class="modal-desc" id="exportModalDesc">Renders the timeline with its captions and mix. PNG saves the current image canvas.</p>
                 <div class="form-group">
-                    <label>Target Format</label>
+                    <label for="exportFormatSelect">Format</label>
                     <select id="exportFormatSelect" class="select-full">
-                        <option value="mp4">Video MP4 (H.264 / AAC)</option>
-                        <option value="webm">Video WebM (VP9 / Opus)</option>
-                        <option value="gif">Animated GIF (Optimized)</option>
-                        <option value="mp3">Audio MP3 (320 kbps)</option>
-                        <option value="wav">Audio Lossless WAV</option>
-                        <option value="png">Image PNG Snapshot</option>
+                        <option value="mp4">MP4 video (H.264)</option>
+                        <option value="webm">WebM video (VP9)</option>
+                        <option value="gif">Animated GIF</option>
+                        <option value="mp3">MP3 audio (320 kbps)</option>
+                        <option value="wav">WAV audio (lossless)</option>
+                        <option value="png">PNG image</option>
                     </select>
                 </div>
                 <div class="form-group">
-                    <label>Quality / Preset</label>
+                    <label for="exportQualitySelect">Resolution</label>
                     <select id="exportQualitySelect" class="select-full">
-                        <option value="1080p">High 1080p Full HD</option>
-                        <option value="720p">Balanced 720p HD</option>
-                        <option value="4k">Ultra 4K UHD</option>
+                        <option value="1080p">1080p Full HD</option>
+                        <option value="720p">720p HD</option>
+                        <option value="4k">2160p 4K UHD</option>
                     </select>
                 </div>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-secondary" id="btnCancelExport">Cancel</button>
-                <button class="btn btn-primary" id="btnStartExport"><i class="fa-solid fa-bolt"></i> Start Render</button>
+                <button type="button" class="btn btn-secondary" id="btnCancelExport">Cancel</button>
+                <button type="button" class="btn btn-primary" id="btnStartExport">Export</button>
             </div>
         </div>
     </div>
 
-    <!-- Keyboard Shortcuts Modal -->
+    <!-- Keyboard shortcuts dialog -->
     <div class="modal-overlay" id="shortcutsModal">
-        <div class="modal-card modal-lg">
+        <div class="modal-card modal-lg" role="dialog" aria-modal="true" aria-labelledby="shortcutsModalTitle">
             <div class="modal-header">
-                <h3><i class="fa-solid fa-keyboard"></i> Keyboard Shortcuts Reference</h3>
-                <button class="modal-close" id="btnCloseShortcutsModal">&times;</button>
+                <h2 id="shortcutsModalTitle">Keyboard shortcuts</h2>
+                <button type="button" class="modal-close" id="btnCloseShortcutsModal" aria-label="Close"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
             </div>
             <div class="modal-body">
                 <table class="shortcuts-table">
-                    <thead>
-                        <tr><th>Shortcut</th><th>Action</th></tr>
-                    </thead>
+                    <caption class="sr-only">Studio keyboard shortcuts</caption>
                     <tbody>
-                        <tr><td><kbd>Space</kbd></td><td>Play / Pause Timeline & Preview</td></tr>
-                        <tr><td><kbd>S</kbd></td><td>Split Clip at Playhead Position</td></tr>
-                        <tr><td><kbd>Delete</kbd> / <kbd>Backspace</kbd></td><td>Delete Selected Clip / Layer</td></tr>
-                        <tr><td><kbd>Ctrl + Z</kbd></td><td>Undo Last Action</td></tr>
-                        <tr><td><kbd>Ctrl + Y</kbd></td><td>Redo Action</td></tr>
-                        <tr><td><kbd>J</kbd> / <kbd>K</kbd> / <kbd>L</kbd></td><td>Shuttle Reverse / Stop / Forward</td></tr>
-                        <tr><td><kbd>←</kbd> / <kbd>→</kbd></td><td>Nudge Playhead Frame-by-Frame</td></tr>
-                        <tr><td><kbd>M</kbd></td><td>Mute Audio Output</td></tr>
-                        <tr><td><kbd>?</kbd></td><td>Open Shortcuts Dialog</td></tr>
+                        <tr><th scope="row">Play or pause</th><td><kbd>Space</kbd></td></tr>
+                        <tr><th scope="row">Split selected clip at the playhead</th><td><kbd>S</kbd></td></tr>
+                        <tr><th scope="row">Delete selected clip</th><td><kbd>Delete</kbd> <kbd>Backspace</kbd></td></tr>
+                        <tr><th scope="row">Previous or next frame</th><td><kbd>←</kbd> <kbd>→</kbd></td></tr>
+                        <tr><th scope="row">Back 5 frames · pause · forward 5 frames</th><td><kbd>J</kbd> <kbd>K</kbd> <kbd>L</kbd></td></tr>
+                        <tr><th scope="row">Close dialog or {{ brand.assistant }}</th><td><kbd>Esc</kbd></td></tr>
+                        <tr><th scope="row">Show this list</th><td><kbd>?</kbd></td></tr>
                     </tbody>
                 </table>
             </div>
         </div>
     </div>
 
-    <!-- Processing Overlay Loader -->
-    <div id="processingOverlay" class="processing-overlay hidden">
-        <div class="overlay-card">
-            <div class="spinner"></div>
-            <h3 id="processingTitle">Processing Media...</h3>
-            <p id="processingMsg">Applying local CPU/GPU AI processing...</p>
+    <!-- {{ brand.assistant }} drawer (wired by static/js/ai_agent.js) -->
+    <aside class="ai-agent-drawer" id="aiAgentDrawer" aria-label="{{ brand.assistant }}">
+        <div class="agent-drawer-header">
+            <div class="agent-title">
+                <i class="fa-solid fa-comment-dots" aria-hidden="true"></i>
+                <span>{{ brand.assistant }}</span>
+                <span class="copilot-status-badge">Local</span>
+            </div>
+            <div class="agent-drawer-actions">
+                <button type="button" class="icon-btn" id="btnAgentSkills" aria-label="Browse skills" aria-haspopup="dialog" title="Skills (type @)">
+                    <i class="fa-solid fa-bolt" aria-hidden="true"></i>
+                </button>
+                <a href="/agent" class="icon-btn agent-drawer-link" aria-label="Open {{ brand.assistant }} full page" title="Open full page">
+                    <i class="fa-solid fa-up-right-from-square" aria-hidden="true"></i>
+                </a>
+                <button type="button" class="icon-btn" id="btnCloseAgentDrawer" aria-label="Close {{ brand.assistant }}" title="Close (Esc)"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
+            </div>
         </div>
-    </div>
 
-    <!-- JavaScript Scripts -->
-    <script src="/static/theme.js"></script>
-    <script src="/static/processing_overlay.js"></script>
-    <script src="/static/js/studio_core.js"></script>
-    <script src="/static/js/audio_studio.js"></script>
-    <script src="/static/js/video_studio.js"></script>
-    <script src="/static/js/image_studio.js"></script>
-    <script src="/static/js/shortcuts.js"></script>
+        <div class="agent-context-bar" id="agentContextBar">
+            <span class="context-label">Working on</span> <strong id="agentActiveTarget">No media selected</strong>
+        </div>
+
+        <div class="agent-drawer-body" id="agentChatHistory" aria-live="polite">
+            <div class="agent-message bot-msg">
+                <div class="agent-avatar"><i class="fa-solid fa-comment-dots" aria-hidden="true"></i></div>
+                <div class="msg-bubble">
+                    <p>{{ brand.assistant }} edits the clip or image you have selected in Studio.</p>
+                    <p>Describe the change, for example “remove background noise” or “trim the first 3 seconds”.</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="agent-quick-chips" id="agentQuickChips" role="group" aria-label="Suggested requests">
+            <button type="button" class="chip-btn" data-prompt="Remove all background noise from this audio">Reduce noise</button>
+            <button type="button" class="chip-btn" data-prompt="Auto trim silence from start and end">Trim silence</button>
+            <button type="button" class="chip-btn" data-prompt="Upscale this image quality by 2x">Upscale 2×</button>
+            <button type="button" class="chip-btn" data-prompt="Extract audio track as MP3">Extract audio</button>
+            <button type="button" class="chip-btn" data-prompt="Speed up video by 1.5x">Speed 1.5×</button>
+        </div>
+
+        <div class="agent-input-container">
+            <button type="button" class="btn-mic-agent" id="btnMicAgent" aria-label="Voice input" title="Voice input"><i class="fa-solid fa-microphone" aria-hidden="true"></i></button>
+            <label class="sr-only" for="agentInputText">Request for {{ brand.assistant }}</label>
+            <input type="text" id="agentInputText" placeholder="Describe an edit…" autocomplete="off">
+            <button type="button" class="btn-send-agent" id="btnSendAgent" aria-label="Send" title="Send (Enter)"><i class="fa-solid fa-arrow-up" aria-hidden="true"></i></button>
+        </div>
+    </aside>
+
+    <script src="{{ url_for('static', filename='theme.js') }}"></script>
+    <script src="{{ url_for('static', filename='processing_overlay.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/studio_core.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/audio_studio.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/video_studio.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/image_studio.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/shortcuts.js') }}"></script>
+    <script src="{{ url_for('static', filename='local_voice_input.js') }}"></script>
+    <script src="{{ url_for('static', filename='agent_skills.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/ai_agent.js') }}"></script>
 </body>
 </html>

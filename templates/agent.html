@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    {% include '_head.html' %}
+    <title>{{ brand.assistant }} — {{ brand.product }}</title>
+    <meta name="description" content="Describe an edit in plain language and {{ brand.assistant }} trims, cleans, transcribes and retouches your media locally.">
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='agent.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='agent_skills.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='vendor/fontawesome/css/all.min.css') }}">
+
+    <script src="{{ url_for('static', filename='theme.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='local_voice_input.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='agent_skills.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='agent.js') }}" defer></script>
+</head>
+
+<body class="agent-page-body">
+    <a class="skip-link" href="#main">Skip to content</a>
+
+    <!-- Drag & drop target (shown by agent.js while a file is dragged over the window) -->
+    <div id="dragOverlay" class="window-drag-overlay" aria-hidden="true">
+        <div class="drag-overlay-card">
+            <div class="drag-overlay-icon"><i class="fas fa-arrow-up-from-bracket" aria-hidden="true"></i></div>
+            <div class="drag-overlay-text">Drop to attach</div>
+            <div class="drag-overlay-hint">Video, audio or image — MP4, MOV, MP3, WAV, PNG, JPG</div>
+        </div>
+    </div>
+
+    <div class="agent-app-container">
+
+        <!-- ─── Conversations sidebar (off-canvas drawer below 860px) ─── -->
+        <aside id="agentSidebar" class="agent-sidebar" aria-label="Conversations">
+            <div class="sidebar-header">
+                <a href="/" class="brand-wrapper" aria-label="{{ brand.product }} home">
+                    <img src="{{ url_for('static', filename='brand-mark.svg') }}" alt="" class="brand-mark" width="28" height="28">
+                    <span class="brand-name">{{ brand.product }}</span>
+                    <span class="brand-context">{{ brand.assistant }}</span>
+                </a>
+                <button type="button" id="closeAgentSidebar" class="icon-btn mobile-sidebar-close" aria-label="Close conversations" title="Close">
+                    <i class="fas fa-xmark" aria-hidden="true"></i>
+                </button>
+            </div>
+
+            <div class="sidebar-actions">
+                <button type="button" id="newChatBtn" class="new-chat-btn">
+                    <i class="fas fa-pen-to-square" aria-hidden="true"></i>
+                    <span>New chat</span>
+                </button>
+            </div>
+
+            <!-- File currently in context (agent.js toggles display) -->
+            <section id="activeMediaBox" class="active-media-box" aria-label="Current file" style="display: none;">
+                <div class="active-media-icon" aria-hidden="true">
+                    <i class="fas fa-file-waveform"></i>
+                </div>
+                <div class="active-media-details">
+                    <div id="activeMediaName" class="active-media-name">file.mp4</div>
+                    <div id="activeMediaMeta" class="active-media-meta">VIDEO • 12 MB</div>
+                </div>
+                <button type="button" id="removeActiveMediaBtn" class="active-media-remove" aria-label="Remove current file" title="Remove current file">
+                    <i class="fas fa-xmark" aria-hidden="true"></i>
+                </button>
+            </section>
+
+            <nav class="sessions-list-container" aria-labelledby="sessionsHeading">
+                <h2 id="sessionsHeading" class="sidebar-label">Recent</h2>
+                <div id="sessionsList" class="sessions-list">
+                    <!-- Populated by agent.js -->
+                </div>
+            </nav>
+
+            <!-- What {{ brand.assistant }} can work on; the chip matching the current file is highlighted by agent.js -->
+            <div class="subagents-widget">
+                <h2 class="sidebar-label">Works with</h2>
+                <div class="subagent-grid">
+                    <span class="subagent-chip" id="chipVision" title="Remove background, upscale, retouch">
+                        <i class="fas fa-image" aria-hidden="true"></i> Images
+                    </span>
+                    <span class="subagent-chip" id="chipVideo" title="Trim, change speed, export GIF">
+                        <i class="fas fa-film" aria-hidden="true"></i> Video
+                    </span>
+                    <span class="subagent-chip" id="chipAudio" title="Transcribe, reduce noise, equalise">
+                        <i class="fas fa-wave-square" aria-hidden="true"></i> Audio
+                    </span>
+                </div>
+            </div>
+
+            <nav class="sidebar-footer" aria-label="Workspaces">
+                <a href="/" class="footer-nav-link"><i class="fas fa-house" aria-hidden="true"></i> Home</a>
+                <a href="/studio" class="footer-nav-link"><i class="fas fa-layer-group" aria-hidden="true"></i> Studio</a>
+                <a href="/audio" class="footer-nav-link"><i class="fas fa-wave-square" aria-hidden="true"></i> Audio</a>
+                <a href="/video" class="footer-nav-link"><i class="fas fa-film" aria-hidden="true"></i> Video</a>
+                <a href="/image" class="footer-nav-link"><i class="fas fa-image" aria-hidden="true"></i> Image</a>
+            </nav>
+        </aside>
+        <!-- Tapping the scrim activates the drawer's close button (label → button), no extra script -->
+        <label class="sidebar-scrim" for="closeAgentSidebar" aria-hidden="true"></label>
+
+        <!-- ─── Conversation ─── -->
+        <main id="main" class="agent-chat-viewport" tabindex="-1">
+
+            <header class="chat-top-bar">
+                <div class="top-bar-left">
+                    <button type="button" id="sidebarToggleBtn" class="icon-btn" title="Show or hide conversations" aria-label="Toggle conversations" aria-controls="agentSidebar" aria-expanded="false">
+                        <i class="fas fa-bars" aria-hidden="true"></i>
+                    </button>
+                    <h1 id="sessionHeaderTitle" class="session-header-title">{{ brand.assistant }}</h1>
+                </div>
+                <div class="top-bar-right">
+                    <button type="button" id="shortcutsBtn" class="icon-btn hide-on-phone" title="Keyboard shortcuts (?)" aria-label="Keyboard shortcuts" aria-haspopup="dialog" aria-controls="shortcutsModal">
+                        <i class="fas fa-keyboard" aria-hidden="true"></i>
+                    </button>
+                    <button type="button" id="clearChatBtn" class="icon-btn" title="Clear conversation (Ctrl+K)" aria-label="Clear conversation">
+                        <i class="fas fa-eraser" aria-hidden="true"></i>
+                    </button>
+                    <button type="button" id="themeToggle" class="icon-btn" title="Switch theme" aria-label="Switch theme">
+                        <i class="fas fa-moon" aria-hidden="true"></i>
+                    </button>
+                    <span class="top-bar-divider hide-on-phone" aria-hidden="true"></span>
+                    <a href="/studio" class="top-bar-link hide-on-phone" title="Open the multitrack Studio">
+                        <i class="fas fa-layer-group" aria-hidden="true"></i>
+                        <span>Open Studio</span>
+                    </a>
+                </div>
+            </header>
+
+            <div id="messagesStream" class="chat-messages-stream" role="log" aria-live="polite" aria-relevant="additions" aria-label="Conversation">
+                <!-- Welcome state or messages rendered by agent.js -->
+            </div>
+
+            <!-- ─── Composer ─── -->
+            <div class="bottom-command-dock">
+                <div class="dock-content-wrapper">
+                    <div class="input-capsule">
+                        <!-- File attached to the next message (agent.js toggles display) -->
+                        <div id="pendingAttachmentCard" class="pending-attachment-card" style="display: none;">
+                            <div class="pending-file-info">
+                                <div class="pending-file-badge" aria-hidden="true"><i class="fas fa-paperclip"></i></div>
+                                <div class="pending-file-text">
+                                    <div id="pendingFileName" class="pending-file-name">example.mp4</div>
+                                    <div id="pendingFileSize" class="pending-file-size">14.2 MB</div>
+                                </div>
+                            </div>
+                            <button type="button" id="removePendingBtn" class="remove-attachment-btn" aria-label="Remove attached file" title="Remove attached file">
+                                <i class="fas fa-xmark" aria-hidden="true"></i>
+                            </button>
+                        </div>
+
+                        <input type="file" id="filePicker" class="sr-only" tabindex="-1" aria-hidden="true" accept="audio/*,video/*,image/*">
+
+                        <label for="chatInput" class="sr-only">Message {{ brand.assistant }}</label>
+                        <textarea id="chatInput" class="chat-textarea" rows="1"
+                            placeholder="Describe an edit, or attach a file to start"></textarea>
+
+                        <div class="composer-toolbar">
+                            <div class="composer-tools">
+                                <button type="button" id="attachBtn" class="dock-btn" title="Attach a file (Ctrl+U)" aria-label="Attach a file">
+                                    <i class="fas fa-paperclip" aria-hidden="true"></i>
+                                </button>
+                                <button type="button" id="micBtn" class="dock-btn" title="Dictate" aria-label="Dictate a message">
+                                    <i class="fas fa-microphone" aria-hidden="true"></i>
+                                </button>
+                                <button type="button" id="skillsBtn" class="dock-btn" title="Skills (Ctrl+/)" aria-label="Browse skills" aria-haspopup="dialog">
+                                    <i class="fas fa-bolt" aria-hidden="true"></i>
+                                </button>
+                            </div>
+                            <span class="composer-hint" aria-hidden="true"><kbd>Enter</kbd> to send · <kbd>Shift</kbd> <kbd>Enter</kbd> for a new line</span>
+                            <button type="button" id="sendBtn" class="send-btn" title="Send (Enter)" aria-label="Send message">
+                                <i class="fas fa-arrow-up" aria-hidden="true"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <p class="privacy-footnote">
+                        <i class="fas fa-lock" aria-hidden="true"></i> Files are processed on this computer and never leave it.
+                    </p>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <div id="toastContainer" class="toast-container" role="status" aria-live="polite"></div>
+
+    <!-- ─── Keyboard shortcuts ─── -->
+    <div id="shortcutsModal" class="shortcuts-modal-backdrop">
+        <div class="shortcuts-modal-card" role="dialog" aria-modal="true" aria-labelledby="shortcutsTitle">
+            <div class="shortcuts-modal-header">
+                <h2 class="shortcuts-modal-title" id="shortcutsTitle">Keyboard shortcuts</h2>
+                <button type="button" id="closeShortcutsBtn" class="icon-btn" title="Close" aria-label="Close shortcuts">
+                    <i class="fas fa-xmark" aria-hidden="true"></i>
+                </button>
+            </div>
+            <dl class="shortcuts-table">
+                <div class="shortcut-row">
+                    <dt>Send message</dt>
+                    <dd><kbd>Enter</kbd></dd>
+                </div>
+                <div class="shortcut-row">
+                    <dt>New line</dt>
+                    <dd><kbd>Shift</kbd><kbd>Enter</kbd></dd>
+                </div>
+                <div class="shortcut-row">
+                    <dt>Attach a file</dt>
+                    <dd><kbd>Ctrl</kbd><kbd>U</kbd></dd>
+                </div>
+                <div class="shortcut-row">
+                    <dt>Clear conversation</dt>
+                    <dd><kbd>Ctrl</kbd><kbd>K</kbd></dd>
+                </div>
+                <div class="shortcut-row">
+                    <dt>Browse skills (or type @)</dt>
+                    <dd><kbd>Ctrl</kbd><kbd>/</kbd></dd>
+                </div>
+                <div class="shortcut-row">
+                    <dt>Close dialog</dt>
+                    <dd><kbd>Esc</kbd></dd>
+                </div>
+                <div class="shortcut-row">
+                    <dt>Show shortcuts</dt>
+                    <dd><kbd>?</kbd></dd>
+                </div>
+            </dl>
+        </div>
+    </div>
+
+</body>
+
+</html>

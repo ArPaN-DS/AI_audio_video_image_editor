@@ -1,0 +1,303 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   Assistant skills: "@" autocomplete, Skills library, and chat helpers.
+   Uses design tokens from tokens.css only. Shared by /agent and the studio drawer.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ─── "@" autocomplete popup ─── */
+.input-capsule, .agent-skills-host { position: relative; }
+.agent-skills-popup {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: calc(100% + var(--space-2, 8px));
+    max-height: min(320px, 50vh);
+    overflow-y: auto;
+    background: var(--surface, var(--bg-card));
+    color: var(--text, var(--text-primary));
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md, 10px);
+    box-shadow: var(--shadow-lg, 0 12px 32px rgba(0, 0, 0, 0.18));
+    padding: var(--space-1, 4px);
+    z-index: var(--z-dropdown, 50);
+}
+.agent-skills-popup[hidden] { display: none; }
+
+.agent-skills-option,
+.agent-skills-result {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: var(--space-2, 8px) var(--space-3, 12px);
+    border-radius: var(--radius-sm, 6px);
+    cursor: pointer;
+    min-height: var(--touch-target, 44px);
+    justify-content: center;
+}
+.agent-skills-option.is-active,
+.agent-skills-option:hover,
+.agent-skills-result.is-active,
+.agent-skills-result:hover {
+    background: var(--accent-soft, var(--surface-2));
+}
+.agent-skills-option-title {
+    font-weight: var(--weight-semibold, 600);
+    font-size: var(--text-sm, 0.875rem);
+}
+.agent-skills-id {
+    font-family: var(--font-mono, monospace);
+    font-weight: var(--weight-regular, 400);
+    font-size: var(--text-xs, 0.75rem);
+    color: var(--accent-text, var(--accent));
+}
+.agent-skills-option-desc {
+    font-size: var(--text-xs, 0.75rem);
+    color: var(--text-muted, var(--text-secondary));
+    line-height: var(--leading-snug, 1.35);
+}
+.agent-skills-empty {
+    padding: var(--space-3, 12px);
+    font-size: var(--text-sm, 0.875rem);
+    color: var(--text-muted, var(--text-secondary));
+}
+.agent-skills-browse {
+    display: block;
+    width: 100%;
+    margin-top: var(--space-1, 4px);
+    padding: var(--space-2, 8px);
+    border: 0;
+    border-top: 1px solid var(--divider, var(--border));
+    background: transparent;
+    color: var(--accent-text, var(--accent));
+    font: inherit;
+    font-size: var(--text-sm, 0.875rem);
+    cursor: pointer;
+    min-height: var(--touch-target, 44px);
+}
+
+/* ─── Skills library dialog ─── */
+body.agent-skills-open { overflow: hidden; }
+.agent-skills-backdrop {
+    position: fixed;
+    inset: 0;
+    background: var(--scrim, rgba(0, 0, 0, 0.45));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-4, 16px);
+    z-index: var(--z-modal, 1000);
+}
+.agent-skills-backdrop[hidden] { display: none; }
+.agent-skills-dialog {
+    width: min(960px, 100%);
+    max-height: min(720px, 100%);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3, 12px);
+    background: var(--surface, var(--bg-card));
+    color: var(--text, var(--text-primary));
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg, 14px);
+    box-shadow: var(--shadow-3, 0 24px 64px rgba(0, 0, 0, 0.3));
+    padding: var(--space-5, 20px);
+    overflow: hidden;
+}
+.agent-skills-header { display: flex; align-items: center; gap: var(--space-3, 12px); }
+.agent-skills-header h2 { margin: 0; font-size: var(--text-lg, 1.125rem); }
+.agent-skills-count { color: var(--text-muted, var(--text-secondary)); font-size: var(--text-sm, 0.875rem); }
+.agent-skills-close {
+    margin-left: auto;
+    width: var(--touch-target, 44px);
+    height: var(--touch-target, 44px);
+    border: 0;
+    border-radius: var(--radius-sm, 6px);
+    background: transparent;
+    color: inherit;
+    font-size: 1.5rem;
+    cursor: pointer;
+}
+.agent-skills-search-label {
+    position: absolute;
+    width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;
+}
+.agent-skills-search {
+    width: 100%;
+    min-height: var(--control-h, 40px);
+    padding: 0 var(--space-3, 12px);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md, 10px);
+    background: var(--field, var(--bg-input));
+    color: inherit;
+    font: inherit;
+}
+.agent-skills-tabs, .agent-skills-chips { display: flex; flex-wrap: wrap; gap: var(--space-2, 8px); margin-bottom: var(--space-2, 8px); }
+.agent-skills-tab, .agent-skills-chip {
+    min-height: 36px;
+    padding: 0 var(--space-3, 12px);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-pill, 999px);
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    font-size: var(--text-sm, 0.875rem);
+    cursor: pointer;
+}
+.agent-skills-tab[aria-selected="true"], .agent-skills-chip.is-on {
+    background: var(--accent-soft, var(--surface-2));
+    border-color: var(--accent-border, var(--accent));
+    color: var(--accent-text, var(--accent));
+}
+.agent-skills-body {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+    gap: var(--space-4, 16px);
+    min-height: 0;
+    flex: 1;
+}
+.agent-skills-list, .agent-skills-detail { overflow-y: auto; min-height: 0; }
+.agent-skills-list { border: 1px solid var(--border); border-radius: var(--radius-md, 10px); padding: var(--space-1, 4px); }
+.agent-skills-detail p { color: var(--text-secondary, inherit); line-height: var(--leading-normal, 1.5); }
+.agent-skills-detail-title { margin: 0 0 var(--space-2, 8px); font-size: var(--text-md, 1rem); }
+.agent-skills-meta { display: grid; grid-template-columns: auto 1fr; gap: var(--space-2, 8px) var(--space-3, 12px); font-size: var(--text-sm, 0.875rem); }
+.agent-skills-meta dt { color: var(--text-muted, var(--text-secondary)); }
+.agent-skills-meta dd { margin: 0; }
+.agent-skills-actions, .agent-skills-confirm, .agent-skills-rename {
+    display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2, 8px); margin-top: var(--space-4, 16px);
+}
+.agent-skills-use, .agent-skills-secondary, .agent-skills-danger {
+    min-height: var(--control-h, 40px);
+    padding: 0 var(--space-4, 16px);
+    border-radius: var(--radius-md, 10px);
+    font: inherit;
+    font-weight: var(--weight-semibold, 600);
+    cursor: pointer;
+}
+.agent-skills-use { border: 0; background: var(--accent, var(--primary)); color: var(--on-accent, #fff); }
+.agent-skills-secondary { border: 1px solid var(--border); background: transparent; color: inherit; }
+.agent-skills-danger { border: 1px solid var(--danger); background: transparent; color: var(--danger); }
+.agent-skills-error { color: var(--danger); margin: 0; font-size: var(--text-sm, 0.875rem); }
+.agent-skills-rename input {
+    min-height: var(--control-h, 40px); padding: 0 var(--space-2, 8px); border: 1px solid var(--border);
+    border-radius: var(--radius-sm, 6px); background: var(--field, var(--bg-input)); color: inherit; font: inherit;
+}
+.agent-skills-trigger {
+    display: inline-flex; align-items: center; gap: var(--space-1, 4px);
+}
+.agent-skill-badge {
+    display: inline-flex; align-items: center; gap: var(--space-1, 4px);
+    padding: 2px var(--space-2, 8px); margin-bottom: var(--space-2, 8px);
+    border-radius: var(--radius-pill, 999px); background: var(--accent-soft, var(--surface-2));
+    color: var(--accent-text, var(--accent)); font-size: var(--text-xs, 0.75rem); font-weight: var(--weight-medium, 500);
+}
+
+.agent-skills-dialog :focus-visible,
+.agent-skills-popup :focus-visible,
+.agent-skills-list:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring, 0 0 0 3px rgba(59, 130, 246, 0.45));
+}
+
+@media (max-width: 720px) {
+    .agent-skills-backdrop { padding: 0; }
+    .agent-skills-dialog { width: 100%; height: 100%; max-height: 100%; border-radius: 0; padding: var(--space-4, 16px); }
+    .agent-skills-body { grid-template-columns: 1fr; grid-template-rows: minmax(140px, 1fr) auto; }
+    .agent-skills-detail { max-height: 45vh; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .agent-skills-popup, .agent-skills-dialog { transition: none; }
+}
+
+/* ─── Chat helpers (replace former inline styles) ─── */
+.tone-indigo { color: var(--accent, #6366f1); }
+.tone-rose { color: var(--danger, #ec4899); }
+.tone-sky { color: var(--accent-cyan, #0284c7); }
+.tone-green { color: var(--success, #10b981); }
+
+button.starter-card {
+    font: inherit;
+    color: inherit;
+    text-align: left;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+}
+button.session-open-btn {
+    font: inherit;
+    color: inherit;
+    background: transparent;
+    border: 0;
+    padding: 0;
+    text-align: left;
+    cursor: pointer;
+    flex: 1;
+    min-width: 0;
+}
+.message-avatar.thinking-avatar { background: var(--accent, var(--primary)); color: var(--on-accent, #fff); }
+.system-notice-chip {
+    display: inline-block;
+    background: var(--surface-2);
+    padding: 4px 12px;
+    border-radius: var(--radius-pill, 999px);
+    border: 1px solid var(--border);
+}
+.inline-code {
+    background: var(--surface-2);
+    padding: 2px 5px;
+    border-radius: var(--radius-xs, 4px);
+    font-family: var(--font-mono, monospace);
+}
+.message-row.is-error .message-bubble { border-color: var(--danger); }
+.message-row.is-error .agent-text { color: var(--danger); }
+.agent-inline-confirm {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2, 8px);
+    padding: var(--space-3, 12px);
+    margin: var(--space-2, 8px) 0;
+    border: 1px solid var(--border-strong, var(--border));
+    border-radius: var(--radius-md, 10px);
+    background: var(--surface, var(--bg-card));
+}
+.agent-inline-confirm-text { flex: 1 1 auto; }
+.agent-inline-confirm button {
+    min-height: var(--control-h, 40px);
+    padding: 0 var(--space-3, 12px);
+    border-radius: var(--radius-sm, 6px);
+    border: 1px solid var(--border);
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+}
+.agent-inline-confirm .agent-inline-confirm-ok { border-color: var(--danger); color: var(--danger); }
+
+/* Studio drawer loading card (no inline styles, no undefined animations) */
+.copilot-loading-avatar { background: var(--accent, var(--primary)); color: var(--on-accent, #fff); }
+.copilot-loading-bubble { width: 100%; border: 1px solid var(--accent-border, var(--border)); }
+.copilot-loading-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-2, 8px); }
+.copilot-loading-title { font-weight: var(--weight-bold, 700); font-size: var(--text-sm, 0.85rem); }
+.copilot-loading-timer {
+    font-size: var(--text-xs, 0.75rem);
+    font-family: var(--font-mono, monospace);
+    color: var(--accent-text, var(--accent));
+    background: var(--accent-soft, var(--surface-2));
+    padding: 2px 6px;
+    border-radius: var(--radius-pill, 999px);
+}
+.copilot-loading-bars { display: flex; gap: 3px; height: 14px; align-items: center; margin-bottom: var(--space-2, 8px); }
+.copilot-loading-bars span {
+    width: 3px;
+    height: 10px;
+    border-radius: 2px;
+    background: var(--accent, var(--primary));
+    animation: agentSkillsBars 1.2s ease-in-out infinite alternate;
+}
+.copilot-loading-bars span:nth-child(2) { animation-delay: 0.2s; }
+.copilot-loading-bars span:nth-child(3) { animation-delay: 0.4s; }
+.copilot-loading-bars span:nth-child(4) { animation-delay: 0.1s; }
+.copilot-loading-bars span:nth-child(5) { animation-delay: 0.3s; }
+.copilot-loading-text { font-size: var(--text-xs, 0.8rem); color: var(--text-muted); margin: 0; }
+@keyframes agentSkillsBars { from { transform: scaleY(0.4); } to { transform: scaleY(1.4); } }
+@media (prefers-reduced-motion: reduce) { .copilot-loading-bars span { animation: none; } }

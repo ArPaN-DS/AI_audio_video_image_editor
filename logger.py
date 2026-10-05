@@ -1,4 +1,8 @@
-import psycopg2
+try:
+    import psycopg2
+except ImportError:
+    psycopg2 = None
+
 from datetime import datetime
 import os
 import csv
@@ -43,9 +47,8 @@ def log_upload_details(request, filename, file_size_bytes, target_format, status
     file_ext = os.path.splitext(filename)[1]
     size_mb = round(file_size_bytes / (1024 * 1024), 2)
 
-    # Check if database is configured (non-empty database name and password)
-    # If not configured, write to CSV directly to avoid connection timeout delay.
-    if not DB_NAME or not DB_PASSWORD:
+    # Check if database driver is available and configured
+    if not psycopg2 or not DB_NAME or not DB_PASSWORD:
         # Fall back directly to local CSV logging
         log_to_csv(timestamp, ip_address, user_agent, filename, file_ext, size_mb, target_format, status)
         return

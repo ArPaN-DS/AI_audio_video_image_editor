@@ -1,6 +1,5 @@
 /* ═══════════════════════════════════════
-   Audio Cutter Pro — Main Script
-   Next-Level UX Edition
+   Media Studio — Audio editor
    ═══════════════════════════════════════ */
 
 let wavesurfer, wsRegions;
@@ -30,16 +29,55 @@ function updateUndoBtn() {
         : 'Nothing to undo';
 }
 
-// Theme-aware waveform colors — read live design tokens so the
-// waveform matches whichever theme (light / dark) is active.
+// Theme-aware waveform colours — resolved from the page's design tokens
+// (--wave-color / --wave-progress / --wave-cursor in style.css) so the
+// waveform matches whichever theme is active. A probe element resolves
+// var() and color-mix() into a concrete rgb() the canvas can paint.
+function resolveTokenColor(name, fallback) {
+    try {
+        const probe = document.createElement('span');
+        probe.style.cssText = `position:absolute;width:0;height:0;overflow:hidden;color:var(${name}, ${fallback})`;
+        document.body.appendChild(probe);
+        const value = getComputedStyle(probe).color;
+        probe.remove();
+        return value || fallback;
+    } catch (e) {
+        return fallback;
+    }
+}
+
 function themeWaveColors() {
-    const cs = getComputedStyle(document.documentElement);
-    const dark = document.documentElement.getAttribute('data-theme') === 'dark';
     return {
-        waveColor: dark ? '#3A4A68' : '#CBD5E1',
-        progressColor: (cs.getPropertyValue('--primary').trim() || '#2563EB'),
-        cursorColor: (cs.getPropertyValue('--text').trim() || '#1E293B'),
+        waveColor: resolveTokenColor('--wave-color', '#8A92A1'),
+        progressColor: resolveTokenColor('--wave-progress', '#4F46E5'),
+        cursorColor: resolveTokenColor('--wave-cursor', '#E11D48'),
     };
+}
+
+// Region / marker fills reference tokens directly. Regions render in the
+// waveform's shadow DOM, which inherits custom properties, so these follow
+// theme changes without any re-colouring.
+const REGION_FILL = 'var(--region-fill)';
+const MARKER_COLORS = {
+    silence: 'var(--marker-silence)',
+    speech: 'var(--marker-speech)',
+    beat: 'var(--marker-beat)',
+    filler: 'var(--marker-filler)',
+};
+
+function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, ch => (
+        { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]
+    ));
+}
+
+// Range inputs paint an accent fill up to their value (see .styled-range).
+function updateRangeFill(input) {
+    if (!input) return;
+    const min = Number(input.min) || 0;
+    const max = Number(input.max) || 100;
+    const pct = max > min ? ((Number(input.value) - min) / (max - min)) * 100 : 0;
+    input.style.setProperty('--fill', `${Math.max(0, Math.min(100, pct))}%`);
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -77,12 +115,24 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('btnTabUpload').onclick = () => switchTab('upload');
     document.getElementById('btnTabRecord').onclick = () => switchTab('record');
 
+    function setTabState(mode) {
+        const up = document.getElementById('btnTabUpload');
+        const rec = document.getElementById('btnTabRecord');
+        up.classList.toggle('active', mode === 'upload');
+        rec.classList.toggle('active', mode === 'record');
+        up.setAttribute('aria-selected', String(mode === 'upload'));
+        rec.setAttribute('aria-selected', String(mode === 'record'));
+    }
+
     function switchTab(mode) {
-        document.getElementById('btnTabUpload').classList.toggle('active', mode === 'upload');
-        document.getElementById('btnTabRecord').classList.toggle('active', mode === 'record');
+        setTabState(mode);
+        // Clear any inline display left by a previous reset, then toggle panels.
+        // (The editor wrapper also holds these tabs, so it must stay visible.)
+        uploadSec.style.display = '';
+        recordSec.style.display = '';
         uploadSec.classList.toggle('hidden', mode !== 'upload');
         recordSec.classList.toggle('hidden', mode !== 'record');
-        editorSec.classList.add('hidden');
+        editorSec.classList.remove('hidden');
     }
 
     // ─── 3. FILE UPLOAD with DRAG & DROP ───
@@ -108,7 +158,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (file && (file.type.startsWith('audio/') || file.type.startsWith('video/'))) {
             handleFileLoad(file);
         } else {
-            showToast('Please drop an audio or video file.', 'warning');
+            showToast('That file type isn’t supported. Drop an audio or video file (MP3, WAV, M4A, MP4…).', 'warning');
         }
     });
 
@@ -139,18 +189,21 @@ document.addEventListener('DOMContentLoaded', () => {
             };
             mediaRecorder.start();
             recBtn.classList.add('recording');
-            recStatus.textContent = 'Recording... Click Stop when done.';
+            recBtn.setAttribute('aria-label', 'Recording');
+            recStatus.textContent = 'Recording… Select Stop and edit when you’re done.';
             stopBtn.classList.remove('hidden');
             recBtn.disabled = true;
         } catch (err) {
-            recStatus.textContent = 'Microphone access denied.';
+            recStatus.textContent = 'Microphone access was blocked. Allow it in your browser’s site settings, then try again.';
         }
     };
 
     stopBtn.onclick = () => {
         mediaRecorder.stop();
+        try { mediaRecorder.stream.getTracks().forEach(t => t.stop()); } catch (e) { /* already released */ }
         recBtn.classList.remove('recording');
-        recStatus.textContent = 'Recording finished!';
+        recBtn.setAttribute('aria-label', 'Start recording');
+        recStatus.textContent = 'Recording finished. Loading the waveform…';
         recBtn.disabled = false;
         stopBtn.classList.add('hidden');
     };
@@ -196,8 +249,10 @@ document.addEventListener('DOMContentLoaded', () => {
         // Add default region
         addRegion(duration * 0.1, duration * 0.4, `Region ${regionCounter++}`, false);
 
+        updateExportSummary();
+
         // Show helpful hint for first-time users
-        showToast('💡 Double-click the waveform to add cut regions!', 'info');
+        showToast('Audio loaded. Double-click the waveform to add more regions.', 'info');
     });
 
     // ─── TIME UPDATE ───
@@ -212,20 +267,23 @@ document.addEventListener('DOMContentLoaded', () => {
     // Play icon toggle
     wavesurfer.on('play', () => {
         document.getElementById('playIcon').className = 'fas fa-pause';
-        document.getElementById('playBtn').classList.add('playing');
+        const pb = document.getElementById('playBtn');
+        pb.classList.add('playing');
+        pb.setAttribute('aria-label', 'Pause');
     });
     wavesurfer.on('pause', () => {
         document.getElementById('playIcon').className = 'fas fa-play';
-        document.getElementById('playBtn').classList.remove('playing');
+        const pb = document.getElementById('playBtn');
+        pb.classList.remove('playing');
+        pb.setAttribute('aria-label', 'Play');
     });
 
     // ─── 6. REGION MANAGEMENT ───
     function addRegion(start, end, name, trackUndo = true) {
-        const alpha = 0.12 + Math.random() * 0.13;
         const region = wsRegions.addRegion({
             start: start,
             end: end,
-            color: `rgba(37, 99, 235, ${alpha})`,
+            color: REGION_FILL,
             drag: true,
             resize: true
         });
@@ -257,21 +315,27 @@ document.addEventListener('DOMContentLoaded', () => {
     function selectRegion(regionId) {
         // Clear all highlights
         allRegions.forEach(r => {
+            if (!r.region.element) return;
             r.region.element.style.border = 'none';
             r.region.element.style.boxShadow = 'none';
         });
-        document.querySelectorAll('.region-item').forEach(el => el.classList.remove('selected'));
+        document.querySelectorAll('.region-item').forEach(el => {
+            el.classList.remove('selected');
+            el.removeAttribute('aria-current');
+        });
 
         const regionData = allRegions.find(r => r.id === regionId);
         if (regionData) {
             selectedRegion = regionData;
-            regionData.region.element.style.border = '2px solid #2563EB';
-            regionData.region.element.style.boxShadow = '0 0 12px rgba(37, 99, 235, 0.35)';
+            if (regionData.region.element) {
+                regionData.region.element.style.boxShadow = 'inset 0 0 0 2px var(--region-edge)';
+            }
 
             const idx = allRegions.indexOf(regionData);
             const items = document.querySelectorAll('.region-item');
             if (items[idx]) {
                 items[idx].classList.add('selected');
+                items[idx].setAttribute('aria-current', 'true');
                 items[idx].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
             }
         }
@@ -286,7 +350,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (countBadge) countBadge.textContent = allRegions.length;
 
         if (allRegions.length === 0) {
-            list.innerHTML = '<p class="empty-state"><i class="fas fa-info-circle"></i> No regions yet. Double-click the waveform or press "Add Region" to start cutting.</p>';
+            list.innerHTML = '<p class="empty-state">No regions yet. Double-click the waveform or choose <strong>Add region</strong>.</p>';
+            document.getElementById('exportModeGroup').style.display = 'none';
+            updateExportSummary();
             return;
         }
 
@@ -294,21 +360,23 @@ document.addEventListener('DOMContentLoaded', () => {
             const div = document.createElement('div');
             div.className = 'region-item';
             const dur = r.region.end - r.region.start;
+            const safeName = escapeHtml(r.name);
 
             div.innerHTML = `
+                <span class="region-index" aria-hidden="true">${index + 1}</span>
                 <div class="region-info">
                     <div class="region-name">
-                        <i class="fas fa-wave-square" style="color:var(--primary);margin-right:6px;font-size:0.8rem;"></i>
-                        <span class="region-name-text" data-id="${r.id}">${r.name}</span>
+                        <span class="region-name-text" data-id="${r.id}" title="Double-click to rename">${safeName}</span>
                     </div>
-                    <div class="region-time">${formatTimePrecise(r.region.start)} → ${formatTimePrecise(r.region.end)}  ·  ${formatTimePrecise(dur)}</div>
+                    <div class="region-time">${formatTimePrecise(r.region.start)} – ${formatTimePrecise(r.region.end)}</div>
                 </div>
+                <span class="region-duration" title="Length">${formatTimePrecise(dur)}</span>
                 <div class="region-actions">
-                    <button class="region-play-btn" data-id="${r.id}" title="Play just this region">
-                        <i class="fas fa-play"></i>
+                    <button type="button" class="region-play-btn" data-id="${r.id}" title="Play this region" aria-label="Play ${safeName}">
+                        <i class="fas fa-play" aria-hidden="true"></i>
                     </button>
-                    <button class="region-delete" data-id="${r.id}" title="Delete this region">
-                        <i class="fas fa-trash-alt"></i>
+                    <button type="button" class="region-delete" data-id="${r.id}" title="Delete this region" aria-label="Delete ${safeName}">
+                        <i class="fas fa-trash-can" aria-hidden="true"></i>
                     </button>
                 </div>
             `;
@@ -363,7 +431,26 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         document.getElementById('exportModeGroup').style.display = allRegions.length > 1 ? 'grid' : 'none';
+        updateExportSummary();
     }
+
+    // One-line summary under the export button: "2 regions · 0:12.4 · MP3"
+    function updateExportSummary() {
+        const el = document.getElementById('exportSummary');
+        if (!el) return;
+        if (allRegions.length === 0) {
+            el.textContent = 'Add a region to export.';
+            return;
+        }
+        const total = allRegions.reduce((sum, r) => sum + Math.max(0, r.region.end - r.region.start), 0);
+        const fmt = (document.querySelector('input[name="format"]:checked')?.value || 'mp3').toUpperCase();
+        const separate = allRegions.length > 1 && document.querySelector('input[name="export_mode"]:checked')?.value === 'separate';
+        const count = `${allRegions.length} region${allRegions.length === 1 ? '' : 's'}`;
+        el.textContent = `${count} · ${formatTimePrecise(total)} · ${fmt}${separate ? ' files in a ZIP' : ''}`;
+    }
+    document.querySelectorAll('input[name="format"], input[name="export_mode"]').forEach(input => {
+        input.addEventListener('change', updateExportSummary);
+    });
 
     window.deleteRegion = function (regionId) {
         const index = allRegions.findIndex(r => r.id === regionId);
@@ -379,7 +466,7 @@ document.addEventListener('DOMContentLoaded', () => {
             allRegions.splice(index, 1);
             selectedRegion = null;
             updateRegionList();
-            showToast(`"${removed.name}" removed. Press Ctrl+Z to undo.`, 'info');
+            showToast(`Deleted “${removed.name}”. Press Ctrl+Z to undo.`, 'info');
         }
     };
 
@@ -394,7 +481,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (last.action === 'Delete Region') {
             // Re-add the deleted region
             addRegion(last.data.start, last.data.end, last.data.name, false);
-            showToast(`↩ Restored "${last.data.name}"`, 'success');
+            showToast(`Restored “${last.data.name}”.`, 'success');
         } else if (last.action === 'Add Region') {
             // Remove the last added region
             const idx = allRegions.findIndex(r => r.id === last.data.id);
@@ -403,14 +490,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 allRegions.splice(idx, 1);
                 selectedRegion = null;
                 updateRegionList();
-                showToast('↩ Region removed', 'success');
+                showToast('Undid adding a region.', 'success');
             }
         } else if (last.action === 'Clear All') {
             // Re-add all cleared regions
             last.data.forEach(d => {
                 addRegion(d.start, d.end, d.name, false);
             });
-            showToast(`↩ Restored ${last.data.length} region(s)`, 'success');
+            showToast(`Restored ${last.data.length} region${last.data.length === 1 ? '' : 's'}.`, 'success');
         }
     }
 
@@ -439,7 +526,7 @@ document.addEventListener('DOMContentLoaded', () => {
         allRegions = [];
         selectedRegion = null;
         updateRegionList();
-        showToast(`Cleared all regions. Press Ctrl+Z to undo.`, 'warning');
+        showToast('Cleared all regions. Press Ctrl+Z to undo.', 'info');
     };
 
     // Region update listener
@@ -468,12 +555,15 @@ document.addEventListener('DOMContentLoaded', () => {
     // ─── 8. ZOOM ───
     const zoomSlider = document.getElementById('zoomSlider');
     zoomSlider.oninput = function () {
-        wavesurfer.zoom(Number(this.value));
+        updateRangeFill(this);
+        try { wavesurfer.zoom(Number(this.value)); } catch (e) { /* no audio loaded yet */ }
     };
+    updateRangeFill(zoomSlider);
 
     // ─── 9. VOLUME CONTROL ───
     const volumeSlider = document.getElementById('volumeSlider');
     volumeSlider.value = currentVolume * 100;
+    updateRangeFill(volumeSlider);
 
     volumeSlider.oninput = function () {
         currentVolume = Number(this.value) / 100;
@@ -498,6 +588,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (vol === 0) icon.className = 'fas fa-volume-mute';
         else if (vol < 0.5) icon.className = 'fas fa-volume-down';
         else icon.className = 'fas fa-volume-up';
+        const muteBtn = document.getElementById('muteBtn');
+        muteBtn.setAttribute('aria-pressed', String(vol === 0));
+        muteBtn.setAttribute('aria-label', vol === 0 ? 'Unmute preview' : 'Mute preview');
+        muteBtn.title = vol === 0 ? 'Unmute preview (M)' : 'Mute preview (M)';
+        updateRangeFill(volumeSlider);
     }
 
     // ─── 10. SPEED CONTROL ───
@@ -508,7 +603,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // ─── 11. NEW FILE / REMOVE AUDIO BUTTONS ───
 
     function resetToUpload() {
-        console.log('[AudioCutter] resetToUpload called');
         isResetting = true;
 
         // FIRST: Force-hide editor with both methods
@@ -518,7 +612,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         ei.style.display = '';
         ei.classList.remove('hidden');
+        ei.classList.add('editor-pre-upload');
         document.getElementById('fileInfoBar')?.classList.add('hidden');
+        document.getElementById('aiResultsPanel')?.classList.add('hidden');
         const wfPlaceholder = document.getElementById('waveformPlaceholder');
         if (wfPlaceholder) wfPlaceholder.style.display = '';
         document.getElementById('waveform-container')?.classList.remove('waveform-loaded');
@@ -526,12 +622,13 @@ document.addEventListener('DOMContentLoaded', () => {
         us.style.display = '';
         us.classList.remove('hidden');
 
-        rs.style.display = 'none';
+        rs.style.display = '';
         rs.classList.add('hidden');
 
-        document.getElementById('btnTabUpload').classList.add('active');
-        document.getElementById('btnTabRecord').classList.remove('active');
+        setTabState('upload');
         document.getElementById('newFileBtn').classList.add('hidden');
+        document.getElementById('currentTime').textContent = '0:00';
+        document.getElementById('totalTime').textContent = '0:00';
 
         // THEN: Try to clean up wavesurfer
         try {
@@ -552,8 +649,14 @@ document.addEventListener('DOMContentLoaded', () => {
         updateUndoBtn();
         recordedBlob = null;
         fileInput.value = '';
+        updateRegionList();
 
-        showToast('Audio removed. Upload a new file to continue.', 'info');
+        showToast('File closed. Open or record another to continue.', 'info');
+        // Keep keyboard users oriented: move focus to the file picker.
+        if (document.activeElement && document.activeElement.closest &&
+            document.activeElement.closest('#fileInfoBar, .header-actions')) {
+            fileInput.focus({ preventScroll: true });
+        }
 
         // Allow future wavesurfer 'ready' events after a delay
         setTimeout(() => { isResetting = false; }, 500);
@@ -564,7 +667,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // ─── 12. KEYBOARD SHORTCUTS ───
     document.addEventListener('keydown', (e) => {
+        const shortcutsEl = document.getElementById('shortcutsOverlay');
+        if (!shortcutsEl.classList.contains('hidden')) {
+            if (e.key === 'Escape') { e.preventDefault(); closeShortcuts(); }
+            return;
+        }
         if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') return;
+        // Let Space / Enter activate a focused button or link as usual.
+        if ((e.code === 'Space' || e.key === 'Enter') && e.target.closest && e.target.closest('button, a, [role="button"], [role="tab"]')) return;
+        const hasAudio = !!(wavesurfer && wavesurfer.getDuration && wavesurfer.getDuration() > 0);
+        if (!hasAudio && (e.code === 'Space' || e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'm' || e.key === 'M')) return;
 
         // Ctrl+Z = Undo
         if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
@@ -587,7 +699,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (e.key === '?' || e.key === '/') {
             e.preventDefault();
-            document.getElementById('shortcutsOverlay').classList.remove('hidden');
+            openShortcuts();
         }
 
         if (e.key === 'm' || e.key === 'M') {
@@ -608,33 +720,49 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Help overlay
-    document.getElementById('helpBtn').onclick = () =>
-        document.getElementById('shortcutsOverlay').classList.remove('hidden');
-
-    document.getElementById('closeShortcuts').onclick = () =>
+    // Help overlay — modal dialog: focus moves in on open and back on close.
+    let shortcutsReturnFocus = null;
+    function openShortcuts() {
+        const overlay = document.getElementById('shortcutsOverlay');
+        shortcutsReturnFocus = document.activeElement;
+        overlay.classList.remove('hidden');
+        document.getElementById('closeShortcuts').focus({ preventScroll: true });
+    }
+    function closeShortcuts() {
         document.getElementById('shortcutsOverlay').classList.add('hidden');
+        const target = shortcutsReturnFocus && document.contains(shortcutsReturnFocus)
+            ? shortcutsReturnFocus : document.getElementById('helpBtn');
+        if (target && target.focus) target.focus({ preventScroll: true });
+        shortcutsReturnFocus = null;
+    }
+
+    document.getElementById('helpBtn').onclick = openShortcuts;
+    document.getElementById('closeShortcuts').onclick = closeShortcuts;
 
     document.getElementById('shortcutsOverlay').onclick = (e) => {
-        if (e.target.id === 'shortcutsOverlay') e.target.classList.add('hidden');
+        if (e.target.id === 'shortcutsOverlay') closeShortcuts();
     };
+    // Trap Tab inside the dialog (it has a single focusable control).
+    document.getElementById('shortcutsOverlay').addEventListener('keydown', (e) => {
+        if (e.key === 'Tab') { e.preventDefault(); document.getElementById('closeShortcuts').focus(); }
+    });
 
     // ─── 13. FORM SUBMISSION ───
     document.getElementById('cutForm').onsubmit = async (e) => {
         e.preventDefault();
 
         if (allRegions.length === 0) {
-            showToast('Please add at least one region before exporting.', 'warning');
+            showToast('Add at least one region before exporting. Double-click the waveform or choose Add region.', 'warning');
             return;
         }
 
         if (window.ProcessingOverlay) {
             window.ProcessingOverlay.show({
-                title: 'Audio Export Engine',
-                stageText: `Processing ${allRegions.length} audio region(s) & preparing export...`,
+                title: 'Exporting audio',
+                stageText: `Preparing ${allRegions.length} region${allRegions.length === 1 ? '' : 's'}…`,
                 category: 'audio'
             });
-            window.ProcessingOverlay.updateProgress(35, 'Cutting waveform regions & rendering audio output...');
+            window.ProcessingOverlay.updateProgress(35, 'Cutting regions and applying effects…');
         }
 
         const formData = new FormData(e.target);
@@ -645,7 +773,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if (fileInput.files[0]) {
             formData.append('file', fileInput.files[0]);
         } else {
-            showToast('No audio source found.', 'error');
+            showToast('No audio is loaded. Open or record a file, then export again.', 'error');
             if (window.ProcessingOverlay) window.ProcessingOverlay.hide();
             return;
         }
@@ -660,14 +788,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
         try {
             if (window.ProcessingOverlay) {
-                window.ProcessingOverlay.updateProgress(75, 'Encoding final audio file...');
+                window.ProcessingOverlay.updateProgress(75, 'Encoding the file…');
             }
 
             const resp = await fetch('/cut', { method: 'POST', body: formData });
 
             if (resp.ok) {
                 if (window.ProcessingOverlay) {
-                    window.ProcessingOverlay.updateProgress(100, '✅ Export complete! Downloading...');
+                    window.ProcessingOverlay.updateProgress(100, 'Export complete. Downloading…');
                 }
 
                 const contentType = resp.headers.get('content-type');
@@ -688,18 +816,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 a.remove();
                 URL.revokeObjectURL(url);
 
-                showToast('✅ Your audio has been exported successfully!', 'success');
+                showToast('Export complete. Check your downloads folder.', 'success');
                 setTimeout(() => {
                     if (window.ProcessingOverlay) window.ProcessingOverlay.hide();
                 }, 1000);
             } else {
                 const errText = await resp.text();
-                showToast(`Error: ${errText}`, 'error');
+                showToast(`Export failed: ${cleanServerError(errText)}`, 'error');
                 if (window.ProcessingOverlay) window.ProcessingOverlay.hide();
             }
         } catch (err) {
             console.error(err);
-            showToast('Network error. Check your connection.', 'error');
+            showToast('Couldn’t reach ' + ((window.APP_BRAND && window.APP_BRAND.product) || 'the app') + '. Make sure the app is still running, then try again.', 'error');
             if (window.ProcessingOverlay) window.ProcessingOverlay.hide();
         }
     };
@@ -719,45 +847,48 @@ document.addEventListener('DOMContentLoaded', () => {
         return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
     }
 
-    function showToast(message, type = 'info') {
-        // Remove old toasts
-        document.querySelectorAll('.app-toast').forEach(t => t.remove());
-
-        const toast = document.createElement('div');
-        toast.className = 'app-toast';
-        const colors = {
-            error: '#e74c3c',
-            warning: '#f39c12',
-            success: '#27ae60',
-            info: '#2c3e50'
-        };
-        toast.innerHTML = `<span>${message}</span>`;
-        toast.style.cssText = `
-            position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%) translateY(20px);
-            background: ${colors[type] || colors.info};
-            color: white; padding: 14px 28px; border-radius: 12px; font-size: 0.88rem;
-            font-weight: 600; z-index: 99999; box-shadow: 0 10px 30px rgba(0,0,0,0.25);
-            opacity: 0; transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
-            display: flex; align-items: center; gap: 8px; font-family: 'Inter', sans-serif;
-            max-width: 480px;
-        `;
-        document.body.appendChild(toast);
-
-        // Animate in
-        requestAnimationFrame(() => {
-            toast.style.opacity = '1';
-            toast.style.transform = 'translateX(-50%) translateY(0)';
-        });
-
-        // Animate out
-        setTimeout(() => {
-            toast.style.opacity = '0';
-            toast.style.transform = 'translateX(-50%) translateY(20px)';
-        }, 3000);
-        setTimeout(() => toast.remove(), 3500);
+    // Server errors can arrive as an HTML error page; keep only readable text.
+    function cleanServerError(text) {
+        const plain = String(text || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+        if (!plain) return 'Something went wrong. Try again.';
+        return plain.length > 160 ? plain.slice(0, 157) + '…' : plain;
     }
 
-    // ─── 14. 🤖 AI AUDIO PROCESSING UX ───
+    // Toasts: styled by .app-toast in style.css; one at a time, announced politely.
+    const TOAST_ICONS = {
+        info: 'fa-circle-info',
+        success: 'fa-circle-check',
+        warning: 'fa-triangle-exclamation',
+        error: 'fa-circle-exclamation'
+    };
+    let toastTimers = [];
+    function showToast(message, type = 'info') {
+        toastTimers.forEach(clearTimeout);
+        toastTimers = [];
+        document.querySelectorAll('.app-toast').forEach(t => t.remove());
+
+        const kind = TOAST_ICONS[type] ? type : 'info';
+        const toast = document.createElement('div');
+        toast.className = 'app-toast';
+        toast.dataset.type = kind;
+        toast.setAttribute('role', kind === 'error' ? 'alert' : 'status');
+        toast.setAttribute('aria-live', kind === 'error' ? 'assertive' : 'polite');
+        const icon = document.createElement('i');
+        icon.className = `fas ${TOAST_ICONS[kind]}`;
+        icon.setAttribute('aria-hidden', 'true');
+        const text = document.createElement('span');
+        text.textContent = message;
+        toast.append(icon, text);
+        document.body.appendChild(toast);
+
+        requestAnimationFrame(() => requestAnimationFrame(() => toast.classList.add('is-visible')));
+
+        const visibleFor = kind === 'error' ? 6000 : 3200;
+        toastTimers.push(setTimeout(() => toast.classList.remove('is-visible'), visibleFor));
+        toastTimers.push(setTimeout(() => toast.remove(), visibleFor + 300));
+    }
+
+    // ─── 14. ANALYSIS & CLEAN-UP TOOLS ───
     let allAiRegions = [];
     let detectedBeats = [];
     let snapToBeatsEnabled = false;
@@ -769,6 +900,12 @@ document.addEventListener('DOMContentLoaded', () => {
             try { r.remove(); } catch(e) {}
         });
         allAiRegions = [];
+    }
+
+    // Results panel heading reflects the tool that produced it
+    function setResultsTitle(title) {
+        const el = document.getElementById('aiResultsTitle');
+        if (el) el.textContent = title;
     }
 
     // Helper to add non-editable AI display regions
@@ -799,16 +936,20 @@ document.addEventListener('DOMContentLoaded', () => {
     async function runAIFeature(btnId, endpoint, extraParams = {}, onResponse) {
         const file = getActiveAudioFile();
         if (!file) {
-            showToast('Please upload or record an audio file first.', 'warning');
+            showToast('Open or record audio first.', 'warning');
             return;
         }
 
         const btn = document.getElementById(btnId);
         if (!btn) return;
 
+        // Busy state: keep the label, swap the tool icon for a spinner.
         btn.classList.add('loading');
-        const originalHtml = btn.innerHTML;
-        btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Running...`;
+        btn.setAttribute('aria-busy', 'true');
+        btn.disabled = true;
+        const toolIcon = btn.querySelector('.ai-btn-icon i');
+        const originalIconClass = toolIcon ? toolIcon.className : '';
+        if (toolIcon) toolIcon.className = 'fas fa-circle-notch fa-spin';
 
         const formData = new FormData();
         formData.append('file', file, file.name || 'audio.webm');
@@ -818,13 +959,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Map endpoint to natural language titles & stage descriptions
         const aiMeta = {
-            '/ai/transcribe': { title: 'AI Speech-to-Text Studio', stage: 'Transcribing spoken voice using local Whisper AI model...' },
-            '/ai/detect-silence': { title: 'AI Silence Detection', stage: 'Scanning audio waveform to locate silent gaps & pauses...' },
-            '/ai/auto-trim': { title: 'AI Auto-Trimmer', stage: 'Analyzing audio thresholds & auto-trimming silence...' },
-            '/ai/noise-reduce': { title: 'AI Noise Reduction Engine', stage: 'Filtering background noise & leveling audio voice clarity...' },
-            '/ai/bpm': { title: 'BPM & Beat Tracker', stage: 'Tracking rhythm beats & calculating tempo (BPM)...' }
+            '/ai/transcribe': { title: 'Transcribing', stage: 'Converting speech to text…' },
+            '/ai/detect-silence': { title: 'Finding pauses', stage: 'Scanning for silent gaps…' },
+            '/ai/auto-trim': { title: 'Trimming silent edges', stage: 'Finding where sound starts and ends…' },
+            '/ai/noise-reduce': { title: 'Removing noise', stage: 'Reducing hiss, hum and background noise…' },
+            '/ai/detect-beats': { title: 'Detecting beats', stage: 'Measuring tempo and beat positions…' },
+            '/ai/detect-vad': { title: 'Finding speech', stage: 'Marking sections with voice…' },
+            '/ai/filler-words': { title: 'Finding filler words', stage: 'Listening for “um”, “uh” and similar…' },
+            '/ai/enhance-speech': { title: 'Enhancing speech', stage: 'Reducing room echo and evening out the voice…' },
+            '/ai/separate-stems': { title: 'Separating vocals', stage: 'Splitting vocals from music…' }
         };
-        const meta = aiMeta[endpoint] || { title: 'AI Audio Processor', stage: 'Processing audio file using AI models...' };
+        const meta = aiMeta[endpoint] || { title: 'Processing audio', stage: 'Working on your audio…' };
 
         if (window.ProcessingOverlay) {
             window.ProcessingOverlay.show({
@@ -836,14 +981,13 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         try {
-            showToast('🤖 AI processing started...', 'info');
             const resp = await fetch(endpoint, {
                 method: 'POST',
                 body: formData
             });
 
             if (window.ProcessingOverlay) {
-                window.ProcessingOverlay.updateProgress(80, 'Finalizing results & generating output...');
+                window.ProcessingOverlay.updateProgress(80, 'Preparing results…');
             }
 
             if (!resp.ok) {
@@ -865,14 +1009,16 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             if (window.ProcessingOverlay) {
-                window.ProcessingOverlay.updateProgress(100, '✅ Complete!');
+                window.ProcessingOverlay.updateProgress(100, 'Done');
             }
         } catch (err) {
-            console.error('[AI Error]', err);
-            showToast(`🤖 AI Error: ${err.message}`, 'error');
+            console.error('[Audio tool error]', err);
+            showToast(`${meta.title} failed: ${cleanServerError(err.message)}`, 'error');
         } finally {
             btn.classList.remove('loading');
-            btn.innerHTML = originalHtml;
+            btn.removeAttribute('aria-busy');
+            btn.disabled = false;
+            if (toolIcon) toolIcon.className = originalIconClass;
             if (window.ProcessingOverlay) {
                 setTimeout(() => window.ProcessingOverlay.hide(), 500);
             }
@@ -888,19 +1034,17 @@ document.addEventListener('DOMContentLoaded', () => {
             const resultsContent = document.getElementById('aiResultsContent');
             resultsPanel.classList.remove('hidden');
 
+            setResultsTitle('Pauses');
             if (!data || data.length === 0) {
                 resultsContent.innerHTML = `
-                    <div style="text-align:center; padding:12px; color:var(--text-secondary);">
-                        <i class="fas fa-info-circle" style="font-size:1.2rem; margin-bottom:6px; color:var(--ai-accent);"></i>
-                        <p>No silent regions found in this audio file.</p>
-                    </div>`;
-                showToast('No silence detected.', 'info');
+                    <p class="ai-result-empty"><i class="fas fa-circle-info" aria-hidden="true"></i>No pauses found. The audio has no silent gaps longer than half a second.</p>`;
+                showToast('No pauses found.', 'info');
                 return;
             }
 
             // Draw silence regions
             data.forEach((region, i) => {
-                addAiMarker(region.start, region.end, 'rgba(100, 100, 100, 0.25)', `Silence ${i+1}`);
+                addAiMarker(region.start, region.end, MARKER_COLORS.silence, `Pause ${i+1}`);
             });
 
             // Populate results HTML
@@ -908,23 +1052,23 @@ document.addEventListener('DOMContentLoaded', () => {
             data.forEach((region, i) => {
                 rowsHtml += `
                     <div class="ai-stat-row">
-                        <span class="ai-stat-label">Silence #${i+1} (${formatTimePrecise(region.duration)}s)</span>
-                        <span class="ai-stat-value">${formatTimePrecise(region.start)} → ${formatTimePrecise(region.end)}</span>
+                        <span class="ai-stat-label">Pause ${i+1} · ${formatTimePrecise(region.duration)}</span>
+                        <span class="ai-stat-value">${formatTimePrecise(region.start)} – ${formatTimePrecise(region.end)}</span>
                     </div>`;
             });
 
             resultsContent.innerHTML = `
                 <div class="transcript-container">
-                    <p style="margin-bottom:8px; font-weight:500;">Detected <strong>${data.length}</strong> silent region(s) (highlighted in gray):</p>
-                    <div style="max-height:160px; overflow-y:auto; border:1px solid var(--border); border-radius:8px; padding:10px; background:var(--surface);">
+                    <p>Found <strong>${data.length}</strong> pause${data.length === 1 ? '' : 's'}, shaded grey on the waveform.</p>
+                    <div class="ai-result-list">
                         ${rowsHtml}
                     </div>
-                    <div style="display:flex; gap:10px;">
+                    <div class="ai-result-actions">
                         <button type="button" class="ai-action-btn" id="aiSplitSilencesBtn">
-                            <i class="fas fa-cut"></i> Split at Silences
+                            <i class="fas fa-scissors" aria-hidden="true"></i> Split at pauses
                         </button>
                         <button type="button" class="ai-action-btn-outline" id="aiClearSilenceOverlayBtn">
-                            <i class="fas fa-eraser"></i> Clear Overlay
+                            <i class="fas fa-eraser" aria-hidden="true"></i> Clear markers
                         </button>
                     </div>
                 </div>`;
@@ -962,17 +1106,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 // Add non-silent regions to the timeline
                 nonSilents.forEach((ns, idx) => {
-                    addRegion(ns.start, ns.end, `Speech ${idx+1}`, false);
+                    addRegion(ns.start, ns.end, `Part ${idx+1}`, false);
                 });
 
                 pushUndo('Split at Silences', nonSilents);
                 updateRegionList();
                 clearAiMarkers();
                 resultsPanel.classList.add('hidden');
-                showToast(`✂️ Created ${nonSilents.length} speech regions!`, 'success');
+                showToast(`Split into ${nonSilents.length} regions.`, 'success');
             };
 
-            showToast(`Smart Silence: Detected ${data.length} regions.`, 'success');
+            showToast(`Found ${data.length} pause${data.length === 1 ? '' : 's'}.`, 'success');
         });
     };
 
@@ -983,33 +1127,34 @@ document.addEventListener('DOMContentLoaded', () => {
             const resultsContent = document.getElementById('aiResultsContent');
             resultsPanel.classList.remove('hidden');
 
+            setResultsTitle('Trim silent edges');
             resultsContent.innerHTML = `
                 <div class="transcript-container">
-                    <p style="margin-bottom:8px; font-weight:500;">Calculated trim points to remove start/end silence:</p>
-                    <div style="border:1px solid var(--border); border-radius:8px; padding:12px; background:var(--surface); margin-bottom:12px;">
+                    <p>Sound starts and ends at these points. Apply them to keep only the audible part.</p>
+                    <div class="ai-result-list">
                         <div class="ai-stat-row">
-                            <span class="ai-stat-label">Original Duration</span>
-                            <span class="ai-stat-value">${formatTimePrecise(data.total_duration)}s</span>
+                            <span class="ai-stat-label">Original length</span>
+                            <span class="ai-stat-value">${formatTimePrecise(data.total_duration)}</span>
                         </div>
                         <div class="ai-stat-row">
-                            <span class="ai-stat-label">Trimmed Start Time</span>
-                            <span class="ai-stat-value">${formatTimePrecise(data.trimmed_start)}s (${formatTimePrecise(data.removed_start_ms/1000)}s removed)</span>
+                            <span class="ai-stat-label">New start</span>
+                            <span class="ai-stat-value">${formatTimePrecise(data.trimmed_start)} (−${formatTimePrecise(data.removed_start_ms/1000)})</span>
                         </div>
                         <div class="ai-stat-row">
-                            <span class="ai-stat-label">Trimmed End Time</span>
-                            <span class="ai-stat-value">${formatTimePrecise(data.trimmed_end)}s (${formatTimePrecise(data.removed_end_ms/1000)}s removed)</span>
+                            <span class="ai-stat-label">New end</span>
+                            <span class="ai-stat-value">${formatTimePrecise(data.trimmed_end)} (−${formatTimePrecise(data.removed_end_ms/1000)})</span>
                         </div>
                         <div class="ai-stat-row">
-                            <span class="ai-stat-label">New Duration</span>
-                            <span class="ai-stat-value">${formatTimePrecise(data.trimmed_end - data.trimmed_start)}s</span>
+                            <span class="ai-stat-label">New length</span>
+                            <span class="ai-stat-value">${formatTimePrecise(data.trimmed_end - data.trimmed_start)}</span>
                         </div>
                     </div>
-                    <div style="display:flex; gap:10px;">
+                    <div class="ai-result-actions">
                         <button type="button" class="ai-action-btn" id="aiApplyTrimBtn">
-                            <i class="fas fa-crop-alt"></i> Apply Trim Region
+                            <i class="fas fa-crop-simple" aria-hidden="true"></i> Apply as region
                         </button>
                         <button type="button" class="ai-action-btn-outline" id="aiCloseTrimBtn">
-                            <i class="fas fa-times"></i> Dismiss
+                            Dismiss
                         </button>
                     </div>
                 </div>`;
@@ -1026,7 +1171,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 selectedRegion = null;
 
                 // Add trimmed region
-                const name = "Trimmed Audio";
+                const name = "Trimmed";
                 addRegion(data.trimmed_start, data.trimmed_end, name);
                 
                 // Highlight the new region
@@ -1035,10 +1180,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 resultsPanel.classList.add('hidden');
-                showToast('✂️ Applied trim points to editor!', 'success');
+                showToast('Trim applied as a region.', 'success');
             };
 
-            showToast('Auto Trim calculation complete!', 'success');
+            showToast('Trim points found.', 'success');
         });
     };
 
@@ -1054,34 +1199,35 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Draw beat lines
             detectedBeats.forEach(t => {
-                addAiMarker(t, t + 0.02, 'rgba(249, 115, 22, 0.45)');
+                addAiMarker(t, t + 0.02, MARKER_COLORS.beat);
             });
 
+            setResultsTitle('Tempo and beats');
             resultsContent.innerHTML = `
                 <div class="transcript-container">
                     <div class="ai-bpm-container">
                         <div class="ai-bpm-badge">
-                            <span class="ai-bpm-number">${data.bpm}</span>
-                            <span class="ai-bpm-label">BPM (Tempo)</span>
+                            <span class="ai-bpm-number">${escapeHtml(data.bpm)}</span>
+                            <span class="ai-bpm-label">BPM</span>
                         </div>
                         <div class="ai-bpm-details">
                             <div class="ai-bpm-detail-item">
-                                <i class="fas fa-drum"></i> Total Beats: <strong>${data.total_beats}</strong>
+                                <i class="fas fa-drum" aria-hidden="true"></i> <span><strong>${escapeHtml(data.total_beats)}</strong> beats</span>
                             </div>
                             <div class="ai-bpm-detail-item">
-                                <i class="fas fa-clock"></i> Average Interval: <strong>${(60 / data.bpm).toFixed(3)}s</strong>
+                                <i class="fas fa-clock" aria-hidden="true"></i> <span><strong>${(60 / data.bpm).toFixed(3)} s</strong> between beats</span>
                             </div>
                         </div>
                     </div>
-                    
+
                     <div class="ai-snap-container">
                         <input type="checkbox" id="aiSnapCheckbox" ${snapToBeatsEnabled ? 'checked' : ''}>
-                        <label for="aiSnapCheckbox">🧲 Snap region adjustments to closest beat markers</label>
+                        <label for="aiSnapCheckbox">Snap region edges to the nearest beat</label>
                     </div>
 
-                    <div style="display:flex; gap:10px; margin-top:8px;">
+                    <div class="ai-result-actions">
                         <button type="button" class="ai-action-btn-outline" id="aiClearBeatsOverlayBtn">
-                            <i class="fas fa-eraser"></i> Clear Overlay
+                            <i class="fas fa-eraser" aria-hidden="true"></i> Clear markers
                         </button>
                     </div>
                 </div>`;
@@ -1089,7 +1235,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Snap checkbox toggle
             document.getElementById('aiSnapCheckbox').onchange = (e) => {
                 snapToBeatsEnabled = e.target.checked;
-                showToast(snapToBeatsEnabled ? '🧲 Snap-to-beats enabled' : 'Snap-to-beats disabled', 'info');
+                showToast(snapToBeatsEnabled ? 'Region edges now snap to beats.' : 'Snap to beats turned off.', 'info');
             };
 
             document.getElementById('aiClearBeatsOverlayBtn').onclick = () => {
@@ -1099,7 +1245,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 resultsPanel.classList.add('hidden');
             };
 
-            showToast(`🎵 Beat detection success: ${data.bpm} BPM`, 'success');
+            showToast(`Tempo: ${data.bpm} BPM.`, 'success');
         });
     };
 
@@ -1162,17 +1308,17 @@ document.addEventListener('DOMContentLoaded', () => {
             const resultsContent = document.getElementById('aiResultsContent');
             resultsPanel.classList.remove('hidden');
 
+            setResultsTitle('Remove noise');
             resultsContent.innerHTML = `
                 <div class="transcript-container">
-                    <p style="color:#27ae60; font-weight:600;"><i class="fas fa-check-circle"></i> Local Noise Reduction Complete!</p>
-                    <p style="margin-top:6px;">Background hum, hiss, and noise removed. The processed audio has been successfully loaded into the editor timeline.</p>
-                    
-                    <div style="display:flex; gap:10px; margin-top:12px;">
+                    <p class="ai-result-status"><i class="fas fa-circle-check" aria-hidden="true"></i> Noise removed</p>
+                    <p>The cleaned audio replaced the original in the editor. Export as usual, or save the full cleaned file.</p>
+                    <div class="ai-result-actions">
                         <button type="button" class="ai-action-btn" id="aiDownloadDenoisedBtn">
-                            <i class="fas fa-download"></i> Save Cleaned Audio File
+                            <i class="fas fa-download" aria-hidden="true"></i> Save cleaned file
                         </button>
                         <button type="button" class="ai-action-btn-outline" id="aiDismissDenoiseBtn">
-                            <i class="fas fa-times"></i> Dismiss
+                            Dismiss
                         </button>
                     </div>
                 </div>`;
@@ -1193,7 +1339,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 resultsPanel.classList.add('hidden');
             };
 
-            showToast('🔊 Noise reduction applied!', 'success');
+            showToast('Noise removed. The cleaned audio is now loaded.', 'success');
         });
     };
 
@@ -1205,27 +1351,28 @@ document.addEventListener('DOMContentLoaded', () => {
                 const resultsPanel = document.getElementById('aiResultsPanel');
                 const resultsContent = document.getElementById('aiResultsContent');
                 resultsPanel.classList.remove('hidden');
+                setResultsTitle('Filler words');
 
                 const fillers = data.fillers || [];
                 if (fillers.length === 0) {
-                    resultsContent.innerHTML = `<p style="padding:10px;">Clean speech! No filler words ("um", "uh", "like") found.</p>`;
-                    showToast('No filler words found!', 'info');
+                    resultsContent.innerHTML = `<p class="ai-result-empty"><i class="fas fa-circle-info" aria-hidden="true"></i>No filler words found (“um”, “uh”, “like”).</p>`;
+                    showToast('No filler words found.', 'info');
                     return;
                 }
 
                 fillers.forEach(f => {
-                    addAiMarker(f.start, f.end, 'rgba(239, 68, 68, 0.35)', f.word);
+                    addAiMarker(f.start, f.end, MARKER_COLORS.filler, escapeHtml(f.word));
                 });
 
                 resultsContent.innerHTML = `
                     <div class="transcript-container">
-                        <p style="margin-bottom:8px; font-weight:500;">Found <strong>${fillers.length}</strong> filler word(s) ('um', 'uh', 'like'):</p>
-                        <div style="display:flex; gap:10px; margin-top:8px;">
+                        <p>Found <strong>${fillers.length}</strong> filler word${fillers.length === 1 ? '' : 's'}, marked in red on the waveform.</p>
+                        <div class="ai-result-actions">
                             <button type="button" class="ai-action-btn" id="aiCutFillersBtn">
-                                <i class="fas fa-cut"></i> Auto-Cut Filler Words
+                                <i class="fas fa-scissors" aria-hidden="true"></i> Turn into regions
                             </button>
                             <button type="button" class="ai-action-btn-outline" id="aiClearFillersBtn">
-                                <i class="fas fa-eraser"></i> Clear Markers
+                                <i class="fas fa-eraser" aria-hidden="true"></i> Clear markers
                             </button>
                         </div>
                     </div>`;
@@ -1238,9 +1385,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 document.getElementById('aiCutFillersBtn').onclick = () => {
                     allRegions.forEach(r => r.region.remove());
                     allRegions = [];
-                    fillers.forEach(f => addRegion(f.start, f.end, `Cut: ${f.word}`));
+                    fillers.forEach(f => addRegion(f.start, f.end, `Filler: ${f.word}`));
                     resultsPanel.classList.add('hidden');
-                    showToast(`Marked ${fillers.length} filler words for removal!`, 'success');
+                    showToast(`Marked ${fillers.length} filler word${fillers.length === 1 ? '' : 's'} as regions.`, 'success');
                 };
             });
         };
@@ -1258,13 +1405,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 const resultsContent = document.getElementById('aiResultsContent');
                 resultsPanel.classList.remove('hidden');
 
+                setResultsTitle('Enhance speech');
                 resultsContent.innerHTML = `
                     <div class="transcript-container">
-                        <p style="color:#27ae60; font-weight:600;"><i class="fas fa-magic"></i> AI Speech Studio Enhancement Complete!</p>
-                        <p style="margin-top:6px;">Room echo and acoustic reverberation removed. Enhanced voice loaded into timeline.</p>
-                        <div style="display:flex; gap:10px; margin-top:12px;">
+                        <p class="ai-result-status"><i class="fas fa-circle-check" aria-hidden="true"></i> Speech enhanced</p>
+                        <p>Room echo was reduced and the voice evened out. The enhanced audio replaced the original in the editor.</p>
+                        <div class="ai-result-actions">
                             <button type="button" class="ai-action-btn" id="aiSaveEnhancedBtn">
-                                <i class="fas fa-download"></i> Save Enhanced Speech
+                                <i class="fas fa-download" aria-hidden="true"></i> Save enhanced file
                             </button>
                         </div>
                     </div>`;
@@ -1277,36 +1425,205 @@ document.addEventListener('DOMContentLoaded', () => {
                     a.click();
                     a.remove();
                 };
-                showToast('✨ AI Speech Enhancement complete!', 'success');
+                showToast('Speech enhanced. The new audio is now loaded.', 'success');
             });
         };
     }
 
-    // AI Vocal / Stem Separator
+    // Separate vocals tool: opens the Separate panel (vocals / stems / voice / lyrics).
     if (document.getElementById('aiSeparateStemsBtn')) {
         document.getElementById('aiSeparateStemsBtn').onclick = () => {
-            runAIFeature('aiSeparateStemsBtn', '/ai/separate-stems', {}, (data) => {
-                const resultsPanel = document.getElementById('aiResultsPanel');
-                const resultsContent = document.getElementById('aiResultsContent');
-                resultsPanel.classList.remove('hidden');
-
-                resultsContent.innerHTML = `
-                    <div class="transcript-container">
-                        <p style="color:#8b5cf6; font-weight:600;"><i class="fas fa-sliders"></i> Stem Separation Complete!</p>
-                        <p style="margin-top:6px;">Separated vocals and instrumental tracks into high quality stems.</p>
-                        <div style="display:flex; gap:10px; margin-top:12px;">
-                            <a href="${data.vocals || '#'}" download="vocals.wav" class="ai-action-btn" style="text-decoration:none;">
-                                <i class="fas fa-microphone"></i> Download Vocals
-                            </a>
-                            <a href="${data.no_vocals || '#'}" download="instrumental.wav" class="ai-action-btn-outline" style="text-decoration:none;">
-                                <i class="fas fa-music"></i> Download Music
-                            </a>
-                        </div>
-                    </div>`;
-                showToast('🎤 Stems separated successfully!', 'success');
-            });
+            const panel = document.getElementById('separatePanel');
+            if (!panel) return;
+            const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            panel.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
+            const active = panel.querySelector('#separateModes .tab-btn.active');
+            if (active) active.focus({ preventScroll: true });
         };
     }
+
+    // ─── SEPARATE PANEL ───
+    (function initSeparatePanel() {
+        const panel = document.getElementById('separatePanel');
+        if (!panel) return;
+        const modeButtons = Array.from(panel.querySelectorAll('#separateModes .tab-btn'));
+        const desc = document.getElementById('separateModeDesc');
+        const formatSel = document.getElementById('separateFormat');
+        const runBtn = document.getElementById('separateRunBtn');
+        const note = document.getElementById('separateQualityNote');
+        const progress = document.getElementById('separateProgress');
+        const progressText = document.getElementById('separateProgressText');
+        const results = document.getElementById('separateResults');
+        const MODE_TEXT = {
+            vocals: 'Two tracks: the singing voice and everything else, for karaoke or remixing.',
+            '4stem': 'Four tracks: vocals, drums, bass and other instruments.',
+            voice: 'Keeps the spoken or sung voice and removes music and background noise.',
+            lyrics: 'Isolates the vocals, then writes down the words with timings you can save as subtitles.'
+        };
+        const FAILED = 'Separation could not be completed. Please try again.';
+        let mode = 'vocals';
+        let busy = false;
+
+        function selectMode(btn, focus) {
+            modeButtons.forEach(b => {
+                const on = b === btn;
+                b.classList.toggle('active', on);
+                b.setAttribute('aria-checked', on ? 'true' : 'false');
+                b.tabIndex = on ? 0 : -1;
+            });
+            mode = btn.dataset.mode;
+            desc.textContent = MODE_TEXT[mode] || '';
+            const lyrics = mode === 'lyrics';
+            formatSel.disabled = lyrics;
+            const formatWrap = formatSel.closest('.separate-format');
+            if (formatWrap) formatWrap.classList.toggle('is-disabled', lyrics);
+            runBtn.querySelector('span').textContent = lyrics ? 'Get lyrics' : 'Separate';
+            if (focus) btn.focus();
+        }
+        modeButtons.forEach((btn, i) => {
+            btn.addEventListener('click', () => selectMode(btn, false));
+            btn.addEventListener('keydown', (e) => {
+                const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key];
+                if (!step) return;
+                e.preventDefault();
+                selectMode(modeButtons[(i + step + modeButtons.length) % modeButtons.length], true);
+            });
+        });
+
+        fetch('/ai/separate/capabilities').then(r => (r.ok ? r.json() : null)).then(info => {
+            if (!info) { note.textContent = ''; return; }
+            note.textContent = info.studio_stems_installed
+                ? 'Studio stems quality is available. Long files are processed in sections.'
+                : 'Using Quick separation, which works best on stereo songs with centred vocals. Studio stems give cleaner results and are an optional download.';
+        }).catch(() => { note.textContent = ''; });
+
+        function fmtTime(t) {
+            const s = Math.max(0, Math.floor(Number(t) || 0));
+            return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+        }
+
+        function setBusy(on, text) {
+            busy = on;
+            runBtn.disabled = on;
+            runBtn.setAttribute('aria-busy', on ? 'true' : 'false');
+            progress.classList.toggle('hidden', !on);
+            if (text) progressText.textContent = text;
+        }
+
+        async function errorMessage(resp) {
+            try {
+                const body = await resp.json();
+                return body.error || FAILED;
+            } catch (e) {
+                return FAILED;
+            }
+        }
+
+        function warningsHtml(list) {
+            if (!list || !list.length) return '';
+            return `<ul class="separate-warnings">${list.map(w => `<li>${escapeHtml(w)}</li>`).join('')}</ul>`;
+        }
+
+        async function openInEditor(url, name) {
+            try {
+                const resp = await fetch(url);
+                if (!resp.ok) throw new Error('fetch failed');
+                const blob = await resp.blob();
+                const file = new File([blob], name, { type: blob.type || 'audio/wav' });
+                loadAudio(file);
+                recordedBlob = file;
+                fileInput.value = '';
+                showToast(`${name} is now open in the editor.`, 'success');
+            } catch (e) {
+                showToast('That stem could not be opened. Try downloading it instead.', 'error');
+            }
+        }
+
+        function renderStems(data) {
+            const rows = data.stems.map((s, i) => {
+                const loud = s.loudness || {};
+                const meta = [];
+                if (typeof loud.integrated_lufs === 'number') meta.push(`${loud.integrated_lufs.toFixed(1)} LUFS`);
+                if (typeof loud.true_peak_dbtp === 'number') meta.push(`peak ${loud.true_peak_dbtp.toFixed(1)} dBTP`);
+                return `
+                    <div class="separate-stem" role="group" aria-labelledby="sepStem${i}">
+                        <div class="separate-stem-head">
+                            <strong id="sepStem${i}">${escapeHtml(s.label)}</strong>
+                            <span class="separate-stem-meta">${escapeHtml(meta.join(' · '))}</span>
+                        </div>
+                        <audio controls preload="none" src="${escapeHtml(s.url)}" aria-label="Preview ${escapeHtml(s.label)}"></audio>
+                        <div class="ai-result-actions">
+                            <a class="ai-action-btn-outline" href="${escapeHtml(s.url)}" download="${escapeHtml(s.download_name)}">
+                                <i class="fas fa-download" aria-hidden="true"></i> Download
+                            </a>
+                            <button type="button" class="ai-action-btn-outline" data-open-url="${escapeHtml(s.url)}" data-open-name="${escapeHtml(s.download_name)}">
+                                <i class="fas fa-pen-to-square" aria-hidden="true"></i> Open in editor
+                            </button>
+                        </div>
+                    </div>`;
+            }).join('');
+            const zip = data.zip_url ? `
+                <div class="ai-result-actions">
+                    <a class="ai-action-btn" href="${escapeHtml(data.zip_url)}" download>
+                        <i class="fas fa-file-zipper" aria-hidden="true"></i> Download all (ZIP)
+                    </a>
+                </div>` : '';
+            results.innerHTML = `
+                <p class="ai-result-status"><i class="fas fa-circle-check" aria-hidden="true"></i> ${escapeHtml(data.mode_label)} finished</p>
+                <p class="separate-summary">${escapeHtml(data.quality.label)} · ${escapeHtml(data.quality_note || '')}</p>
+                ${warningsHtml(data.warnings)}${rows}${zip}`;
+            results.querySelectorAll('[data-open-url]').forEach(btn => {
+                btn.addEventListener('click', () => openInEditor(btn.dataset.openUrl, btn.dataset.openName));
+            });
+        }
+
+        function renderLyrics(data) {
+            const lines = (data.lines || []).map(l =>
+                `<p><time>${fmtTime(l.start)}</time>${escapeHtml(l.text)}</p>`).join('');
+            results.innerHTML = `
+                <p class="ai-result-status"><i class="fas fa-circle-check" aria-hidden="true"></i> Lyrics ready</p>
+                <p class="separate-summary">The vocals were isolated first (${escapeHtml(data.quality.label)}), then transcribed. Check the words before publishing.</p>
+                ${warningsHtml(data.warnings)}
+                <div class="separate-lyrics" tabindex="0" role="region" aria-label="Lyrics">${lines || '<p>No words were recognised.</p>'}</div>
+                <div class="ai-result-actions">
+                    <a class="ai-action-btn" href="${escapeHtml(data.srt_url)}" download><i class="fas fa-closed-captioning" aria-hidden="true"></i> Subtitles (SRT)</a>
+                    <a class="ai-action-btn-outline" href="${escapeHtml(data.vtt_url)}" download><i class="fas fa-file-lines" aria-hidden="true"></i> Web subtitles (VTT)</a>
+                    <a class="ai-action-btn-outline" href="${escapeHtml(data.txt_url)}" download><i class="fas fa-align-left" aria-hidden="true"></i> Text</a>
+                </div>`;
+        }
+
+        runBtn.addEventListener('click', async () => {
+            if (busy) return;
+            const file = getActiveAudioFile();
+            if (!file) { showToast('Open or record audio first.', 'warning'); return; }
+            const lyrics = mode === 'lyrics';
+            const form = new FormData();
+            form.append('file', file, file.name || 'audio.webm');
+            if (!lyrics) {
+                form.append('mode', mode);
+                form.append('format', formatSel.value);
+                form.append('delivery', 'json');
+            }
+            results.classList.add('hidden');
+            setBusy(true, lyrics ? 'Isolating the vocals and transcribing. This can take a few minutes.'
+                                 : 'Separating. This can take up to about the length of the audio.');
+            try {
+                const resp = await fetch(lyrics ? '/ai/lyrics' : '/ai/separate', { method: 'POST', body: form });
+                if (!resp.ok) throw new Error(await errorMessage(resp));
+                const data = await resp.json();
+                if (lyrics) renderLyrics(data); else renderStems(data);
+                results.classList.remove('hidden');
+                showToast(lyrics ? 'Lyrics are ready.' : 'Separation finished.', 'success');
+            } catch (e) {
+                const message = (e && e.message) || FAILED;
+                results.innerHTML = `<p class="separate-summary" role="alert">${escapeHtml(message)}</p>`;
+                results.classList.remove('hidden');
+                showToast(message, 'error');
+            } finally {
+                setBusy(false);
+            }
+        });
+    })();
 
     // AI Voice Activity Detection (VAD)
     document.getElementById('aiVadBtn').onclick = () => {
@@ -1317,8 +1634,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const resultsContent = document.getElementById('aiResultsContent');
             resultsPanel.classList.remove('hidden');
 
+            setResultsTitle('Speech');
             if (!data || data.length === 0) {
-                resultsContent.innerHTML = `<p>No voice segments found.</p>`;
+                resultsContent.innerHTML = `<p class="ai-result-empty"><i class="fas fa-circle-info" aria-hidden="true"></i>No speech found in this audio.</p>`;
+                showToast('No speech found.', 'info');
                 return;
             }
 
@@ -1327,21 +1646,21 @@ document.addEventListener('DOMContentLoaded', () => {
             data.forEach(seg => {
                 if (seg.type === 'speech') {
                     speechCount++;
-                    addAiMarker(seg.start, seg.end, 'rgba(46, 204, 113, 0.22)', `Speech`);
+                    addAiMarker(seg.start, seg.end, MARKER_COLORS.speech, `Speech`);
                 } else {
-                    addAiMarker(seg.start, seg.end, 'rgba(100, 100, 100, 0.15)', `Silence`);
+                    addAiMarker(seg.start, seg.end, MARKER_COLORS.silence);
                 }
             });
 
             resultsContent.innerHTML = `
                 <div class="transcript-container">
-                    <p style="margin-bottom:8px; font-weight:500;">Isolated <strong>${speechCount}</strong> vocal sections (highlighted in green):</p>
-                    <div style="display:flex; gap:10px; margin-top:8px;">
+                    <p>Found <strong>${speechCount}</strong> speech section${speechCount === 1 ? '' : 's'}, shaded green on the waveform.</p>
+                    <div class="ai-result-actions">
                         <button type="button" class="ai-action-btn" id="aiExtractVocalsBtn">
-                            <i class="fas fa-external-link-alt"></i> Extract Speech Sections
+                            <i class="fas fa-scissors" aria-hidden="true"></i> Turn into regions
                         </button>
                         <button type="button" class="ai-action-btn-outline" id="aiClearVadOverlayBtn">
-                            <i class="fas fa-eraser"></i> Clear Overlay
+                            <i class="fas fa-eraser" aria-hidden="true"></i> Clear markers
                         </button>
                     </div>
                 </div>`;
@@ -1361,7 +1680,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 let count = 1;
                 data.forEach(seg => {
                     if (seg.type === 'speech') {
-                        addRegion(seg.start, seg.end, `Vocal Section ${count++}`, false);
+                        addRegion(seg.start, seg.end, `Speech ${count++}`, false);
                     }
                 });
 
@@ -1369,10 +1688,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 updateRegionList();
                 clearAiMarkers();
                 resultsPanel.classList.add('hidden');
-                showToast(`🗣️ Extracted ${count - 1} speech regions!`, 'success');
+                showToast(`Created ${count - 1} speech region${count - 1 === 1 ? '' : 's'}.`, 'success');
             };
 
-            showToast(`Voice Activity: Identified ${speechCount} vocal section(s).`, 'success');
+            showToast(`Found ${speechCount} speech section${speechCount === 1 ? '' : 's'}.`, 'success');
         });
     };
 
@@ -1385,13 +1704,14 @@ document.addEventListener('DOMContentLoaded', () => {
             const resultsContent = document.getElementById('aiResultsContent');
             resultsPanel.classList.remove('hidden');
 
+            setResultsTitle('Transcript');
             if (!data.available) {
                 resultsContent.innerHTML = `
-                    <div style="border:1px solid #ffccd5; background:#fff5f6; border-radius:8px; padding:14px; color:#c92a2a;">
-                        <h6 style="margin:0 0 6px; font-weight:600;"><i class="fas fa-exclamation-triangle"></i> Transcription Unavailable</h6>
-                        <p style="font-size:0.8rem; line-height:1.4;">${data.error}</p>
+                    <div class="ai-result-error" role="alert">
+                        <h4><i class="fas fa-triangle-exclamation" aria-hidden="true"></i> Transcription unavailable</h4>
+                        <p>${escapeHtml(cleanServerError(data.error))}</p>
                     </div>`;
-                showToast('Whisper model not installed.', 'warning');
+                showToast('Transcription isn’t available on this computer.', 'warning');
                 return;
             }
 
@@ -1401,18 +1721,18 @@ document.addEventListener('DOMContentLoaded', () => {
             let linesHtml = '';
             data.segments.forEach((seg, i) => {
                 linesHtml += `
-                    <div class="transcript-line" data-start="${seg.start}" data-end="${seg.end}" id="transcriptLine_${i}">
+                    <div class="transcript-line" data-start="${seg.start}" data-end="${seg.end}" id="transcriptLine_${i}" tabindex="0" role="button" aria-label="Jump to ${formatTimePrecise(seg.start)}: ${escapeHtml(seg.text)}">
                         <span class="transcript-time">${formatTimePrecise(seg.start)}</span>
-                        <span class="transcript-text">${seg.text}</span>
+                        <span class="transcript-text">${escapeHtml(seg.text)}</span>
                     </div>`;
             });
 
             resultsContent.innerHTML = `
                 <div class="transcript-container">
                     <div class="transcript-meta">
-                        <span>Language detected: <strong>${data.language.toUpperCase()}</strong></span>
-                        <button type="button" class="mini-btn" id="copyTranscriptBtn" title="Copy full transcript text">
-                            <i class="fas fa-copy"></i> Copy Text
+                        <span>Language: <strong>${escapeHtml(String(data.language || '').toUpperCase())}</strong> · ${data.segments.length} line${data.segments.length === 1 ? '' : 's'}</span>
+                        <button type="button" class="mini-btn" id="copyTranscriptBtn" title="Copy the full transcript">
+                            <i class="fas fa-copy" aria-hidden="true"></i> Copy
                         </button>
                     </div>
                     <div class="transcript-panel" id="transcriptLinesContainer">
@@ -1426,10 +1746,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 line.onclick = () => {
                     const start = parseFloat(line.dataset.start);
                     wavesurfer.setTime(start);
-                    
+
                     // Highlight active
                     lines.forEach(l => l.classList.remove('active'));
                     line.classList.add('active');
+                };
+                line.onkeydown = (ev) => {
+                    if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); line.click(); }
                 };
             });
 
@@ -1438,13 +1761,13 @@ document.addEventListener('DOMContentLoaded', () => {
             // Action: Copy Transcript to clipboard
             document.getElementById('copyTranscriptBtn').onclick = () => {
                 navigator.clipboard.writeText(data.full_text).then(() => {
-                    showToast('📋 Transcript copied to clipboard!', 'success');
+                    showToast('Transcript copied.', 'success');
                 }).catch(() => {
-                    showToast('Failed to copy transcript text.', 'error');
+                    showToast('Couldn’t copy the transcript. Select the text and copy it manually.', 'error');
                 });
             };
 
-            showToast('📝 Transcription timeline loaded!', 'success');
+            showToast('Transcript ready. Click a line to jump there.', 'success');
         });
     };
 }
@@ -1493,17 +1816,18 @@ document.addEventListener('DOMContentLoaded', () => {
     if (autoTrimSilenceBtn) {
         autoTrimSilenceBtn.onclick = async () => {
             if (!fileInput.files[0] && !recordedBlob) {
-                showToast('Please upload or record audio first.', 'warning');
+                showToast('Open or record audio first.', 'warning');
                 return;
             }
 
             if (window.ProcessingOverlay) {
                 window.ProcessingOverlay.show({
-                    title: 'AI Audio Silence Trimmer',
-                    message: 'Detecting dead silence gaps (>1s) & jump-cutting audio...'
+                    title: 'Removing long pauses',
+                    stageText: 'Cutting silent gaps longer than 1 second…',
+                    category: 'audio'
                 });
             } else {
-                showToast('Auto-trimming silence gaps...', 'info');
+                showToast('Removing long pauses…', 'info');
             }
 
             try {
@@ -1518,7 +1842,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const res = await fetch('/ai/trim-silence', { method: 'POST', body: fd });
                 if (!res.ok) {
                     const e = await res.json().catch(() => ({}));
-                    showToast(e.error || 'Silence trimming failed', 'error');
+                    showToast(`Removing pauses failed: ${e.error || 'the server returned an error. Try again.'}`, 'error');
                     return;
                 }
 
@@ -1529,14 +1853,152 @@ document.addEventListener('DOMContentLoaded', () => {
                 a.download = 'silence_trimmed_audio.wav';
                 a.click();
                 URL.revokeObjectURL(url);
-                showToast('⚡ Silence gaps trimmed and audio downloaded!', 'success');
+                showToast('Long pauses removed. The new file was downloaded.', 'success');
             } catch (e) {
-                showToast('Silence trimming failed: ' + e.message, 'error');
+                showToast('Removing pauses failed: ' + e.message, 'error');
             } finally {
                 if (window.ProcessingOverlay) window.ProcessingOverlay.hide();
             }
         };
     }
+
+    // ─── VOICEOVER (text to speech) — self-contained panel ───
+    function initVoiceoverPanel() {
+        const panel = document.getElementById('voiceoverPanel');
+        if (!panel) return;
+        const form = document.getElementById('voiceoverForm');
+        const textEl = document.getElementById('voiceoverText');
+        const countEl = document.getElementById('voiceoverCount');
+        const voiceEl = document.getElementById('voiceoverVoice');
+        const speedEl = document.getElementById('voiceoverSpeed');
+        const speedValueEl = document.getElementById('voiceoverSpeedValue');
+        const formatEl = document.getElementById('voiceoverFormat');
+        const generateBtn = document.getElementById('voiceoverGenerateBtn');
+        const statusEl = document.getElementById('voiceoverStatus');
+        const resultEl = document.getElementById('voiceoverResult');
+        const audioEl = document.getElementById('voiceoverAudio');
+        const openBtn = document.getElementById('voiceoverOpenBtn');
+        const downloadEl = document.getElementById('voiceoverDownload');
+        let maxChars = Number(textEl.getAttribute('maxlength')) || 5000;
+        let voicesReady = false;
+        let busy = false;
+        let lastBlob = null;
+        let lastUrl = null;
+
+        const setStatus = (message, tone) => {
+            statusEl.textContent = message || '';
+            statusEl.classList.toggle('is-error', tone === 'error');
+            statusEl.classList.toggle('is-warning', tone === 'warning');
+        };
+        const updateCount = () => {
+            const length = textEl.value.length;
+            countEl.textContent = `${length.toLocaleString()} / ${maxChars.toLocaleString()} characters`;
+            countEl.classList.toggle('is-error', length > maxChars);
+            generateBtn.disabled = busy || !voicesReady || !textEl.value.trim() || length > maxChars;
+        };
+        const updateSpeed = () => {
+            const value = Number(speedEl.value).toFixed(2).replace(/0$/, '');
+            speedValueEl.textContent = `${value}x`;
+            speedEl.setAttribute('aria-valuetext', `${value} times`);
+        };
+
+        async function loadVoices() {
+            try {
+                const res = await fetch('/ai/tts/voices');
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Voices could not be loaded.');
+                maxChars = data.max_chars || maxChars;
+                textEl.setAttribute('maxlength', String(maxChars));
+                voiceEl.innerHTML = '';
+                const groups = {};
+                (data.voices || []).forEach((voice) => {
+                    if (!groups[voice.quality]) {
+                        groups[voice.quality] = document.createElement('optgroup');
+                        groups[voice.quality].label = voice.quality;
+                        voiceEl.appendChild(groups[voice.quality]);
+                    }
+                    const option = document.createElement('option');
+                    option.value = voice.id;
+                    option.textContent = voice.label;
+                    option.selected = Boolean(voice.default);
+                    groups[voice.quality].appendChild(option);
+                });
+                voicesReady = Boolean(data.voices && data.voices.length);
+                voiceEl.disabled = !voicesReady;
+                if (!voicesReady) {
+                    voiceEl.innerHTML = '<option value="">No voices available</option>';
+                    setStatus('Voiceover isn’t available on this computer yet.', 'warning');
+                }
+            } catch (err) {
+                voiceEl.innerHTML = '<option value="">Voices unavailable</option>';
+                setStatus('Voices could not be loaded. Reload the page to try again.', 'error');
+            }
+            updateCount();
+        }
+
+        form.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            if (generateBtn.disabled) return;
+            busy = true;
+            updateCount();
+            generateBtn.setAttribute('aria-busy', 'true');
+            setStatus('Creating voiceover…');
+            if (window.ProcessingOverlay) {
+                window.ProcessingOverlay.show({ title: 'Creating voiceover', stageText: 'Reading your script aloud…', category: 'audio' });
+                window.ProcessingOverlay.updateProgress(35, 'Reading your script aloud…');
+            }
+            try {
+                const format = formatEl.value;
+                const res = await fetch('/ai/tts', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text: textEl.value, voice: voiceEl.value, speed: Number(speedEl.value), format })
+                });
+                if (!res.ok) {
+                    const err = await res.json().catch(() => ({}));
+                    throw new Error(err.error || 'The voiceover could not be created. Try again.');
+                }
+                lastBlob = await res.blob();
+                if (lastUrl) URL.revokeObjectURL(lastUrl);
+                lastUrl = URL.createObjectURL(lastBlob);
+                audioEl.src = lastUrl;
+                downloadEl.href = lastUrl;
+                downloadEl.setAttribute('download', `voiceover.${format}`);
+                resultEl.classList.remove('hidden');
+                const seconds = Number(res.headers.get('X-Audio-Duration') || 0);
+                const quality = res.headers.get('X-Voice-Quality') || 'Voice';
+                const notice = res.headers.get('X-Voice-Notice');
+                setStatus(`${quality}, ${seconds.toFixed(1)} seconds.${notice ? ' ' + notice : ''}`, notice ? 'warning' : null);
+                showToast('Voiceover ready.', 'success');
+            } catch (err) {
+                setStatus(err.message, 'error');
+                showToast(`Voiceover failed: ${err.message}`, 'error');
+            } finally {
+                busy = false;
+                generateBtn.removeAttribute('aria-busy');
+                updateCount();
+                if (window.ProcessingOverlay) window.ProcessingOverlay.hide();
+            }
+        });
+
+        openBtn.addEventListener('click', () => {
+            if (!lastBlob) return;
+            const ext = (formatEl.value === 'mp3') ? 'mp3' : 'wav';
+            const file = new File([lastBlob], `voiceover.${ext}`, { type: lastBlob.type || `audio/${ext}` });
+            recordedBlob = file;
+            fileInput.value = '';
+            handleFileLoad(file);
+            document.getElementById('main')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            showToast('Voiceover opened in the editor.', 'success');
+        });
+
+        textEl.addEventListener('input', updateCount);
+        speedEl.addEventListener('input', updateSpeed);
+        updateSpeed();
+        updateCount();
+        loadVoices();
+    }
+    initVoiceoverPanel();
 
     // Initialize undo button state
     updateUndoBtn();

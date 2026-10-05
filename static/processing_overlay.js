@@ -1,46 +1,57 @@
 /**
- * Interactive Natural-Language Processing Overlay & Engagement System
- * Keeps users engaged with live elapsed time, natural language updates, and pro-tips!
+ * Processing overlay — modal progress panel for long-running local jobs.
+ * Shows elapsed time, a live activity meter, natural-language stage text,
+ * determinate or indeterminate progress, and rotating tips.
+ *
+ * Public API (unchanged): ProcessingOverlay.show({ title, stageText, stepText, category }),
+ * ProcessingOverlay.updateProgress(percent, stageText?, stepText?), ProcessingOverlay.hide().
  */
-
 window.ProcessingOverlay = (function () {
   let timerInterval = null;
   let tipInterval = null;
   let startTime = 0;
   let currentTipIndex = 0;
   let currentCategory = 'general';
+  let previousFocus = null;
 
-  // Bank of engaging non-technical Pro-Tips & Shortcuts
   const TIPS = {
     audio: [
-      { label: "Pro Tip", text: "Double-click anywhere on the audio waveform to instantly create a new cut region!" },
-      { label: "Shortcut", text: "Press Spacebar anytime to play or pause your audio track." },
-      { label: "Pro Tip", text: "Use Fade In and Fade Out effects to make smooth transitions at the beginning and end of clips." },
-      { label: "Shortcut", text: "Press Ctrl+Z to undo any cut or edit operation." },
-      { label: "Privacy First", text: "All audio cutting and AI transcription runs 100% locally on your machine!" },
-      { label: "Did You Know?", text: "You can record directly from your microphone using the Record Mic button." }
+      { label: 'Tip', text: 'Double-click the waveform to add a cut region at that point.' },
+      { label: 'Shortcut', text: 'Press Space to play or pause.' },
+      { label: 'Tip', text: 'Add a fade in and fade out to avoid clicks at the start and end of a clip.' },
+      { label: 'Shortcut', text: 'Press Ctrl+Z to undo the last cut or edit.' },
+      { label: 'Privacy', text: 'Audio is processed on this computer and never leaves it.' },
+      { label: 'Tip', text: 'Use Record to capture audio straight from your microphone.' }
     ],
     video: [
-      { label: "Pro Tip", text: "Drag clips on the timeline to reorder them before rendering your final video." },
-      { label: "Shortcut", text: "Press 'S' or click Split to slice a clip at the current playhead position." },
-      { label: "Pro Tip", text: "Add text overlays with custom colors and positions to create captions or titles!" },
-      { label: "Quick Tools", text: "Need just the soundtrack? Use the 'Extract Audio' tool to save any video as MP3!" },
-      { label: "Privacy First", text: "Your video files are processed locally via FFmpeg — no cloud uploads!" },
-      { label: "Pro Tip", text: "Use Canvas Presets (16:9, 9:16 Shorts/Reels, 1:1 Square) for instant social media formatting." }
+      { label: 'Tip', text: 'Drag clips on the timeline to reorder them before exporting.' },
+      { label: 'Shortcut', text: 'Press S to split the selected clip at the playhead.' },
+      { label: 'Tip', text: 'Text overlays work well for titles and captions; set colour and position in the inspector.' },
+      { label: 'Tip', text: 'Need only the soundtrack? Export as MP3 or WAV.' },
+      { label: 'Privacy', text: 'Video files stay on this computer. Nothing is uploaded.' },
+      { label: 'Tip', text: 'Canvas presets (16:9, 9:16, 1:1) reframe your project for each platform.' }
     ],
     image: [
-      { label: "Pro Tip", text: "Paste an image straight from your clipboard using Ctrl+V!" },
-      { label: "Local AI", text: "The 'Increase Quality' tool uses AI super-resolution to sharpen edges without pixelation." },
-      { label: "Shortcut", text: "Press Ctrl+Z to undo adjustments or freehand drawing annotations." },
-      { label: "Privacy First", text: "Image editing is 100% browser-based — your pictures never touch the server!" },
-      { label: "Meme Generator", text: "Add top and bottom text with classic Impact font to turn any image into a meme!" }
+      { label: 'Shortcut', text: 'Press Ctrl+V to paste an image from the clipboard.' },
+      { label: 'Tip', text: 'Increase quality reconstructs detail and edges instead of simply stretching pixels.' },
+      { label: 'Shortcut', text: 'Press Ctrl+Z to undo adjustments and drawing.' },
+      { label: 'Privacy', text: 'Images are processed on this computer and never leave it.' },
+      { label: 'Tip', text: 'Use the Text tool for captions, then drag them into place on the canvas.' }
     ],
     general: [
-      { label: "Privacy First", text: "All your files stay on your machine — zero cloud tracking or third-party storage." },
-      { label: "Tip", text: "Dark mode is automatically matched to your system preference!" },
-      { label: "Pro Tip", text: "You can drag & drop files directly anywhere on the studio canvas." }
+      { label: 'Privacy', text: 'Your files stay on this computer. Nothing is sent to an online service.' },
+      { label: 'Tip', text: 'The theme follows your system setting until you choose one in the header.' },
+      { label: 'Tip', text: 'You can drop files anywhere on the workspace to import them.' }
     ]
   };
+
+  // Callers sometimes pass decorative emoji in status strings; keep the copy clean.
+  const EMOJI = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B50}\u{2705}\u{274C}\u{FE0F}\u{200D}]/gu;
+  function clean(text) {
+    return String(text == null ? '' : text).replace(EMOJI, '').replace(/!+(\s|$)/g, '.$1').replace(/\s{2,}/g, ' ').trim();
+  }
+
+  function $(id) { return document.getElementById(id); }
 
   function formatTime(seconds) {
     const m = Math.floor(seconds / 60).toString().padStart(2, '0');
@@ -48,115 +59,106 @@ window.ProcessingOverlay = (function () {
     return `${m}:${s}`;
   }
 
+  function prefersReducedMotion() {
+    try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { return false; }
+  }
+
   function rotateTip() {
     const tipList = TIPS[currentCategory] || TIPS.general;
-    if (!tipList || tipList.length === 0) return;
-
+    if (!tipList.length) return;
     currentTipIndex = (currentTipIndex + 1) % tipList.length;
     const tip = tipList[currentTipIndex];
-
-    const labelEl = document.getElementById('poTipLabel');
-    const textEl = document.getElementById('poTipText');
-
-    if (textEl) {
-      textEl.classList.add('fade-out');
-      setTimeout(() => {
-        if (labelEl) labelEl.textContent = tip.label;
-        textEl.textContent = tip.text;
-        textEl.classList.remove('fade-out');
-        textEl.classList.add('fade-in');
-        setTimeout(() => textEl.classList.remove('fade-in'), 300);
-      }, 250);
-    }
+    const labelEl = $('poTipLabel');
+    const textEl = $('poTipText');
+    if (!textEl) return;
+    const swap = () => {
+      if (labelEl) labelEl.textContent = tip.label;
+      textEl.textContent = tip.text;
+      textEl.classList.remove('fade-out');
+    };
+    if (prefersReducedMotion()) { swap(); return; }
+    textEl.classList.add('fade-out');
+    setTimeout(swap, 260);
   }
 
   function startTimer() {
     stopTimer();
     startTime = Date.now();
-    const timerEl = document.getElementById('poTimerText');
+    const timerEl = $('poTimerText');
     if (timerEl) timerEl.textContent = '00:00';
-
     timerInterval = setInterval(() => {
-      const elapsedSec = Math.floor((Date.now() - startTime) / 1000);
-      if (timerEl) timerEl.textContent = formatTime(elapsedSec);
+      const el = $('poTimerText');
+      if (el) el.textContent = formatTime(Math.floor((Date.now() - startTime) / 1000));
     }, 1000);
   }
 
   function stopTimer() {
-    if (timerInterval) {
-      clearInterval(timerInterval);
-      timerInterval = null;
-    }
+    if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
   }
 
   function startTipRotator(category) {
     stopTipRotator();
-    currentCategory = category || 'general';
+    currentCategory = TIPS[category] ? category : 'general';
     currentTipIndex = 0;
-
-    const tipList = TIPS[currentCategory] || TIPS.general;
-    const firstTip = tipList[0] || TIPS.general[0];
-
-    const labelEl = document.getElementById('poTipLabel');
-    const textEl = document.getElementById('poTipText');
-    if (labelEl) labelEl.textContent = firstTip.label;
-    if (textEl) textEl.textContent = firstTip.text;
-
-    tipInterval = setInterval(rotateTip, 4500);
+    const first = (TIPS[currentCategory] || TIPS.general)[0];
+    const labelEl = $('poTipLabel');
+    const textEl = $('poTipText');
+    if (labelEl) labelEl.textContent = first.label;
+    if (textEl) textEl.textContent = first.text;
+    tipInterval = setInterval(rotateTip, 5000);
   }
 
   function stopTipRotator() {
-    if (tipInterval) {
-      clearInterval(tipInterval);
-      tipInterval = null;
-    }
+    if (tipInterval) { clearInterval(tipInterval); tipInterval = null; }
+  }
+
+  function setIndeterminate(on) {
+    const track = document.querySelector('#processingOverlay .po-progress-track');
+    if (!track) return;
+    track.classList.toggle('is-indeterminate', on);
+    if (on) track.removeAttribute('aria-valuenow');
   }
 
   function injectDOM() {
-    if (document.getElementById('processingOverlay')) return;
-
+    if ($('processingOverlay') || !document.body) return;
     const div = document.createElement('div');
     div.id = 'processingOverlay';
     div.className = 'hidden';
     div.innerHTML = `
-      <div class="po-card">
+      <div class="po-card" role="dialog" aria-modal="true" aria-labelledby="poTitleText" aria-describedby="poStageText" tabindex="-1">
         <div class="po-header">
-          <h4 class="po-title" id="poTitle">
-            <span>⚡</span> <span id="poTitleText">Processing...</span>
-          </h4>
-          <div class="po-timer-pill">
-            <span>⏱️</span> <span id="poTimerText">00:00</span>
-          </div>
-        </div>
-
-        <div class="po-visualizer">
-          <div class="po-wave-bar"></div>
-          <div class="po-wave-bar"></div>
-          <div class="po-wave-bar"></div>
-          <div class="po-wave-bar"></div>
-          <div class="po-wave-bar"></div>
-          <div class="po-wave-bar"></div>
+          <h2 class="po-title" id="poTitle">
+            <span class="po-visualizer" aria-hidden="true">
+              <span class="po-wave-bar"></span><span class="po-wave-bar"></span><span class="po-wave-bar"></span><span class="po-wave-bar"></span>
+            </span>
+            <span class="po-title-text" id="poTitleText">Processing</span>
+          </h2>
+          <span class="po-timer-pill" title="Elapsed time">
+            <i class="fas fa-clock" aria-hidden="true"></i>
+            <span class="sr-only">Elapsed time</span>
+            <span id="poTimerText">00:00</span>
+          </span>
         </div>
 
         <div class="po-stage-container">
-          <div class="po-stage-text" id="poStageText">Initializing task...</div>
+          <p class="po-stage-text" id="poStageText" role="status" aria-live="polite">Starting…</p>
         </div>
 
         <div class="po-progress-wrapper">
-          <div class="po-progress-track">
-            <div class="po-progress-fill" id="poProgressFill" style="width: 0%;"></div>
+          <div class="po-progress-track is-indeterminate" role="progressbar" aria-label="Progress" aria-valuemin="0" aria-valuemax="100">
+            <div class="po-progress-fill" id="poProgressFill"></div>
           </div>
           <div class="po-progress-meta">
-            <span id="poProgressStep">Step 1 of 1</span>
+            <span id="poProgressStep">Working</span>
             <span id="poProgressPercent">0%</span>
           </div>
         </div>
 
         <div class="po-tip-box">
-          <div class="po-tip-icon">💡</div>
+          <i class="fas fa-lightbulb po-tip-icon" aria-hidden="true"></i>
           <div class="po-tip-content">
-            <div class="po-tip-label" id="poTipLabel">Pro Tip</div>
-            <p class="po-tip-text" id="poTipText">Dark mode is automatically matched to your system preference!</p>
+            <div class="po-tip-label" id="poTipLabel">Tip</div>
+            <p class="po-tip-text" id="poTipText"></p>
           </div>
         </div>
       </div>
@@ -164,7 +166,6 @@ window.ProcessingOverlay = (function () {
     document.body.appendChild(div);
   }
 
-  // Ensure DOM is ready before injecting
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', injectDOM);
   } else {
@@ -174,57 +175,70 @@ window.ProcessingOverlay = (function () {
   return {
     show: function (options) {
       injectDOM();
-      const title = options?.title || 'Processing...';
-      const stageText = options?.stageText || 'Working on your request...';
-      const category = options?.category || 'general';
+      const opts = options || {};
+      const titleEl = $('poTitleText');
+      const stageEl = $('poStageText');
+      const fillEl = $('poProgressFill');
+      const percentEl = $('poProgressPercent');
+      const stepEl = $('poProgressStep');
 
-      const titleEl = document.getElementById('poTitleText');
-      const stageEl = document.getElementById('poStageText');
-      const fillEl = document.getElementById('poProgressFill');
-      const percentEl = document.getElementById('poProgressPercent');
-      const stepEl = document.getElementById('poProgressStep');
-
-      if (titleEl) titleEl.textContent = title;
-      if (stageEl) stageEl.textContent = stageText;
+      if (titleEl) titleEl.textContent = clean(opts.title || 'Processing') || 'Processing';
+      if (stageEl) stageEl.textContent = clean(opts.stageText || opts.message || 'Working on your request…');
       if (fillEl) fillEl.style.width = '0%';
       if (percentEl) percentEl.textContent = '0%';
-      if (stepEl) stepEl.textContent = options?.stepText || 'Working...';
+      if (stepEl) stepEl.textContent = clean(opts.stepText || 'Working');
+      setIndeterminate(true);
 
       startTimer();
-      startTipRotator(category);
+      startTipRotator(opts.category || 'general');
 
-      const overlay = document.getElementById('processingOverlay');
-      if (overlay) overlay.classList.remove('hidden');
+      const overlay = $('processingOverlay');
+      if (overlay) {
+        const wasHidden = overlay.classList.contains('hidden');
+        overlay.classList.remove('hidden');
+        if (wasHidden) {
+          previousFocus = document.activeElement;
+          const card = overlay.querySelector('.po-card');
+          if (card) { try { card.focus({ preventScroll: true }); } catch (e) { card.focus(); } }
+        }
+      }
     },
 
     updateProgress: function (percent, stageText, stepText) {
-      const fillEl = document.getElementById('poProgressFill');
-      const percentEl = document.getElementById('poProgressPercent');
-      const stageEl = document.getElementById('poStageText');
-      const stepEl = document.getElementById('poProgressStep');
+      const fillEl = $('poProgressFill');
+      const percentEl = $('poProgressPercent');
+      const stageEl = $('poStageText');
+      const stepEl = $('poProgressStep');
+      const track = document.querySelector('#processingOverlay .po-progress-track');
 
-      const p = Math.min(100, Math.max(0, Math.round(percent)));
+      const p = Math.min(100, Math.max(0, Math.round(Number(percent) || 0)));
+      setIndeterminate(false);
       if (fillEl) fillEl.style.width = `${p}%`;
       if (percentEl) percentEl.textContent = `${p}%`;
+      if (track) track.setAttribute('aria-valuenow', String(p));
 
       if (stageText && stageEl) {
-        stageEl.style.opacity = '0.5';
-        setTimeout(() => {
-          stageEl.textContent = stageText;
-          stageEl.style.opacity = '1';
-        }, 150);
+        const text = clean(stageText);
+        if (prefersReducedMotion()) {
+          stageEl.textContent = text;
+        } else {
+          stageEl.style.opacity = '0.4';
+          setTimeout(() => { stageEl.textContent = text; stageEl.style.opacity = '1'; }, 140);
+        }
       }
-
-      if (stepText && stepEl) {
-        stepEl.textContent = stepText;
-      }
+      if (stepText && stepEl) stepEl.textContent = clean(stepText);
     },
 
     hide: function () {
-      const overlay = document.getElementById('processingOverlay');
+      const overlay = $('processingOverlay');
+      const wasOpen = overlay && !overlay.classList.contains('hidden');
       if (overlay) overlay.classList.add('hidden');
       stopTimer();
       stopTipRotator();
+      if (wasOpen && previousFocus && typeof previousFocus.focus === 'function' && document.contains(previousFocus)) {
+        try { previousFocus.focus({ preventScroll: true }); } catch (e) { /* element gone */ }
+      }
+      previousFocus = null;
     }
   };
 })();

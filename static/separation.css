@@ -1,0 +1,105 @@
+/* Separate panel (Audio editor): vocals / 4 stems / voice / lyrics.
+   Uses design tokens from tokens.css and the shared .tabs / .ai-action-btn components. */
+
+.audio-body .separate-panel { margin-top: var(--space-4); }
+.audio-body .separate-modes { flex-wrap: wrap; margin-top: var(--space-3); margin-bottom: var(--space-1); }
+.audio-body .separate-modes .tab-btn:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.audio-body .separate-mode-desc { margin-top: 0; }
+
+.audio-body .separate-controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: var(--space-3);
+    margin-top: var(--space-3);
+}
+.audio-body .separate-format {
+    display: inline-flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    font-size: var(--text-xs);
+    color: var(--text-3);
+}
+.audio-body .separate-format select {
+    min-height: var(--control-h);
+    padding: 0 var(--space-3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm-token);
+    background: var(--surface-1);
+    color: var(--text);
+    font-size: var(--text-sm);
+}
+.audio-body .separate-format.is-disabled { opacity: 0.5; }
+
+.audio-body .separate-quality-note {
+    margin-top: var(--space-2);
+    font-size: var(--text-xs);
+    color: var(--text-3);
+    max-width: 72ch;
+}
+
+.audio-body .separate-progress {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    margin-top: var(--space-3);
+    font-size: var(--text-sm);
+    color: var(--text-2);
+}
+.audio-body .separate-progress progress { width: 160px; height: 6px; accent-color: var(--accent); }
+
+.audio-body .separate-results { margin-top: var(--space-4); display: grid; gap: var(--space-3); }
+.audio-body .separate-summary { font-size: var(--text-sm); color: var(--text-2); }
+.audio-body .separate-warnings {
+    margin: 0;
+    padding: var(--space-2) var(--space-3);
+    list-style: none;
+    border-radius: var(--radius-sm-token);
+    background: var(--warning-soft);
+    color: var(--text);
+    font-size: var(--text-xs);
+}
+.audio-body .separate-stem {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-2);
+    padding: var(--space-3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md-token);
+    background: var(--surface-1);
+}
+.audio-body .separate-stem-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-2);
+}
+.audio-body .separate-stem-head strong { font-size: var(--text-sm); color: var(--text); }
+.audio-body .separate-stem-meta { font-size: var(--text-xs); color: var(--text-3); font-variant-numeric: tabular-nums; }
+.audio-body .separate-stem audio { width: 100%; height: 36px; }
+.audio-body .separate-stem .ai-result-actions { margin-top: 0; }
+
+.audio-body .separate-lyrics {
+    max-height: 320px;
+    overflow: auto;
+    padding: var(--space-3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md-token);
+    background: var(--surface-1);
+    font-size: var(--text-sm);
+    line-height: var(--leading-normal);
+}
+.audio-body .separate-lyrics p { margin: 0 0 var(--space-1); }
+.audio-body .separate-lyrics time {
+    display: inline-block;
+    min-width: 4.5ch;
+    margin-right: var(--space-2);
+    color: var(--text-3);
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .audio-body .separate-progress progress { animation: none; }
+}

@@ -1,239 +1,180 @@
-/* ==========================================================================
-   Interactive Natural-Language Processing Overlay & Engagement System
-   ========================================================================== */
+/* ═══════════════════════════════════════════════════════════════════════
+   PROCESSING OVERLAY — modal progress panel for long-running local jobs
+   Elapsed timer · live activity meter · stage text · progress · tips
+   Tokens from tokens.css; works in both themes.
+   ═══════════════════════════════════════════════════════════════════════ */
 
 #processingOverlay {
-  position: fixed;
-  inset: 0;
-  z-index: 9999;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(10, 12, 20, 0.85);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  opacity: 1;
-  transition: opacity 0.3s ease, visibility 0.3s ease;
-  padding: 1.5rem;
+    position: fixed;
+    inset: 0;
+    z-index: var(--z-modal, 1100);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-6, 24px);
+    background: var(--scrim, rgba(10, 12, 18, 0.55));
+    animation: poFade var(--dur-2, 180ms) var(--ease-out, ease-out);
 }
 
-#processingOverlay.hidden {
-  opacity: 0;
-  visibility: hidden;
-  pointer-events: none;
-}
+#processingOverlay.hidden { display: none !important; }
 
 .po-card {
-  position: relative;
-  width: 100%;
-  max-width: 480px;
-  background: rgba(22, 27, 44, 0.95);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 20px;
-  padding: 2.25rem 2rem 1.75rem;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7),
-              0 0 40px rgba(99, 102, 241, 0.15);
-  text-align: center;
-  overflow: hidden;
-  animation: poCardPop 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+    width: 100%;
+    max-width: 440px;
+    padding: var(--space-6, 24px);
+    border: 1px solid var(--border, #262b37);
+    border-radius: var(--radius-lg-token, 12px);
+    background: var(--surface-1, #13161d);
+    color: var(--text, #eceef3);
+    box-shadow: var(--shadow-3);
+    text-align: left;
+    animation: poRise var(--dur-3, 260ms) var(--ease-out, ease-out);
 }
+.po-card:focus { outline: none; }
 
-@keyframes poCardPop {
-  0% { transform: scale(0.92) translateY(12px); opacity: 0; }
-  100% { transform: scale(1) translateY(0); opacity: 1; }
-}
+@keyframes poFade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes poRise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 
-/* Ambient glow accent top bar */
-.po-card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 4px;
-  background: linear-gradient(90deg, #6366f1, #a855f7, #ec4899, #6366f1);
-  background-size: 300% 100%;
-  animation: poGlowBar 3s linear infinite;
-}
-
-@keyframes poGlowBar {
-  0% { background-position: 0% 0%; }
-  100% { background-position: 300% 0%; }
-}
-
-/* Header & Timer Pill */
+/* Header: title + elapsed time */
 .po-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 1.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3, 12px);
 }
 
 .po-title {
-  font-size: 1.15rem;
-  font-weight: 700;
-  color: #f8fafc;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin: 0;
+    display: flex;
+    align-items: center;
+    gap: var(--space-2-5, 10px);
+    min-width: 0;
+    margin: 0;
+    font-size: var(--text-md, 1rem);
+    font-weight: var(--weight-semibold, 600);
+    line-height: var(--leading-snug, 1.35);
+    color: var(--text);
 }
+.po-title-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .po-timer-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 0.25rem 0.75rem;
-  background: rgba(99, 102, 241, 0.15);
-  border: 1px solid rgba(99, 102, 241, 0.3);
-  border-radius: 20px;
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: #a5b4fc;
-  font-family: monospace, monospace;
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1-5, 6px);
+    padding: 2px var(--space-2, 8px);
+    border-radius: var(--radius-xs-token, 6px);
+    background: var(--surface-2);
+    color: var(--text-2);
+    font-family: var(--font-mono, monospace);
+    font-size: var(--text-xs, 12px);
+    font-variant-numeric: tabular-nums;
 }
+.po-timer-pill i { font-size: 0.6875rem; color: var(--text-3); }
 
-/* Equalizer Wave / Pulse Visualizer */
+/* Live activity meter (equalizer) */
 .po-visualizer {
-  height: 64px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  margin: 1rem 0 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    height: 16px;
+    flex-shrink: 0;
 }
-
 .po-wave-bar {
-  width: 5px;
-  height: 16px;
-  background: linear-gradient(180deg, #818cf8, #c084fc);
-  border-radius: 4px;
-  animation: poEqualizer 1.2s ease-in-out infinite alternate;
+    width: 3px;
+    height: 16px;
+    border-radius: 2px;
+    background: var(--accent);
+    transform-origin: center;
+    animation: poEqualizer 900ms var(--ease-in-out, ease-in-out) infinite alternate;
 }
-
-.po-wave-bar:nth-child(1) { animation-delay: 0.1s; }
-.po-wave-bar:nth-child(2) { animation-delay: 0.3s; }
-.po-wave-bar:nth-child(3) { animation-delay: 0.5s; }
-.po-wave-bar:nth-child(4) { animation-delay: 0.2s; }
-.po-wave-bar:nth-child(5) { animation-delay: 0.4s; }
-.po-wave-bar:nth-child(6) { animation-delay: 0.6s; }
-
+.po-wave-bar:nth-child(1) { animation-delay: -0.1s; }
+.po-wave-bar:nth-child(2) { animation-delay: -0.45s; }
+.po-wave-bar:nth-child(3) { animation-delay: -0.2s; }
+.po-wave-bar:nth-child(4) { animation-delay: -0.6s; }
 @keyframes poEqualizer {
-  0% { height: 12px; opacity: 0.4; transform: scaleY(1); }
-  100% { height: 52px; opacity: 1; transform: scaleY(1.1); }
+    from { transform: scaleY(0.25); opacity: 0.55; }
+    to { transform: scaleY(1); opacity: 1; }
 }
 
-/* Stage Natural Language Badge */
-.po-stage-container {
-  margin-bottom: 1rem;
-  min-height: 2.2rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
+/* Stage text */
+.po-stage-container { margin: var(--space-5, 20px) 0 var(--space-3, 12px); min-height: 1.4em; }
 .po-stage-text {
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: #e2e8f0;
-  line-height: 1.4;
-  transition: opacity 0.2s ease;
+    font-size: var(--text-base, 14px);
+    line-height: var(--leading-snug, 1.35);
+    color: var(--text-2);
+    transition: opacity var(--dur-2, 180ms) var(--ease-out, ease-out);
 }
 
-/* Progress Track */
-.po-progress-wrapper {
-  margin-bottom: 1.5rem;
-}
-
+/* Progress */
 .po-progress-track {
-  width: 100%;
-  height: 10px;
-  background: rgba(255, 255, 255, 0.08);
-  border-radius: 10px;
-  overflow: hidden;
-  position: relative;
-  border: 1px solid rgba(255, 255, 255, 0.05);
+    position: relative;
+    height: 6px;
+    overflow: hidden;
+    border-radius: var(--radius-full, 999px);
+    background: var(--surface-3);
 }
-
 .po-progress-fill {
-  height: 100%;
-  width: 0%;
-  background: linear-gradient(90deg, #6366f1, #a855f7, #ec4899);
-  border-radius: 10px;
-  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  position: relative;
+    width: 0%;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--accent);
+    transition: width 320ms var(--ease-out, ease-out);
 }
-
-.po-progress-fill::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
-  animation: poShimmer 1.8s infinite;
+/* Indeterminate until the caller reports real progress */
+.po-progress-track.is-indeterminate .po-progress-fill {
+    width: 32% !important;
+    animation: poIndeterminate 1.4s var(--ease-in-out, ease-in-out) infinite;
 }
-
-@keyframes poShimmer {
-  0% { transform: translateX(-100%); }
-  100% { transform: translateX(100%); }
+@keyframes poIndeterminate {
+    from { transform: translateX(-100%); }
+    to { transform: translateX(320%); }
 }
 
 .po-progress-meta {
-  display: flex;
-  justify-content: space-between;
-  font-size: 0.8rem;
-  color: #94a3b8;
-  font-weight: 500;
-  margin-top: 0.5rem;
+    display: flex;
+    justify-content: space-between;
+    gap: var(--space-3, 12px);
+    margin-top: var(--space-2, 8px);
+    font-size: var(--text-xs, 12px);
+    color: var(--text-3);
+    font-variant-numeric: tabular-nums;
 }
+.po-progress-track.is-indeterminate + .po-progress-meta #poProgressPercent { visibility: hidden; }
 
-/* Pro-Tip & Keyboard Shortcut Carousel */
+/* Tip carousel */
 .po-tip-box {
-  background: rgba(15, 23, 42, 0.6);
-  border: 1px dashed rgba(255, 255, 255, 0.12);
-  border-radius: 12px;
-  padding: 0.85rem 1rem;
-  text-align: left;
-  display: flex;
-  align-items: flex-start;
-  gap: 0.75rem;
-  position: relative;
-  overflow: hidden;
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-3, 12px);
+    margin-top: var(--space-5, 20px);
+    padding: var(--space-3, 12px) var(--space-4, 16px);
+    border-radius: var(--radius-md-token, 10px);
+    background: var(--surface-2);
 }
-
-.po-tip-icon {
-  font-size: 1.25rem;
-  flex-shrink: 0;
-  line-height: 1;
-  margin-top: 0.1rem;
-}
-
-.po-tip-content {
-  flex: 1;
-}
-
+.po-tip-icon { flex-shrink: 0; margin-top: 2px; color: var(--text-3); font-size: 0.875rem; }
+.po-tip-content { flex: 1; min-width: 0; }
 .po-tip-label {
-  font-size: 0.7rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: #818cf8;
-  margin-bottom: 0.2rem;
+    margin-bottom: 2px;
+    font-size: var(--text-xs, 12px);
+    font-weight: var(--weight-semibold, 600);
+    color: var(--text-2);
 }
-
 .po-tip-text {
-  font-size: 0.83rem;
-  color: #cbd5e1;
-  line-height: 1.35;
-  margin: 0;
-  transition: opacity 0.3s ease, transform 0.3s ease;
+    margin: 0;
+    font-size: var(--text-sm, 13px);
+    line-height: var(--leading-snug, 1.35);
+    color: var(--text-2);
+    transition: opacity var(--dur-3, 260ms) var(--ease-out, ease-out), transform var(--dur-3, 260ms) var(--ease-out, ease-out);
+}
+.po-tip-text.fade-out { opacity: 0; transform: translateY(-3px); }
+.po-tip-text.fade-in { opacity: 1; transform: none; }
+
+@media (max-width: 480px) {
+    #processingOverlay { align-items: flex-end; padding: var(--space-3, 12px); }
+    .po-card { padding: var(--space-5, 20px); }
 }
 
-.po-tip-text.fade-out {
-  opacity: 0;
-  transform: translateY(-4px);
-}
-
-.po-tip-text.fade-in {
-  opacity: 1;
-  transform: translateY(0);
+@media (prefers-reduced-motion: reduce) {
+    .po-wave-bar { animation: none; transform: scaleY(0.6); }
+    .po-progress-track.is-indeterminate .po-progress-fill { animation: none; width: 100% !important; opacity: 0.35; }
 }
