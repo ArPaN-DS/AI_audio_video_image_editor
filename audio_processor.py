@@ -877,15 +877,27 @@ def _normalize_source(source, target_lufs, true_peak_ceiling, max_limiting_db, f
     rendered_gain_db = gain_db   # gain of the output that is actually delivered
     post_scale = 1.0
     reduction, measured = 0.0, before
-    for _ in range(5):
-        reduction, measured = render(gain_db, 1.0, sink if keep_in_memory else None)
-        rendered_gain_db = gain_db
-        err = target_lufs - measured["integrated_lufs"]
-        if reduction == 0.0 or abs(err) <= 0.1:
-            break
-        if gain_db + err - base_gain > max_limiting_db:
-            break
-        gain_db += err
+    delivered = False
+
+    # Deliver directly to sink on the first pass (avoids an extra pass over long files).
+    reduction, measured = render(gain_db, 1.0, sink)
+    rendered_gain_db = gain_db
+    delivered = True
+
+    err = target_lufs - measured["integrated_lufs"]
+    if reduction != 0.0 and abs(err) > 0.1:
+        for _ in range(4):
+            if gain_db + err - base_gain > max_limiting_db:
+                break
+            gain_db += err
+            if not keep_in_memory:
+                sink, collected = final_sink_factory()
+            reduction, measured = render(gain_db, 1.0, sink)
+            rendered_gain_db = gain_db
+            delivered = True
+            err = target_lufs - measured["integrated_lufs"]
+            if reduction == 0.0 or abs(err) <= 0.1:
+                break
 
     # Final safety: if inter-sample peaks still poke over, trim statically.
     if measured["true_peak_dbtp"] > true_peak_ceiling:
@@ -895,10 +907,12 @@ def _normalize_source(source, target_lufs, true_peak_ceiling, max_limiting_db, f
             collected.out *= post_scale
             measured = measure_loudness_array(collected.out, source.sr)
         else:
-            _, measured = render(rendered_gain_db, post_scale, None)
+            sink, collected = final_sink_factory()
+            _, measured = render(rendered_gain_db, post_scale, sink)
+            delivered = True
         gain_db += trim
 
-    if not keep_in_memory:
+    if not delivered and not keep_in_memory:
         render(rendered_gain_db, post_scale, sink)
 
     within = (abs(measured["integrated_lufs"] - target_lufs) <= 0.5
@@ -953,6 +967,8 @@ def normalize_loudness(audio_path, output_path, target_lufs=None, true_peak_ceil
             if small:
                 collector = _Collector(source.channels, source.frames)
                 return collector, collector
+            if writer is not None:
+                writer.abort()
             writer = _AudioWriter(output_path, source.sr, source.channels)
             return writer.write, None
 

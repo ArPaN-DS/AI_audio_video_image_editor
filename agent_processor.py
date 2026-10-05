@@ -899,10 +899,13 @@ def _plan_from_reasoning(content, user_prompt, media_context=None, conversation_
     plan = _apply_job_memory(agent_planner.finalize_plan(raw, user_prompt, media_context, perception, source='reasoning'),
                              user_prompt, perception)
     proposed = agent_planner.normalize_raw_plan(raw)['tools']
+    fallback = local()
+    if fallback.get('clarification_needed'):
+        _log.info("Rule-based planner requested clarification; preserving clarification over model hallucination.")
+        return fallback
     if plan['clarification_needed']:
         return plan
     if not plan['tools']:
-        fallback = local()
         if fallback.get('tools') or fallback.get('clarification_needed'):
             if proposed:
                 _log.info("Reasoning plan did not validate; using local intent routing.")

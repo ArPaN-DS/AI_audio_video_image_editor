@@ -1049,7 +1049,58 @@ def _clarification_for(spec, key, state, bad_value=None):
         return 'Which format should I export to?', options
     if key == 'gain_db':
         return 'Should I make it louder or quieter, and by how much?', ['Make it 6 dB louder', 'Make it 6 dB quieter']
-    return (f'What {key.replace("_", " ")} should I use for {spec.label.lower()}?', [spec.example] if spec.example else [])
+def _is_number_grounded(value, prompt_lower):
+    if value is None or not prompt_lower:
+        return False
+    if isinstance(value, (int, float)):
+        str_val = f"{value:g}"
+        if str_val in prompt_lower:
+            return True
+        if isinstance(value, float) and value.is_integer() and str(int(value)) in prompt_lower:
+            return True
+        if value == 2 and any(w in prompt_lower for w in ('double', 'twice', '2x')):
+            return True
+        if value == 0.5 and any(w in prompt_lower for w in ('half', '0.5x')):
+            return True
+        if value == 3 and any(w in prompt_lower for w in ('triple', '3x')):
+            return True
+    return False
+
+
+def _check_grounding(spec, clean_args, prompt, state):
+    prompt_lower = (prompt or '').lower()
+
+    # 1. Number grounding check for required parameters without defaults
+    for key, value in clean_args.items():
+        param = spec.params.get(key)
+        if not param or param.internal:
+            continue
+        if key == 'speed' and param.required and isinstance(value, (int, float)):
+            if not _is_number_grounded(value, prompt_lower):
+                return Clarify(*_clarification_for(spec, key, state))
+
+    # 2. Format grounding check (never change requested formats or accept unsupported formats)
+    if spec.name in ('convert_audio_format', 'convert_video_format', 'convert_image_format', 'extract_audio'):
+        fmt_key = 'target_format' if 'target_format' in clean_args else 'format'
+        planned_fmt = str(clean_args.get(fmt_key) or '').lower()
+        format_matches = re.findall(
+            r'\b(mp3|wav|flac|ogg|mp4|webm|mkv|gif|png|jpe?g|webp|m4a|aac|mov|avi|wma|opus|tiff?|bmp|heic)\b',
+            prompt_lower
+        )
+        if format_matches:
+            requested_fmt = format_matches[0].lower()
+            if requested_fmt in ('jpg', 'jpeg'):
+                requested_fmt = 'jpg'
+            unsupported = {'m4a', 'aac', 'mov', 'avi', 'wma', 'opus', 'tif', 'tiff', 'bmp', 'heic'}
+            if requested_fmt in unsupported:
+                options = {'image': ['Export as PNG', 'Export as JPG', 'Export as WebP'],
+                           'video': ['Convert to MP4', 'Convert to WebM', 'Extract the audio as MP3']
+                          }.get(state.type, ['Export as MP3', 'Export as WAV', 'Export as FLAC'])
+                return Clarify(f'{requested_fmt.upper()} export is not available. Which format should I use?', options)
+            if planned_fmt and requested_fmt != planned_fmt and not (requested_fmt in ('jpg', 'jpeg') and planned_fmt in ('jpg', 'jpeg')):
+                return Clarify(*_clarification_for(spec, fmt_key, state, bad_value=planned_fmt))
+
+    return None
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -1281,6 +1332,11 @@ def finalize_plan(raw, prompt='', media_context=None, perception=None, source='l
             except Clarify as clarify:
                 clarifications.append(clarify)
                 continue
+            if source == 'reasoning' and prompt:
+                grounding_clarify = _check_grounding(spec, clean_args, prompt, state)
+                if grounding_clarify is not None:
+                    clarifications.append(grounding_clarify)
+                    continue
             notes.extend(arg_notes)
             policy = _policies_for(tool_name, dict(clean_args, _explicit=explicit), state, overrides, main_lineage)
             if policy.get('note'):

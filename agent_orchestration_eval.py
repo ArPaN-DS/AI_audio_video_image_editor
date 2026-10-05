@@ -684,6 +684,22 @@ class ReasoningPathTests(unittest.TestCase):
                 self.assertEqual([(t['name'], t['args']) for t in via_model['tools']],
                                  [(t['name'], t['args']) for t in via_rules['tools']])
 
+    def test_grounding_guard_rejects_unspecified_numbers(self):
+        mock_reply = json.dumps({'tools': [{'name': 'adjust_audio_speed', 'args': {'speed': 1.5}}],
+                                'reply': 'Sped up 1.5x'})
+        plan = self.run_with(mock_reply, 'Make it faster', 'audio')
+        self.assertTrue(plan.get('clarification_needed'))
+        self.assertEqual(plan.get('tools'), [])
+        self.assertIn('playback speed', plan.get('reply', '').lower())
+
+    def test_grounding_guard_rejects_format_substitution(self):
+        mock_reply = json.dumps({'tools': [{'name': 'convert_audio_format', 'args': {'target_format': 'mp3'}}],
+                                'reply': 'Exported as mp3'})
+        plan = self.run_with(mock_reply, 'export as m4a', 'audio')
+        self.assertTrue(plan.get('clarification_needed'))
+        self.assertEqual(plan.get('tools'), [])
+        self.assertTrue('m4a' in plan.get('reply', '').lower() or 'which format' in plan.get('reply', '').lower())
+
 
 # ═══════════════════════════════════════════════════════════════════════════
 #  SYNTHETIC MEDIA
