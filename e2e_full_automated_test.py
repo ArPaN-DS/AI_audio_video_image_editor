@@ -1248,7 +1248,9 @@ class ComprehensivePlatformE2ETests(unittest.TestCase):
                 orphan_stem = create_storage_file('PROCESSED_FOLDER', 'stems_orphan/vocals.wav')
                 saved_thumb = create_storage_file('PROCESSED_FOLDER', 'thumbs/saved-video/thumb_0.jpg')
                 orphan_thumb = create_storage_file('PROCESSED_FOLDER', 'thumbs/orphan/thumb_0.jpg')
-                for path in (orphan_stem, orphan_thumb):
+                forensic_upload = create_storage_file('UPLOAD_FOLDER', 'cases/case_01/evidence.wav')
+                forensic_audit = create_storage_file('PROCESSED_FOLDER', 'evidence_hash.audit')
+                for path in (orphan_stem, orphan_thumb, forensic_upload):
                     os.utime(os.path.dirname(path), (old_time, old_time))
                 project_state = {
                     'id': 'storage-test', 'name': 'Retained media',
@@ -1263,7 +1265,7 @@ class ComprehensivePlatformE2ETests(unittest.TestCase):
                 self.assertFalse(os.path.exists(orphan_stem))
                 self.assertFalse(os.path.exists(orphan_thumb))
                 self.assertFalse(os.path.exists(os.path.dirname(orphan_stem)))
-                for retained in (saved_upload, recent_upload, saved_stem, saved_thumb):
+                for retained in (saved_upload, recent_upload, saved_stem, saved_thumb, forensic_upload, forensic_audit):
                     self.assertTrue(os.path.exists(retained), retained)
 
                 with patch('app.json.dump', side_effect=OSError('Interrupted save')):

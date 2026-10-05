@@ -999,13 +999,13 @@ document.addEventListener('DOMContentLoaded', () => {
             const contentType = resp.headers.get('content-type');
             if (contentType && (contentType.includes('audio/') || contentType.includes('application/octet-stream') || endpoint.includes('noise-reduce'))) {
                 const blob = await resp.blob();
-                onResponse(blob);
+                onResponse(blob, resp);
             } else {
                 const json = await resp.json();
                 if (json.error) {
                     throw new Error(json.error);
                 }
-                onResponse(json);
+                onResponse(json, resp);
             }
 
             if (window.ProcessingOverlay) {
@@ -1396,7 +1396,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // AI Speech Studio Enhancement
     if (document.getElementById('aiEnhanceSpeechBtn')) {
         document.getElementById('aiEnhanceSpeechBtn').onclick = () => {
-            runAIFeature('aiEnhanceSpeechBtn', '/ai/enhance-speech', {}, (blob) => {
+            runAIFeature('aiEnhanceSpeechBtn', '/ai/enhance-speech', {}, (blob, resp) => {
                 loadAudio(blob);
                 recordedBlob = blob;
                 fileInput.value = '';
@@ -1405,11 +1405,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 const resultsContent = document.getElementById('aiResultsContent');
                 resultsPanel.classList.remove('hidden');
 
+                const note = (resp && resp.headers && resp.headers.get('x-enhance-note')) || '';
+                const noteHtml = note
+                    ? `<p class="separate-quality-note" style="margin-top: var(--space-2);"><i class="fas fa-info-circle" aria-hidden="true"></i> ${note.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>`
+                    : '';
+
                 setResultsTitle('Enhance speech');
                 resultsContent.innerHTML = `
                     <div class="transcript-container">
                         <p class="ai-result-status"><i class="fas fa-circle-check" aria-hidden="true"></i> Speech enhanced</p>
                         <p>Room echo was reduced and the voice evened out. The enhanced audio replaced the original in the editor.</p>
+                        ${noteHtml}
                         <div class="ai-result-actions">
                             <button type="button" class="ai-action-btn" id="aiSaveEnhancedBtn">
                                 <i class="fas fa-download" aria-hidden="true"></i> Save enhanced file

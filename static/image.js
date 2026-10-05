@@ -460,6 +460,7 @@
             else { selectText(null); renderCanvas(); }
             return;
         }
+        if (tool === 'inpaint') { startInpaintBrush(e, p); return; }
         if (tool === 'draw') { startFreehand(e, p); return; }
         if (tool === 'shape') { startShape(e, p); return; }
     }
@@ -560,6 +561,180 @@
     }
 
     // ═══════════════════════════════════════
+    //  MAGIC ERASER / INPAINTING
+    // ═══════════════════════════════════════
+    let inpaintCtx = null;
+    let hasInpaintMask = false;
+
+    function ensureInpaintCanvas() {
+        const ic = $('ieInpaintCanvas');
+        if (!ic || !base) return null;
+        if (ic.width !== base.width || ic.height !== base.height) {
+            ic.width = base.width;
+            ic.height = base.height;
+            hasInpaintMask = false;
+        }
+        inpaintCtx = ic.getContext('2d');
+        return inpaintCtx;
+    }
+
+    function clearInpaintMask() {
+        const ic = $('ieInpaintCanvas');
+        if (!ic) return;
+        const c = ic.getContext('2d');
+        c.clearRect(0, 0, ic.width, ic.height);
+        hasInpaintMask = false;
+    }
+
+    function startInpaintBrush(e, p) {
+        if (!base) return;
+        const ic = $('ieInpaintCanvas');
+        if (!ic) return;
+        const c = ensureInpaintCanvas();
+        if (!c) return;
+
+        const size = +$('ieInpaintBrushSize')?.value || 28;
+        c.lineWidth = size;
+        c.lineCap = 'round';
+        c.lineJoin = 'round';
+        c.strokeStyle = 'rgba(244, 63, 94, 0.75)';
+        c.fillStyle = 'rgba(244, 63, 94, 0.75)';
+
+        c.beginPath();
+        c.arc(p.x, p.y, size / 2, 0, Math.PI * 2);
+        c.fill();
+
+        c.beginPath();
+        c.moveTo(p.x, p.y);
+        hasInpaintMask = true;
+
+        function move(ev) {
+            const q = toCanvasCoords(ev);
+            c.lineTo(q.x, q.y);
+            c.stroke();
+            c.beginPath();
+            c.moveTo(q.x, q.y);
+        }
+
+        function up() {
+            document.removeEventListener('mousemove', move);
+            document.removeEventListener('mouseup', up);
+        }
+
+        document.addEventListener('mousemove', move);
+        document.addEventListener('mouseup', up);
+    }
+
+    async function applyInpaint() {
+        if (!base) { toast('Open an image first.', 'warning'); return; }
+        const ic = $('ieInpaintCanvas');
+        if (!ic || !hasInpaintMask) {
+            toast('Paint over the object or blemish you want to erase first.', 'warning');
+            return;
+        }
+
+        const activeChip = document.querySelector('#ieInpaintMethod .ve-chip.active');
+        const method = activeChip ? activeChip.dataset.method : 'telea';
+        const btn = $('ieApplyInpaintBtn');
+        if (btn) btn.disabled = true;
+
+        if (window.ProcessingOverlay) {
+            window.ProcessingOverlay.show({
+                title: 'Magic Eraser',
+                stageText: method === 'ns' ? 'Reconstructing image textures with fluid inpainting…' : 'Synthesizing clean background texture…',
+                category: 'image'
+            });
+            window.ProcessingOverlay.updateProgress(25, 'Analyzing masked object…');
+        } else {
+            showLoading('Erasing object…');
+        }
+
+        try {
+            const beforeBlob = await currentImageBlob();
+
+            // Construct 8-bit binary mask (white on black)
+            const maskCanvas = document.createElement('canvas');
+            maskCanvas.width = base.width;
+            maskCanvas.height = base.height;
+            const mctx = maskCanvas.getContext('2d');
+            mctx.fillStyle = '#000000';
+            mctx.fillRect(0, 0, maskCanvas.width, maskCanvas.height);
+            mctx.drawImage(ic, 0, 0);
+
+            const imgData = mctx.getImageData(0, 0, maskCanvas.width, maskCanvas.height);
+            const d = imgData.data;
+            let maskedPixelCount = 0;
+            for (let i = 0; i < d.length; i += 4) {
+                if (d[i + 3] > 10 && (d[i] > 10 || d[i + 1] > 10 || d[i + 2] > 10)) {
+                    d[i] = 255;
+                    d[i + 1] = 255;
+                    d[i + 2] = 255;
+                    d[i + 3] = 255;
+                    maskedPixelCount++;
+                } else {
+                    d[i] = 0;
+                    d[i + 1] = 0;
+                    d[i + 2] = 0;
+                    d[i + 3] = 255;
+                }
+            }
+            mctx.putImageData(imgData, 0, 0);
+
+            if (maskedPixelCount < 4) {
+                toast('Mask area is too small. Brush over the object and try again.', 'warning');
+                return;
+            }
+
+            const maskBlob = await new Promise(r => maskCanvas.toBlob(r, 'image/png'));
+            const fd = new FormData();
+            fd.append('file', beforeBlob, 'image.png');
+            fd.append('mask', maskBlob, 'mask.png');
+            fd.append('method', method);
+
+            if (window.ProcessingOverlay) {
+                window.ProcessingOverlay.updateProgress(65, 'Synthesizing seamless textures…');
+            }
+
+            const res = await fetch('/image/inpaint', { method: 'POST', body: fd });
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                toast(err.error || 'Magic Eraser failed. Try a smaller stroke or different method.', 'error');
+                return;
+            }
+
+            if (window.ProcessingOverlay) {
+                window.ProcessingOverlay.updateProgress(90, 'Finalizing image…');
+            }
+
+            const afterBlob = await res.blob();
+            const afterURL = URL.createObjectURL(afterBlob);
+            const afterImg = new Image();
+            afterImg.onload = () => {
+                snapshot();
+                setBaseFromImage(afterImg);
+                clearInpaintMask();
+                renderCanvas();
+                URL.revokeObjectURL(afterURL);
+                toast('Object removed with Magic Eraser', 'success');
+            };
+            afterImg.onerror = () => {
+                URL.revokeObjectURL(afterURL);
+                toast('Failed to load inpainted image.', 'error');
+            };
+            afterImg.src = afterURL;
+        } catch (e) {
+            toast('Magic Eraser error: ' + e.message, 'error');
+        } finally {
+            if (window.ProcessingOverlay) {
+                window.ProcessingOverlay.hide();
+            } else {
+                hideLoading();
+            }
+            if (btn) btn.disabled = false;
+        }
+    }
+
+    // ═══════════════════════════════════════
     //  TOOLS
     // ═══════════════════════════════════════
     function setTool(t) {
@@ -569,6 +744,11 @@
         $('ieCropSection').classList.toggle('hidden', t !== 'crop');
         $('ieTextSection').classList.toggle('hidden', t !== 'text');
         $('ieDrawSection').classList.toggle('hidden', t !== 'draw' && t !== 'shape');
+        const inpaintSec = $('ieInpaintSection');
+        if (inpaintSec) inpaintSec.classList.toggle('hidden', t !== 'inpaint');
+        const inpaintCanv = $('ieInpaintCanvas');
+        if (inpaintCanv) inpaintCanv.classList.toggle('hidden', t !== 'inpaint');
+        if (t === 'inpaint') ensureInpaintCanvas();
         if (t === 'crop') startCropTool(); else { cropBox = null; overlay.innerHTML = ''; }
         if (t !== 'move' && t !== 'text') { selectedText = null; renderCanvas(); }
     }
@@ -946,6 +1126,7 @@
         filterName = 'none';
         texts = []; strokes = [];
         selectedText = null;
+        clearInpaintMask();
         undoStack.length = 0; redoStack.length = 0;
         updateUndoButtons();
         syncControls();
@@ -1102,6 +1283,44 @@
         safeBind('ieQuality', 'input', () => { if ($('ieQualityVal')) $('ieQualityVal').textContent = $('ieQuality').value; });
         safeClick('ieDownloadBtn', download);
 
+        // Inpaint controls
+        safeBind('ieInpaintBrushSize', 'input', () => {
+            const v = $('ieInpaintBrushSize').value;
+            if ($('ieInpaintBrushSizeVal')) $('ieInpaintBrushSizeVal').textContent = v;
+        });
+        safeBind('ieInpaintMethod', 'click', e => {
+            const b = e.target.closest('.ve-chip');
+            if (!b) return;
+            document.querySelectorAll('#ieInpaintMethod .ve-chip').forEach(c => c.classList.toggle('active', c === b));
+        });
+        safeClick('ieClearInpaintMaskBtn', clearInpaintMask);
+        safeClick('ieApplyInpaintBtn', applyInpaint);
+
+        // Stage backdrop controls
+        document.querySelectorAll('#ieStageControls .ie-stage-btn').forEach(btn => {
+            btn.onclick = () => {
+                document.querySelectorAll('#ieStageControls .ie-stage-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                const stage = btn.dataset.stage;
+                const stageEl = $('ieStage');
+                if (!stageEl) return;
+                stageEl.classList.remove('stage-dark', 'stage-light');
+                if (stage === 'dark') stageEl.classList.add('stage-dark');
+                else if (stage === 'light') stageEl.classList.add('stage-light');
+            };
+        });
+
+        // Direct mousedown on inpaint canvas
+        const inpaintCanvas = $('ieInpaintCanvas');
+        if (inpaintCanvas) {
+            inpaintCanvas.addEventListener('mousedown', e => {
+                if (tool === 'inpaint') {
+                    const p = toCanvasCoords(e);
+                    startInpaintBrush(e, p);
+                }
+            });
+        }
+
         // Action bar
         safeClick('ieUndoBtn', undo);
         safeClick('ieRedoBtn', redo);
@@ -1127,7 +1346,7 @@
     }
     function closeShortcuts() {
         const ov = $('ieShortcutsOverlay'); if (!ov || ov.classList.contains('hidden')) return;
-        ov.classList.add('hidden');
+        if (ov.classList.add) ov.classList.add('hidden');
         if (shortcutsReturnFocus && document.contains(shortcutsReturnFocus)) shortcutsReturnFocus.focus();
         shortcutsReturnFocus = null;
     }
@@ -1170,9 +1389,24 @@
         if (!base) return;
         if (e.ctrlKey || e.metaKey || e.altKey) return;   // leave Ctrl+C / Ctrl+V etc. to the browser
         if (e.key === 'v' || e.key === 'V') setTool('move');
+        else if (e.key === 'e' || e.key === 'E') setTool('inpaint');
         else if (e.key === 'c' || e.key === 'C') setTool('crop');
         else if (e.key === 't' || e.key === 'T') setTool('text');
         else if (e.key === 'b' || e.key === 'B') setTool('draw');
+        else if (e.key === '[' && tool === 'inpaint') {
+            const sl = $('ieInpaintBrushSize');
+            if (sl) {
+                sl.value = Math.max(4, (+sl.value) - 4);
+                if ($('ieInpaintBrushSizeVal')) $('ieInpaintBrushSizeVal').textContent = sl.value;
+            }
+        }
+        else if (e.key === ']' && tool === 'inpaint') {
+            const sl = $('ieInpaintBrushSize');
+            if (sl) {
+                sl.value = Math.min(160, (+sl.value) + 4);
+                if ($('ieInpaintBrushSizeVal')) $('ieInpaintBrushSizeVal').textContent = sl.value;
+            }
+        }
         else if (e.key === 'Enter' && tool === 'crop' && tag !== 'button') applyCrop();
         else if ((e.key === 'Delete' || e.key === 'Backspace') && selectedText) {
             snapshot(); texts = texts.filter(x => x.id !== selectedText); selectedText = null; editingText = null; renderCanvas();

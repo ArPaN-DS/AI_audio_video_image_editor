@@ -846,6 +846,24 @@
     transform: translateY(-50%);
     pointer-events: none;
 }
+.ve-track::after {
+    content: attr(data-label);
+    position: absolute;
+    top: 4px;
+    right: 8px;
+    padding: 2px 7px;
+    border-radius: var(--radius-xs-token);
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    color: var(--text-3);
+    font-size: var(--text-2xs);
+    font-weight: var(--weight-medium);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    pointer-events: none;
+    z-index: 2;
+    opacity: 0.85;
+}
 
 /* Clips */
 .ve-clip {

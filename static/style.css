@@ -469,6 +469,11 @@ body {
 .audio-body .audio-capabilities { grid-area: caps; }
 .audio-body .transport-bar    { grid-area: transport; }
 .audio-body .waveform-hint    { grid-area: hint; }
+.audio-body .waveform-hint .touch-hint { display: none; }
+@media (hover: none) and (pointer: coarse), (max-width: 768px) {
+    .audio-body .waveform-hint .desktop-hint { display: none; }
+    .audio-body .waveform-hint .touch-hint { display: inline; }
+}
 .audio-body .region-manager   { grid-area: regions; }
 .audio-body .ai-tools-panel   { grid-area: tools; }
 .audio-body .ai-tools-panel.separate-panel { grid-area: separate; }

@@ -62,6 +62,8 @@ Key dependencies include:
 - **ONNX Runtime**: MIT License
 - **rembg**: MIT License
 - **scenedetect**: BSD License
+- **PyAV (`av`)**: PyAV wheels bundle FFmpeg binaries licensed under LGPL v2.1+ or GPL v2+/v3 (depending on whether GPL filters such as `x264` or `postproc` are compiled in). This is relevant if packaging a standalone binary installer: ensure LGPL compliance or provide full source/license terms if redistributing a GPL build.
+- **FFmpeg**: Executable / library used for media decoding and muxing. Under LGPL v2.1+ by default, or GPL v2+/v3 when compiled with GPL flags (`--enable-gpl`). Standalone distribution must respect corresponding redistribution terms.
 
 ## AI Models (Auto-Downloaded on First Use)
 

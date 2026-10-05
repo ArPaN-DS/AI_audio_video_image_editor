@@ -24,9 +24,15 @@
     <!-- Drag & drop target (shown by agent.js while a file is dragged over the window) -->
     <div id="dragOverlay" class="window-drag-overlay" aria-hidden="true">
         <div class="drag-overlay-card">
-            <div class="drag-overlay-icon"><i class="fas fa-arrow-up-from-bracket" aria-hidden="true"></i></div>
-            <div class="drag-overlay-text">Drop to attach</div>
-            <div class="drag-overlay-hint">Video, audio or image — MP4, MOV, MP3, WAV, PNG, JPG</div>
+            <div class="drag-overlay-glow"></div>
+            <div class="drag-overlay-icon"><i class="fas fa-cloud-arrow-up" aria-hidden="true"></i></div>
+            <div class="drag-overlay-text">Drop media to edit with AI</div>
+            <div class="drag-overlay-hint">Images, Video, or Audio — 100% Local GPU Processing</div>
+            <div class="drag-overlay-pills">
+                <span class="drag-pill"><i class="fas fa-image"></i> Photos</span>
+                <span class="drag-pill"><i class="fas fa-film"></i> Video</span>
+                <span class="drag-pill"><i class="fas fa-wave-square"></i> Audio</span>
+            </div>
         </div>
     </div>
 
@@ -54,16 +60,21 @@
 
             <!-- File currently in context (agent.js toggles display) -->
             <section id="activeMediaBox" class="active-media-box" aria-label="Current file" style="display: none;">
-                <div class="active-media-icon" aria-hidden="true">
+                <div class="active-media-thumb" id="activeMediaThumb" aria-hidden="true">
                     <i class="fas fa-file-waveform"></i>
                 </div>
                 <div class="active-media-details">
                     <div id="activeMediaName" class="active-media-name">file.mp4</div>
                     <div id="activeMediaMeta" class="active-media-meta">VIDEO • 12 MB</div>
                 </div>
-                <button type="button" id="removeActiveMediaBtn" class="active-media-remove" aria-label="Remove current file" title="Remove current file">
-                    <i class="fas fa-xmark" aria-hidden="true"></i>
-                </button>
+                <div class="active-media-actions">
+                    <button type="button" id="inspectActiveMediaBtn" class="active-media-action-btn" aria-label="Inspect media in lightbox" title="Inspect media">
+                        <i class="fas fa-expand" aria-hidden="true"></i>
+                    </button>
+                    <button type="button" id="removeActiveMediaBtn" class="active-media-remove" aria-label="Remove current file" title="Remove current file">
+                        <i class="fas fa-xmark" aria-hidden="true"></i>
+                    </button>
+                </div>
             </section>
 
             <nav class="sessions-list-container" aria-labelledby="sessionsHeading">
@@ -138,16 +149,42 @@
                     <div class="input-capsule">
                         <!-- File attached to the next message (agent.js toggles display) -->
                         <div id="pendingAttachmentCard" class="pending-attachment-card" style="display: none;">
-                            <div class="pending-file-info">
-                                <div class="pending-file-badge" aria-hidden="true"><i class="fas fa-paperclip"></i></div>
-                                <div class="pending-file-text">
-                                    <div id="pendingFileName" class="pending-file-name">example.mp4</div>
-                                    <div id="pendingFileSize" class="pending-file-size">14.2 MB</div>
+                            <div class="pending-attachment-body">
+                                <div class="pending-file-info">
+                                    <div id="pendingFileThumb" class="pending-file-thumb" aria-hidden="true">
+                                        <i class="fas fa-paperclip"></i>
+                                    </div>
+                                    <div class="pending-file-text">
+                                        <div class="pending-file-name-row">
+                                            <div id="pendingFileName" class="pending-file-name">example.mp4</div>
+                                            <span id="pendingTypeBadge" class="pending-type-badge">IMAGE</span>
+                                        </div>
+                                        <div id="pendingFileSize" class="pending-file-size">14.2 MB</div>
+                                    </div>
+                                </div>
+                                <div id="uploadProgressContainer" class="upload-progress-container" style="display: none;">
+                                    <div class="upload-progress-bar-track">
+                                        <div id="uploadProgressFill" class="upload-progress-bar-fill" style="width: 0%;"></div>
+                                    </div>
+                                    <div class="upload-progress-meta">
+                                        <span id="uploadProgressPercent">0%</span>
+                                        <span class="upload-progress-bullet">·</span>
+                                        <span id="uploadProgressTransferred">0 MB / 0 MB</span>
+                                        <span class="upload-progress-bullet">·</span>
+                                        <span id="uploadProgressSpeed">0 MB/s</span>
+                                        <span class="upload-progress-bullet">·</span>
+                                        <span id="uploadProgressEta">Uploading...</span>
+                                    </div>
                                 </div>
                             </div>
-                            <button type="button" id="removePendingBtn" class="remove-attachment-btn" aria-label="Remove attached file" title="Remove attached file">
-                                <i class="fas fa-xmark" aria-hidden="true"></i>
-                            </button>
+                            <div class="pending-card-actions">
+                                <button type="button" id="previewPendingBtn" class="preview-attachment-btn" title="Inspect / Preview file" aria-label="Inspect file">
+                                    <i class="fas fa-expand" aria-hidden="true"></i>
+                                </button>
+                                <button type="button" id="removePendingBtn" class="remove-attachment-btn" aria-label="Remove attached file" title="Remove attached file">
+                                    <i class="fas fa-xmark" aria-hidden="true"></i>
+                                </button>
+                            </div>
                         </div>
 
                         <input type="file" id="filePicker" class="sr-only" tabindex="-1" aria-hidden="true" accept="audio/*,video/*,image/*">
@@ -225,6 +262,65 @@
                     <dd><kbd>?</kbd></dd>
                 </div>
             </dl>
+        </div>
+    </div>
+
+    <!-- ─── Cinema-Grade Studio Media Inspector Lightbox ─── -->
+    <div id="mediaInspectorModal" class="media-inspector-modal hidden" role="dialog" aria-modal="true" aria-labelledby="inspectorTitle">
+        <div class="inspector-backdrop" id="inspectorBackdrop"></div>
+        <div class="inspector-container">
+            <header class="inspector-header">
+                <div class="inspector-header-left">
+                    <span class="inspector-type-badge" id="inspectorTypeBadge">IMAGE</span>
+                    <h3 class="inspector-title" id="inspectorTitle">media_preview.png</h3>
+                    <span class="inspector-meta-badge" id="inspectorMetaBadge">1920×1080 • 2.4 MB</span>
+                </div>
+                <div class="inspector-header-center">
+                    <!-- Background stage selector for transparency inspection -->
+                    <div class="inspector-stage-selector" id="inspectorStageSelector" title="Stage background">
+                        <button type="button" class="stage-btn active" data-stage="checker" title="Checkerboard (Transparency)"><i class="fas fa-border-all"></i></button>
+                        <button type="button" class="stage-btn" data-stage="dark" title="Dark Slate Studio"><i class="fas fa-circle" style="color:#0f172a"></i></button>
+                        <button type="button" class="stage-btn" data-stage="light" title="Crisp White"><i class="fas fa-circle" style="color:#ffffff"></i></button>
+                        <button type="button" class="stage-btn" data-stage="accent" title="High Contrast Magenta"><i class="fas fa-circle" style="color:#ec4899"></i></button>
+                    </div>
+                    <!-- Zoom controls -->
+                    <div class="inspector-zoom-tools" id="inspectorZoomTools">
+                        <button type="button" class="zoom-btn" id="inspectorZoomOut" title="Zoom out (-)"><i class="fas fa-minus"></i></button>
+                        <span class="zoom-display" id="inspectorZoomLevel">100%</span>
+                        <button type="button" class="zoom-btn" id="inspectorZoomIn" title="Zoom in (+)"><i class="fas fa-plus"></i></button>
+                        <button type="button" class="zoom-btn" id="inspectorZoomReset" title="Fit to screen (0)"><i class="fas fa-compress"></i></button>
+                    </div>
+                </div>
+                <div class="inspector-header-right">
+                    <button type="button" class="inspector-tool-btn" id="inspectorCopyBtn" title="Copy to clipboard">
+                        <i class="fas fa-copy"></i> <span>Copy</span>
+                    </button>
+                    <a href="#" download id="inspectorDownloadBtn" class="inspector-tool-btn inspector-btn-primary" title="Download export">
+                        <i class="fas fa-download"></i> <span>Download</span>
+                    </a>
+                    <button type="button" class="inspector-close-btn" id="inspectorCloseBtn" title="Close (Esc)" aria-label="Close inspector">
+                        <i class="fas fa-xmark"></i>
+                    </button>
+                </div>
+            </header>
+
+            <div class="inspector-viewport" id="inspectorViewport">
+                <div class="inspector-canvas-wrap" id="inspectorCanvasWrap">
+                    <!-- Media element or comparison injected by JS -->
+                </div>
+            </div>
+
+            <footer class="inspector-footer">
+                <div class="inspector-nav-hints">
+                    <span><kbd>Scroll</kbd> or <kbd>+/-</kbd> to zoom</span>
+                    <span><kbd>Drag</kbd> to pan</span>
+                    <span id="inspectorCompareHint" style="display:none;"><kbd>Space</kbd> hold to compare</span>
+                    <span><kbd>Esc</kbd> to close</span>
+                </div>
+                <div class="inspector-quick-actions" id="inspectorQuickActions">
+                    <!-- Actions like 'Open in Studio', 'Open in Image Editor' injected dynamically -->
+                </div>
+            </footer>
         </div>
     </div>
 

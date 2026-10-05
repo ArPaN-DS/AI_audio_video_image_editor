@@ -52,6 +52,7 @@
             <!-- LEFT TOOL RAIL -->
             <aside class="ie-toolbar" id="ieToolbar" role="toolbar" aria-label="Tools">
                 <button type="button" class="ie-tool active" data-tool="move" title="Move and select (V)" aria-keyshortcuts="V"><i class="fas fa-arrow-pointer" aria-hidden="true"></i><span>Move</span></button>
+                <button type="button" class="ie-tool" data-tool="inpaint" title="Magic Eraser: remove objects and blemishes (E)" aria-keyshortcuts="E"><i class="fas fa-wand-magic-sparkles" aria-hidden="true"></i><span>Erase</span></button>
                 <button type="button" class="ie-tool" data-tool="crop" title="Crop (C)" aria-keyshortcuts="C"><i class="fas fa-crop-simple" aria-hidden="true"></i><span>Crop</span></button>
                 <button type="button" class="ie-tool" data-tool="text" title="Text (T)" aria-keyshortcuts="T"><i class="fas fa-font" aria-hidden="true"></i><span>Text</span></button>
                 <button type="button" class="ie-tool" data-tool="draw" title="Draw (B)" aria-keyshortcuts="B"><i class="fas fa-pen" aria-hidden="true"></i><span>Draw</span></button>
@@ -60,8 +61,14 @@
 
             <!-- CANVAS STAGE -->
             <section class="ie-stage" id="ieStage" aria-label="Canvas">
+                <div class="ie-stage-controls" id="ieStageControls">
+                    <button type="button" class="ie-stage-btn active" data-stage="checker" title="Checkerboard (Transparent)"><i class="fas fa-border-all"></i></button>
+                    <button type="button" class="ie-stage-btn" data-stage="dark" title="Dark Studio"><i class="fas fa-circle" style="color:#0f172a"></i></button>
+                    <button type="button" class="ie-stage-btn" data-stage="light" title="Crisp White"><i class="fas fa-circle" style="color:#ffffff"></i></button>
+                </div>
                 <div class="ie-canvas-wrap" id="ieCanvasWrap">
                     <canvas id="ieCanvas" aria-label="Image being edited" role="img"></canvas>
+                    <canvas id="ieInpaintCanvas" class="ie-inpaint-canvas hidden" aria-hidden="true"></canvas>
                     <div class="ie-overlay" id="ieOverlay"></div>
                 </div>
                 <div class="ie-empty" id="ieCanvasPlaceholder">
@@ -154,6 +161,29 @@
                     </div>
                     <div class="ve-chip-row ie-row-gap">
                         <button type="button" class="ve-chip active" id="ieShapeFill" data-toggle title="Fill rectangles and ellipses"><i class="fas fa-fill-drip" aria-hidden="true"></i> Filled</button>
+                    </div>
+                </div>
+
+                <!-- CONTEXTUAL: MAGIC ERASER (OBJECT REMOVAL) -->
+                <div class="ie-section ie-section-context hidden" id="ieInpaintSection">
+                    <div class="ie-section-head">
+                        <h2 class="ie-section-title">Magic Eraser</h2>
+                        <span class="ie-section-note"><i class="fas fa-lock" aria-hidden="true"></i> Local AI</span>
+                    </div>
+                    <div class="ie-slider">
+                        <label for="ieInpaintBrushSize">Brush size</label>
+                        <input type="range" id="ieInpaintBrushSize" class="styled-range" min="4" max="160" value="28">
+                        <span class="ve-value" id="ieInpaintBrushSizeVal">28</span>
+                    </div>
+                    <span class="ie-mini-label">Fill method</span>
+                    <div class="ve-chip-row ve-seg" id="ieInpaintMethod" role="group">
+                        <button type="button" class="ve-chip active" data-method="telea" title="Fast texture diffusion">Smooth</button>
+                        <button type="button" class="ve-chip" data-method="ns" title="Navier-Stokes fluid inpainting">Detail</button>
+                    </div>
+                    <small class="ve-hint">Paint over unwanted objects, people, power lines or blemishes to erase them.</small>
+                    <div class="ie-btn-pair">
+                        <button type="button" class="ie-btn" id="ieClearInpaintMaskBtn">Clear mask</button>
+                        <button type="button" class="ie-btn ie-btn-primary" id="ieApplyInpaintBtn"><i class="fas fa-wand-magic-sparkles" aria-hidden="true"></i> Remove object</button>
                     </div>
                 </div>
 

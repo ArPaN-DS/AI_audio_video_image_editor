@@ -59,6 +59,53 @@ class JobCancelled(RuntimeError):
     """The job was cancelled (by request or by its run-time limit)."""
 
 
+class CancellationToken:
+    """Cancellation shared by a background request and its admitted operations."""
+    def __init__(self):
+        self._event = threading.Event()
+        self._lock = threading.Lock()
+        self._hooks = []
+
+    def check_cancelled(self):
+        if self._event.is_set():
+            raise JobCancelled(CANCELLED_MESSAGE)
+
+    def add_cancel_hook(self, hook):
+        with self._lock:
+            cancelled = self._event.is_set()
+            if not cancelled:
+                self._hooks.append(hook)
+        if cancelled:
+            _safe_call(hook)
+        def remove():
+            with self._lock:
+                if hook in self._hooks:
+                    self._hooks.remove(hook)
+        return remove
+
+    def cancel(self):
+        with self._lock:
+            self._event.set()
+            hooks, self._hooks = self._hooks, []
+        for hook in hooks:
+            _safe_call(hook)
+
+
+_cancellation_local = threading.local()
+
+
+@contextmanager
+def cancellation_scope(token):
+    previous = getattr(_cancellation_local, 'token', None)
+    _cancellation_local.token = token
+    try:
+        token.check_cancelled()
+        yield
+        token.check_cancelled()
+    finally:
+        _cancellation_local.token = previous
+
+
 def _env_int(env, key, default):
     try:
         value = int(str(env.get(key, "")).strip())
@@ -237,6 +284,7 @@ class JobScheduler:
         free up within ``timeout`` seconds and ``JobCancelled`` if cancelled
         while queued.
         """
+        self.checkpoint()
         outer = self.current_job()
         if outer is not None or self._model_lock_owned():
             # Re-entrant (nested call inside an admitted job) or the caller
@@ -246,6 +294,8 @@ class JobScheduler:
             return
         classes = tuple(c for c in (classes or ()) if c in self._slots) or ("cpu",)
         job = self._enqueue(name, classes, ram_gb, vram_gb)
+        token = getattr(_cancellation_local, 'token', None)
+        remove_cancel = token.add_cancel_hook(job.cancel) if token else (lambda: None)
         timer = None
         try:
             self._wait_for_admission(job, self.queue_timeout() if timeout is None else timeout)
@@ -263,6 +313,7 @@ class JobScheduler:
             finally:
                 stack.pop()
         finally:
+            remove_cancel()
             if timer is not None:
                 timer.cancel()
             self._release(job)
@@ -354,6 +405,9 @@ class JobScheduler:
     # ── cooperation helpers ───────────────────────────────────────────
     def checkpoint(self):
         """Raise JobCancelled if the calling thread's job was cancelled."""
+        token = getattr(_cancellation_local, 'token', None)
+        if token is not None:
+            token.check_cancelled()
         job = self.current_job()
         if job is not None:
             job.check_cancelled()
@@ -368,7 +422,9 @@ class JobScheduler:
 
     def add_cancel_hook(self, hook):
         job = self.current_job()
-        return job.add_cancel_hook(hook) if job is not None else (lambda: None)
+        token = getattr(_cancellation_local, 'token', None)
+        owner = job or token
+        return owner.add_cancel_hook(hook) if owner is not None else (lambda: None)
 
     def active_count(self, name):
         with self._cond:

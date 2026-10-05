@@ -43,13 +43,24 @@ FONT_CANDIDATES = [
 
 def _run(cmd, timeout=1800):
     """Run an ffmpeg/ffprobe command; raise with stderr tail on failure."""
-    proc = subprocess.run(
-        cmd, capture_output=True, text=True, timeout=timeout,
-        encoding="utf-8", errors="replace"
-    )
+    import job_scheduler
+    job_scheduler.checkpoint()
+    child = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                             text=True, encoding="utf-8", errors="replace")
+    remove = job_scheduler.global_job_scheduler.add_cancel_hook(child.kill)
+    try:
+        try:
+            stdout, stderr = child.communicate(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            child.kill()
+            child.communicate()
+            raise RuntimeError("The media operation exceeded its time limit.") from None
+        job_scheduler.checkpoint()
+        proc = subprocess.CompletedProcess(cmd, child.returncode, stdout, stderr)
+    finally:
+        remove()
     if proc.returncode != 0:
-        tail = (proc.stderr or "")[-1200:]
-        raise RuntimeError(f"FFmpeg failed (code {proc.returncode}):\n{tail}")
+        raise RuntimeError("The media operation could not be completed. Check the source file and settings.")
     return proc
 
 

@@ -221,6 +221,13 @@ TOOL_SPECS = [
 ]
 
 TOOL_REGISTRY = {spec.name: spec for spec in TOOL_SPECS}
+for _name in SOUNDTRACK_EFFECTS:
+    TOOL_REGISTRY[_name].params.update({
+        'range_start_sec': Param('number', None, minimum=0, unit=_TIME, nullable=True,
+                                out_of_range='clarify'),
+        'range_end_sec': Param('number', None, minimum=0, unit=_TIME, nullable=True,
+                              out_of_range='clarify'),
+    })
 AGENT_FOR_TOOL = {spec.name: spec.agent for spec in TOOL_SPECS}
 
 # Names a reasoning model (or older clients) may use for a registered tool.
@@ -956,6 +963,12 @@ def validate_args(spec, args, state, strict=False):
 
 def _check_semantics(spec, args, state, notes, strict):
     duration = state.duration
+    start, end = args.get('range_start_sec'), args.get('range_end_sec')
+    if start is not None or end is not None:
+        if start is None or end is None or end <= start or (duration and end > duration):
+            if strict:
+                raise ValueError('Choose a valid effect range within the media duration.')
+            raise Clarify('Which time range should receive the effect?', ['Apply the effect from 2 to 5 seconds'])
     if spec.name in ('trim_video', 'trim_audio'):
         keep_last = args.pop('keep_last_sec', None)
         if keep_last is not None:
@@ -1069,6 +1082,13 @@ def _is_number_grounded(value, prompt_lower):
 
 def _check_grounding(spec, clean_args, prompt, state):
     prompt_lower = (prompt or '').lower()
+    if any(key in clean_args for key in ('range_start_sec', 'range_end_sec')):
+        from agent_nlu import find_range
+        requested = find_range(prompt_lower)
+        if requested is None or any(abs(clean_args[key] - requested[index]) > 0.001
+                                    for index, key in enumerate(('range_start_sec', 'range_end_sec'))
+                                    if key in clean_args):
+            return Clarify('Which time range should receive the effect?', ['Apply the effect from 2 to 5 seconds'])
 
     # 1. Number grounding check for required parameters without defaults
     for key, value in clean_args.items():

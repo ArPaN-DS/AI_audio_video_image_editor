@@ -167,9 +167,11 @@ class _SequentialReader:
 
 
 def _iter_blocks(source, block=BLOCK_FRAMES):
+    from job_scheduler import checkpoint
     reader = source.reader()
     try:
         for start in range(0, source.frames, block):
+            checkpoint()
             yield start, reader.read(start, min(source.frames, start + block))
     finally:
         reader.close()

@@ -14,7 +14,9 @@ The app checks temporary storage at most once every five minutes when opening
 the landing hub, Copilot, or Pro Studio. Unreferenced uploads, rendered stems,
 and thumbnails become eligible for removal after one hour. Recent files remain
 available. Media and thumbnails referenced by saved projects remain available
-regardless of age.
+regardless of age. Forensic case records, evidence files, case workspaces,
+intake hashes, and audit logs are permanently protected and never deleted by
+automatic temporary storage cleanup.
 
 Project saves replace the previous file only after the new state has been
 written successfully. Cleanup and saves coordinate so cleanup cannot inspect a

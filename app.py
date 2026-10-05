@@ -263,6 +263,10 @@ def _cleanup_old_temp_files(max_age_seconds=3600):
             return
         protected_files, protected_directories = references
         now = time.time()
+        _forensic_dirs = {'cases', 'forensic', 'forensics', 'evidence'}
+        _forensic_pattern = re.compile(r'^(case[s_-]|forensic[s_-]|evidence[s_-]|\.case|\.evidence)', re.IGNORECASE)
+        _forensic_exts = ('.case', '.evidence', '.audit', '.exhibit')
+
         for folder in [app.config['UPLOAD_FOLDER'], app.config['PROCESSED_FOLDER']]:
             folder = os.path.realpath(folder)
             if not os.path.exists(folder):
@@ -270,6 +274,10 @@ def _cleanup_old_temp_files(max_age_seconds=3600):
             for root, directories, files in os.walk(folder, topdown=False, followlinks=False):
                 resolved_root = os.path.realpath(root)
                 if os.path.commonpath([folder, resolved_root]) != folder:
+                    continue
+                rel_root = os.path.relpath(resolved_root, folder).replace('\\', '/')
+                path_parts = [p.lower() for p in rel_root.split('/') if p and p != '.']
+                if any(p in _forensic_dirs or _forensic_pattern.match(p) for p in path_parts):
                     continue
                 if any(resolved_root == protected or resolved_root.startswith(protected + os.sep)
                        for protected in protected_directories):
@@ -282,6 +290,8 @@ def _cleanup_old_temp_files(max_age_seconds=3600):
                     filepath = os.path.join(root, filename)
                     try:
                         if os.path.islink(filepath) or os.path.realpath(filepath) in protected_files:
+                            continue
+                        if _forensic_pattern.match(filename) or filename.lower().endswith(_forensic_exts):
                             continue
                         if os.path.isfile(filepath) and now - os.path.getmtime(filepath) > max_age_seconds:
                             os.remove(filepath)
@@ -547,27 +557,17 @@ def agent_get_tools():
     })
 
 
-@app.route('/api/agent/upload', methods=['POST'])
-def agent_upload_media():
-    """Direct upload endpoint for AI Agent Full Window workspace."""
-    if 'file' not in request.files:
-        return jsonify({"error": "No file uploaded"}), 400
-    file = request.files['file']
-    if not file or file.filename == '':
-        return jsonify({"error": "No file selected"}), 400
-    if not allowed_file(file.filename):
-        return jsonify({'error': 'Choose a supported audio, video, or image file.'}), 400
-
-    unique_id = str(uuid.uuid4())
-    orig_ext = os.path.splitext(file.filename)[1].lower() or '.bin'
-    saved_filename = f"agent_{unique_id}{orig_ext}"
-    saved_path = os.path.join(app.config['UPLOAD_FOLDER'], saved_filename)
-    file.save(saved_path)
-
-    file_size = os.path.getsize(saved_path)
+def _process_and_register_uploaded_media(saved_path, original_filename):
+    """Common media verification, probing, and registration for direct and chunked uploads."""
+    file_size = os.path.getsize(saved_path) if os.path.exists(saved_path) else 0
     if not file_size:
-        os.remove(saved_path)
+        if os.path.exists(saved_path):
+            os.remove(saved_path)
         return jsonify({'error': 'The uploaded media file is empty.'}), 400
+
+    orig_ext = os.path.splitext(original_filename)[1].lower() or '.bin'
+    saved_filename = os.path.basename(saved_path)
+
     try:
         if orig_ext[1:] in ALLOWED_EXTENSIONS['image']:
             with warnings.catch_warnings():
@@ -602,12 +602,135 @@ def agent_upload_media():
         "status": "success",
         "id": saved_filename,
         "filename": saved_filename,
-        "original_name": file.filename,
+        "original_name": original_filename,
         "type": file_type,
         "size": file_size,
-        "url": f"/media/{saved_filename}"
-        , **metadata
+        "url": f"/media/{saved_filename}",
+        **metadata
     })
+
+
+@app.route('/api/agent/upload', methods=['POST'])
+def agent_upload_media():
+    """Direct upload endpoint for AI Agent Full Window workspace."""
+    if 'file' not in request.files:
+        return jsonify({"error": "No file uploaded"}), 400
+    file = request.files['file']
+    if not file or file.filename == '':
+        return jsonify({"error": "No file selected"}), 400
+    if not allowed_file(file.filename):
+        return jsonify({'error': 'Choose a supported audio, video, or image file.'}), 400
+
+    unique_id = str(uuid.uuid4())
+    orig_ext = os.path.splitext(file.filename)[1].lower() or '.bin'
+    saved_filename = f"agent_{unique_id}{orig_ext}"
+    saved_path = os.path.join(app.config['UPLOAD_FOLDER'], saved_filename)
+    file.save(saved_path)
+
+    return _process_and_register_uploaded_media(saved_path, file.filename)
+
+
+@app.route('/api/agent/upload/chunk', methods=['POST'])
+def agent_upload_chunk():
+    """Receives an individual chunk of a large media upload for resilient network transfers."""
+    if 'file' not in request.files:
+        return jsonify({"error": "No chunk payload received"}), 400
+    chunk = request.files['file']
+    upload_id = request.form.get('upload_id', '').strip()
+    if not upload_id or not re.match(r'^[a-zA-Z0-9_\-]+$', upload_id):
+        return jsonify({"error": "Invalid upload session identifier"}), 400
+
+    filename = request.form.get('filename', '').strip()
+    if not filename or not allowed_file(filename):
+        return jsonify({"error": "Unsupported media format"}), 400
+
+    try:
+        chunk_index = int(request.form.get('chunk_index', -1))
+        total_chunks = int(request.form.get('total_chunks', 0))
+    except (ValueError, TypeError):
+        return jsonify({"error": "Invalid chunk coordinates"}), 400
+
+    if chunk_index < 0 or total_chunks <= 0 or chunk_index >= total_chunks:
+        return jsonify({"error": "Chunk index out of bounds"}), 400
+
+    chunk_dir = os.path.join(app.config['UPLOAD_FOLDER'], '.chunks', upload_id)
+    os.makedirs(chunk_dir, exist_ok=True)
+
+    chunk_path = os.path.join(chunk_dir, f"part_{chunk_index:05d}.chunk")
+    chunk.save(chunk_path)
+    received_bytes = os.path.getsize(chunk_path)
+
+    return jsonify({
+        "status": "chunk_received",
+        "upload_id": upload_id,
+        "chunk_index": chunk_index,
+        "total_chunks": total_chunks,
+        "received_bytes": received_bytes
+    })
+
+
+@app.route('/api/agent/upload/complete', methods=['POST'])
+def agent_upload_complete():
+    """Stitches verified upload chunks into final media file and runs probe/perception."""
+    data = request.get_json(silent=True) or {}
+    upload_id = str(data.get('upload_id') or '').strip()
+    filename = str(data.get('filename') or '').strip()
+    try:
+        total_chunks = int(data.get('total_chunks', 0))
+    except (ValueError, TypeError):
+        total_chunks = 0
+
+    if not upload_id or not re.match(r'^[a-zA-Z0-9_\-]+$', upload_id):
+        return jsonify({"error": "Invalid upload session identifier"}), 400
+    if not filename or not allowed_file(filename):
+        return jsonify({"error": "Unsupported media file format"}), 400
+    if total_chunks <= 0:
+        return jsonify({"error": "Invalid total chunks count"}), 400
+
+    chunk_dir = os.path.join(app.config['UPLOAD_FOLDER'], '.chunks', upload_id)
+    if not os.path.isdir(chunk_dir):
+        return jsonify({"error": "Upload session not found or already completed"}), 404
+
+    # Verify all parts exist before stitching
+    for i in range(total_chunks):
+        part_path = os.path.join(chunk_dir, f"part_{i:05d}.chunk")
+        if not os.path.exists(part_path):
+            return jsonify({"error": f"Missing chunk part {i} of {total_chunks}. Please retry."}), 400
+
+    orig_ext = os.path.splitext(filename)[1].lower() or '.bin'
+    saved_filename = f"agent_{uuid.uuid4()}{orig_ext}"
+    saved_path = os.path.join(app.config['UPLOAD_FOLDER'], saved_filename)
+
+    try:
+        with open(saved_path, 'wb') as outfile:
+            for i in range(total_chunks):
+                part_path = os.path.join(chunk_dir, f"part_{i:05d}.chunk")
+                with open(part_path, 'rb') as infile:
+                    while True:
+                        buf = infile.read(1024 * 1024)
+                        if not buf:
+                            break
+                        outfile.write(buf)
+    except Exception as exc:
+        if os.path.exists(saved_path):
+            os.remove(saved_path)
+        return jsonify({"error": f"Failed to assemble media upload: {exc}"}), 500
+    finally:
+        shutil.rmtree(chunk_dir, ignore_errors=True)
+
+    return _process_and_register_uploaded_media(saved_path, filename)
+
+
+@app.route('/api/agent/upload/abort', methods=['POST'])
+def agent_upload_abort():
+    """Cancels and purges temporary chunks for an aborted upload."""
+    data = request.get_json(silent=True) or {}
+    upload_id = str(data.get('upload_id') or '').strip()
+    if upload_id and re.match(r'^[a-zA-Z0-9_\-]+$', upload_id):
+        chunk_dir = os.path.join(app.config['UPLOAD_FOLDER'], '.chunks', upload_id)
+        if os.path.isdir(chunk_dir):
+            shutil.rmtree(chunk_dir, ignore_errors=True)
+    return jsonify({"status": "aborted", "upload_id": upload_id})
 
 
 @app.route('/api/agent/chat', methods=['POST'])
@@ -1268,6 +1391,9 @@ def ai_enhance_speech():
             download_name=f"enhanced_{base_name}.wav"
         )
         resp.headers['X-Enhance-Engine'] = res.get('engine', 'unknown')
+        if res.get('fallback'):
+            resp.headers['X-Enhance-Fallback'] = 'true'
+            resp.headers['X-Enhance-Note'] = res.get('note', '')
         return resp
     except Exception as e:
         return jsonify({"error": str(e)}), 500

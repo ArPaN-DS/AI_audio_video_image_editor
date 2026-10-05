@@ -203,7 +203,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         msgDiv.innerHTML = `
-            <div class="agent-avatar"><i class="fa-solid fa-robot"></i></div>
+            <div class="agent-avatar"><i class="fa-solid fa-brain"></i></div>
             <div class="msg-bubble">
                 ${thoughtHtml}
                 <p class="reply-text">${escapeHtml(replyText)}</p>

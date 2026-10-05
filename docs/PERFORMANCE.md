@@ -6,6 +6,23 @@ This document details the resource management, admission control, and performanc
 
 ## 1. Resource Governance Architecture
 
+### Optional accelerator runtime
+
+Accelerator support is installed explicitly into the project's virtual environment;
+it is never installed or downloaded by the running app. On this workstation the
+existing 2.13.0 runtime is retained, with the GPU-enabled build selected:
+
+```powershell
+venv\Scripts\python.exe -m pip install --no-deps --upgrade "https://download.pytorch.org/whl/cu130/torch-2.13.0%2Bcu130-cp311-cp311-win_amd64.whl"
+venv\Scripts\python.exe -m unittest test_resource_governor.InstalledGpuRuntimeTests
+```
+
+The hardware regression test executes a small arithmetic operation on the device
+and checks that its allocated memory is released. It skips on machines without an
+available accelerator; CPU fallbacks remain covered by the governor tests. No model
+weights are downloaded by this installation or check. Restart the local app after
+changing the runtime so its processes use the newly installed build.
+
 Media Studio enforces strict hardware limits to prevent Out-Of-Memory (OOM) crashes, CPU starvation, and UI freezes during concurrent usage:
 
 ### A. Single-Active-Model Lifecycle (`model_manager.py`)

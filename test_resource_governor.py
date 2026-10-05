@@ -474,6 +474,32 @@ class ProcessorIntegrationTests(unittest.TestCase):
         self.assertEqual(names, [ai_processor._MODEL_CASCADE[-1]["name"]])
 
 
+class InstalledGpuRuntimeTests(unittest.TestCase):
+    def test_accelerator_executes_and_releases_memory(self):
+        """Exercise the installed runtime on real hardware without loading a model."""
+        code = """
+import gc
+import torch
+if not torch.cuda.is_available():
+    raise SystemExit(77)
+device = torch.device('cuda')
+baseline = torch.cuda.memory_allocated(device)
+x = torch.arange(1024, device=device, dtype=torch.float32)
+y = x * 2 + 1
+torch.cuda.synchronize(device)
+assert float(y[-1].cpu()) == 2047.0
+del x, y
+gc.collect()
+torch.cuda.empty_cache()
+assert torch.cuda.memory_allocated(device) == baseline
+"""
+        result = subprocess.run([sys.executable, "-c", code], capture_output=True,
+                                text=True, cwd=WORKSPACE_DIR, timeout=90)
+        if result.returncode == 77:
+            self.skipTest("Optional accelerator is not available on this machine")
+        self.assertEqual(result.returncode, 0, "Accelerator execution or memory release failed")
+
+
 class PublicSurfaceTests(unittest.TestCase):
 
     def test_status_endpoints_are_public_safe(self):

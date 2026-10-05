@@ -777,6 +777,66 @@ CAPABILITIES_REPLY = (
 )
 
 KNOWLEDGE = [
+    (r'\b(?:mp3 (?:vs\.?|versus|or|and) wav|wav (?:vs\.?|versus|or|and) mp3|difference between (?:mp3 and wav|wav and mp3))\b',
+     "WAV is uncompressed, lossless studio audio with bit-perfect fidelity, best for editing and master recordings. "
+     "MP3 is compressed lossy audio that reduces file size by ~90% while keeping great listening quality, ideal for sharing and web playback.",
+     ['Convert to WAV', 'Export as MP3']),
+    (r'\b(?:mp4 (?:vs\.?|versus|or|and) webm|webm (?:vs\.?|versus|or|and) mp4|difference between (?:mp4 and webm|webm and mp4))\b',
+     "MP4 offers universal compatibility across all devices, browsers, and video editors. WebM is open-source, royalty-free, "
+     "and yields smaller file sizes for modern web streaming, but is less supported on older hardware.",
+     ['Convert to WebM', 'Convert to MP4']),
+    (r'\b(?:png (?:vs\.?|versus|or|and) jpg|jpg (?:vs\.?|versus|or|and) png|png (?:vs\.?|versus|or|and) jpeg|jpeg (?:vs\.?|versus|or|and) png)\b',
+     "JPG uses lossy compression best for photos and rich color gradients. PNG uses lossless compression with alpha channel "
+     "transparency, ideal for graphics, logos, and cutouts after background removal.",
+     ['Remove image background', 'Export as PNG']),
+    (r'\b(?:flac (?:vs\.?|versus|or|and) wav|wav (?:vs\.?|versus|or|and) flac)\b',
+     "Both WAV and FLAC are 100% lossless. FLAC compresses the audio data by ~50% without discarding any sonic detail, "
+     "while WAV stores raw uncompressed PCM data with faster sample seeking in DAWs.",
+     ['Convert to WAV', 'Inspect this file']),
+    (r'\b(?:aac (?:vs\.?|versus|or|and) mp3|mp3 (?:vs\.?|versus|or|and) aac)\b',
+     "AAC is a newer, higher-efficiency codec than MP3. At identical bitrates, AAC provides cleaner high frequencies "
+     "and less compression artifacting, and is the default audio codec for MP4 video and streaming.",
+     ['Export as MP3', 'Inspect this file']),
+    (r'\b(?:what is |what\'s )?mp3\b',
+     "MP3 (MPEG-1 Audio Layer III) is the world's most widely recognized lossy audio format. It compresses audio files by ~90% "
+     "relative to uncompressed CD audio (WAV) while retaining clear listening fidelity, typically encoded at 128 to 320 kbps.",
+     ['Export as MP3', 'Convert to WAV']),
+    (r'\b(?:what is |what\'s )?wav\b',
+     "WAV (Waveform Audio File Format) is an uncompressed, lossless audio container developed by Microsoft and IBM. "
+     "It preserves exact sample values with zero compression artifacts, making it the industry standard for sound recording and editing.",
+     ['Convert to WAV', 'Export as MP3']),
+    (r'\b(?:what is |what\'s )?flac\b',
+     "FLAC (Free Lossless Audio Codec) provides bit-perfect audio compression, reducing file size by 40–60% compared to raw WAV "
+     "without sacrificing any audio fidelity. It is the premier choice for archival audio and audiophile listening.",
+     ['Convert to WAV', 'Inspect this file']),
+    (r'\b(?:what is |what\'s )?aac\b',
+     "AAC (Advanced Audio Coding) is a high-performance lossy audio compression standard designed as the successor to MP3. "
+     "It delivers superior sound quality at equal or lower bitrates, and is universally supported in MP4 and modern streaming.",
+     ['Export as MP3', 'Convert to MP4']),
+    (r'\b(?:what is |what\'s )?(?:opus|ogg)\b',
+     "Opus is a modern, royalty-free audio codec designed for interactive speech and music streaming over the Internet. "
+     "It offers ultra-low latency and beats MP3, AAC, and Vorbis at comparable bitrates.",
+     ['Inspect this file', 'Convert to WebM']),
+    (r'\b(?:what is |what\'s )?mp4\b',
+     "MP4 (MPEG-4 Part 14) is the universal multimedia container format for video, audio, and subtitles. "
+     "It typically pairs H.264 video with AAC audio and is supported natively across virtually all devices and browsers.",
+     ['Convert to MP4', 'Trim video from 2s to 8s']),
+    (r'\b(?:what is |what\'s )?webm\b',
+     "WebM is an open, royalty-free media container format designed for the web. It uses VP8/VP9 or AV1 video codecs "
+     "with Opus audio, generating compact streamable video files optimized for HTML5.",
+     ['Convert to WebM', 'Convert to MP4']),
+    (r'\b(?:what is |what\'s )?webp\b',
+     "WebP is a modern image format from Google providing superior lossless and lossy compression for web images, "
+     "typically 25–34% smaller than PNG or JPEG at equivalent visual quality, with full transparency support.",
+     ['Export as WebP', 'Remove image background']),
+    (r'\b(?:what is |what\'s )?(?:h\.?264|avc)\b',
+     "H.264 (Advanced Video Coding / AVC) is the most widely adopted video compression standard in history, "
+     "featuring hardware-accelerated playback on virtually every modern computer, phone, TV, and browser.",
+     ['Convert to MP4', 'Compress this video']),
+    (r'\b(?:what is |what\'s )?(?:h\.?265|hevc)\b',
+     "H.265 (High Efficiency Video Coding / HEVC) delivers ~50% better compression efficiency than H.264 at identical quality, "
+     "making it ideal for 4K and 8K video, though requiring more recent hardware for decoding.",
+     ['Compress this video', 'Convert to MP4']),
     (r'\bloudness\b(?! normali)', "Loudness is how loud audio is perceived over time. It is measured in LUFS; "
                                   "streaming platforms target about -14 LUFS, so normalizing to that keeps your "
                                   "audio from being turned down or sounding quiet.",
@@ -784,9 +844,6 @@ KNOWLEDGE = [
     (r'\blufs\b', "LUFS (Loudness Units relative to Full Scale) measures perceived loudness over time. "
                   "Streaming platforms such as YouTube and Spotify target about -14 LUFS, Apple Music about -16 LUFS, "
                   "and broadcast about -23 LUFS.", ['Normalize loudness to -14 LUFS', 'Measure the loudness']),
-    (r'\b(?:mp4 (?:vs\.?|versus|or|and) webm|webm (?:vs\.?|versus|or|and) mp4|difference between mp4 and webm)\b',
-     "MP4 offers universal compatibility across devices, browsers and editors. WebM is royalty-free and often gives "
-     "smaller files for web streaming, but is less universal on older hardware.", ['Convert to WebM', 'Convert to MP4']),
     (r'\b(?:sample rate|khz)\b', "Sample rate is how many audio samples are stored per second. 44.1 kHz is the music "
                                  "standard and 48 kHz is the video standard.", ['Inspect this file']),
     (r'\bbit ?rate\b', "Bitrate is how much data is used per second of media; higher bitrates keep more detail but make "
@@ -797,29 +854,58 @@ KNOWLEDGE = [
                                                 "of just stretching pixels.", ['Upscale 2x', 'Upscale 4x']),
     (r'\bdb\b|\bdecibels?\b', "Decibels (dB) describe level changes: +6 dB is roughly twice the amplitude; 0 dBFS is "
                               "the loudest digital level before clipping.", ['Make it 6 dB louder', 'Normalize loudness']),
+    (r'\b(?:fps|frame rate|frames per second)\b',
+     "Frame rate (FPS) measures how many consecutive images are shown per second. 24 fps is film standard, "
+     "30 fps is video broadcast/web standard, and 60 fps is used for ultra-smooth action and gaming.",
+     ['Inspect this file', 'Speed up video 1.5x']),
+    (r'\b(?:resolution|1080p|4k|720p)\b',
+     "Resolution defines the pixel dimensions of a video or image. 1080p (Full HD) is 1920×1080 pixels; "
+     "4K (Ultra HD) is 3840×2160 pixels, offering 4x the pixel density of 1080p.",
+     ['Inspect this file', 'Upscale 2x']),
+    (r'\b(?:aspect ratio|16:9|9:16|4:3)\b',
+     "Aspect ratio is the proportional relationship between width and height. Standard horizontal video is 16:9, "
+     "vertical video for Reels/TikTok/Shorts is 9:16, and classic square format is 1:1.",
+     ['Inspect this file']),
+    (r'\b(?:noise reduction|remove background noise|denoise|clean audio)\b',
+     "Noise reduction identifies and attenuates steady background hiss, hum, and fan rumble using spectral analysis "
+     "while preserving the clarity of spoken vocal frequencies.",
+     ['Clean audio noise', 'Transcribe speech to text']),
+    (r'\b(?:voice isolation|vocal removal|extract vocals|remove vocals|isolate vocals)\b',
+     "Voice isolation separates spoken or sung vocals from background music and sound effects. Vocal removal suppresses "
+     "vocals to produce an instrumental backing track.",
+     ['Isolate voice from background', 'Clean audio noise']),
+    (r'\b(?:transcription|transcribe|speech to text|subtitles|srt|vtt)\b',
+     "Transcription uses local neural speech-to-text models to convert spoken dialogue into timestamped text, "
+     "which can be exported as TXT, SRT, or WebVTT subtitle files.",
+     ['Transcribe speech to text', 'Clean audio noise']),
 ]
 
 
 def _question_reply(text, media_type):
+    # 1. Capabilities / Help queries
     if re.search(r"\b(?:what can you do|what do you do|help me|features|capabilit\w*|how does this work|who are you)\b", text) \
             or text.strip(' ?!.') in ('help', 'menu', 'options'):
         return {'reply': CAPABILITIES_REPLY, 'suggested_actions': SUGGESTIONS_BY_TYPE.get(media_type, SUGGESTIONS_BY_TYPE[None]),
                 'thought': 'Capability overview requested.'}
-    if not re.match(r"\s*(?:what|why|how|which|explain|tell me about|difference|is it|does|should|when|define)\b", text):
-        return None
+
+    # 2. Check curated knowledge directly (supports "MP4 vs WebM", "what is mp3", "lufs", etc.)
     for pattern, reply, suggestions in KNOWLEDGE:
-        if re.search(pattern, text):
+        if re.search(pattern, text, flags=re.IGNORECASE):
             return {'reply': reply, 'suggested_actions': suggestions, 'thought': 'Media knowledge question.'}
-    how_to = re.match(r"\s*how (?:do|can|would|should) i\s+(.*)", text)
+
+    # 3. How-to instruction questions
+    how_to = re.match(r"\s*how (?:do|can|would|should) i\s+(.*)", text, flags=re.IGNORECASE)
     if how_to:
         return {'reply': f"Just tell me what you want in plain words and I will do it — for example "
                          f"\"{how_to.group(1).strip(' ?.').capitalize() or 'Trim from 2s to 8s'}\". "
                          "You can chain several edits in one message.",
                 'suggested_actions': SUGGESTIONS_BY_TYPE.get(media_type, SUGGESTIONS_BY_TYPE[None]),
                 'thought': 'How-to question.'}
-    if re.match(r"\s*(?:what|why|which|explain|difference|define)\b", text):
+
+    # 4. General question fallback
+    if re.match(r"\s*(?:what|why|which|explain|difference|define|tell me about|is it|does|should|when)\b", text, flags=re.IGNORECASE):
         return {'reply': (f"I'm {branding.assistant_name()}, built into {branding.product_name()}, so I'm best at editing and media questions — "
-                          "for example \"What is LUFS?\" or \"MP4 vs WebM?\". Tell me an edit and I'll do it."),
+                          "for example \"What is LUFS?\", \"MP4 vs WebM\", or \"What is MP3?\". Tell me an edit and I'll do it."),
                 'suggested_actions': SUGGESTIONS_BY_TYPE.get(media_type, SUGGESTIONS_BY_TYPE[None]),
                 'thought': 'General question without an edit request.'}
     return None
@@ -885,12 +971,15 @@ def parse_request(prompt, media_context=None, history=None, _depth=0):
                     refined['thought'] = 'Refining the previous cutout with an alternative edge profile.'
                     return refined
 
+    plan = _parse_text(text, media_type)
     question = _question_reply(text, media_type)
-    if question and not re.search(r"\b(?:what(?:'s| is) the (?:duration|length|resolution|sample rate|loudness|size|format)|"
+    explicit_question = (re.match(r"^(?:what|why|which|explain|difference|define|tell me about|is it|does|should|when|how)\b", text)
+                         or re.fullmatch(r"\w+\s+(?:vs\.?|versus)\s+\w+[?!.]*", text))
+    edit_request = plan.get('tools') or plan.get('clarification_needed')
+    if question and (explicit_question or not edit_request) and not re.search(r"\b(?:what(?:'s| is) the (?:duration|length|resolution|sample rate|loudness|size|format)|"
                                   r"how (?:long|loud|big) is)\b", text):
         return {'tools': [], **question}
 
-    plan = _parse_text(text, media_type)
     if keep_order:
         plan['keep_order'] = True
 
@@ -921,6 +1010,9 @@ def _parse_text(text, media_type):
                 unknown.append(raw_clause)
             continue
         for _, name, args in clause.found:
+            window = find_range(raw_clause) if name in agent_planner.SOUNDTRACK_EFFECTS else None
+            if window:
+                args = dict(args, range_start_sec=window[0], range_end_sec=window[1])
             tools.append({'name': name, 'args': dict(args)})
             tracked = _track(tracked, name, args)
 
