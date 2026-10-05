@@ -134,6 +134,11 @@ _NATURAL_VOICES = (
     _NaturalVoice("natural-us-deep", "Deep, male (US English)", "English (United States)", "male", "am_fenrir", "us"),
     _NaturalVoice("natural-uk-clear", "Clear, female (UK English)", "English (United Kingdom)", "female", "bf_emma", "gb"),
     _NaturalVoice("natural-uk-steady", "Steady, male (UK English)", "English (United Kingdom)", "male", "bm_george", "gb"),
+    _NaturalVoice("natural-fr-smooth", "Smooth, female (French)", "French", "female", "ff_siwis", "us"),
+    _NaturalVoice("natural-es-lively", "Lively, female (Spanish)", "Spanish", "female", "ef_dora", "us"),
+    _NaturalVoice("natural-it-clear", "Clear, female (Italian)", "Italian", "female", "if_sara", "us"),
+    _NaturalVoice("natural-ja-calm", "Calm, female (Japanese)", "Japanese", "female", "jf_alpha", "us"),
+    _NaturalVoice("natural-hi-steady", "Steady, male (Hindi)", "Hindi", "male", "hm_omega", "us"),
 )
 _NATURAL_BY_ID = {v.id: v for v in _NATURAL_VOICES}
 

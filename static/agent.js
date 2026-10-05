@@ -604,6 +604,111 @@
         }
     }
 
+    async function submitBackgroundJob(toolsToRun) {
+        if (isProcessing) return;
+        const session = getCurrentSession();
+        if (!session) return;
+        isProcessing = true;
+        sendBtn.disabled = true;
+
+        const thinkingId = 'thinking_' + Date.now();
+        const payload = {
+            tools_to_run: toolsToRun,
+            filename: activeMedia ? activeMedia.filename : '',
+            context: activeMedia ? {
+                filename: activeMedia.filename,
+                name: activeMedia.original_name,
+                type: activeMedia.type,
+                size: activeMedia.size
+            } : null
+        };
+
+        try {
+            const resp = await fetch('/api/agent/job/submit', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            if (!resp.ok) throw new Error('Failed to submit background job.');
+            const submitData = await resp.json();
+            const jobId = submitData.job_id;
+
+            renderThinkingBubble(thinkingId, jobId);
+
+            const jobResult = await new Promise((resolve) => {
+                const intv = setInterval(async () => {
+                    try {
+                        const r = await fetch(`/api/agent/job/${jobId}`);
+                        if (!r.ok) return;
+                        const j = await r.json();
+                        if (['success', 'partial', 'failed', 'error', 'cancelled'].includes(j.status)) {
+                            clearInterval(intv);
+                            resolve(j);
+                        }
+                    } catch (_) {}
+                }, 1500);
+            });
+
+            removeThinkingBubble(thinkingId);
+
+            if (jobResult.status === 'cancelled') {
+                session.messages.push({
+                    role: 'agent',
+                    reply: 'The background job was cancelled.',
+                    delegated_subagent: 'Orchestrator',
+                    timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                });
+            } else if (jobResult.status === 'error') {
+                throw new Error(jobResult.message);
+            } else {
+                const finalData = jobResult.result || {};
+                const inputUrl = activeMedia && typeof activeMedia.url === 'string' ? activeMedia.url : null;
+                
+                if (typeof finalData.output_file === 'string' && typeof finalData.output_url === 'string') {
+                    const outName = finalData.output_file;
+                    const outExt = outName.split('.').pop().toLowerCase();
+                    let newType = 'other';
+                    if (['mp4', 'mov', 'webm', 'mkv', 'gif'].includes(outExt)) newType = 'video';
+                    else if (['mp3', 'wav', 'm4a', 'flac', 'ogg', 'aac', 'opus', 'wma'].includes(outExt)) newType = 'audio';
+                    else if (['png', 'jpg', 'jpeg', 'webp', 'bmp'].includes(outExt)) newType = 'image';
+
+                    setActiveMedia({
+                        filename: outName,
+                        original_name: outName,
+                        type: newType,
+                        url: finalData.output_url
+                    }, session);
+                }
+
+                session.messages.push({
+                    role: 'agent',
+                    reply: finalData.status === 'success' ? 'Background job complete.' : 'Background job finished with warnings.',
+                    delegated_subagent: 'Orchestrator',
+                    tools_planned: toolsToRun,
+                    execution_results: finalData.execution_results || [],
+                    output_url: finalData.output_url,
+                    output_file: finalData.output_file,
+                    input_url: inputUrl,
+                    timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                });
+            }
+        } catch (err) {
+            removeThinkingBubble(thinkingId);
+            session.messages.push({
+                role: 'agent',
+                reply: `Job failed: ${err.message}`,
+                is_error: true,
+                delegated_subagent: 'Orchestrator',
+                timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            });
+        } finally {
+            saveSessionsToStorage();
+            if (currentSessionId === session.id) renderMessages();
+            isProcessing = false;
+            sendBtn.disabled = false;
+        }
+    }
+
     // ─── RENDERING MESSAGES ───
     function renderMessages() {
         const session = getCurrentSession();
@@ -989,7 +1094,14 @@
             }
         });
         row.querySelectorAll('[data-agent-prompt]').forEach(button => {
-            button.addEventListener('click', () => handleSendMessage(button.dataset.agentPrompt));
+            button.addEventListener('click', () => {
+                const prompt = button.dataset.agentPrompt;
+                if (prompt === "Yes, start the background job" && msg.tools_planned && msg.tools_planned.length > 0) {
+                    submitBackgroundJob(msg.tools_planned);
+                } else {
+                    handleSendMessage(prompt);
+                }
+            });
         });
         row.querySelectorAll('.preview-stage-btn').forEach(btn => {
             btn.onclick = (e) => {
@@ -1018,7 +1130,7 @@
         "Type @ to pick a ready-made skill, such as @podcast-polish."
     ];
 
-    function renderThinkingBubble(id) {
+    function renderThinkingBubble(id, jobId = null) {
         const row = document.createElement('div');
         row.className = 'message-row agent';
         row.id = id;
@@ -1032,6 +1144,8 @@
             : 'Analyzing request and preparing response...';
 
         let elapsed = 1;
+        const progressBarId = id + '_pbar';
+        const cancelBtnId = id + '_cancel';
 
         row.innerHTML = `
             <div class="message-avatar thinking-avatar" aria-hidden="true">
@@ -1043,14 +1157,26 @@
                         <span class="thinking-glow-dot"></span>
                         <span class="thinking-main-title" id="${id}_title">${escapeHtml(initialTitle)}</span>
                     </div>
-                    <span class="thinking-elapsed-badge">
-                        <i class="far fa-clock"></i> <span id="${id}_timer">1s</span>
-                    </span>
+                    <div style="display:flex;align-items:center;gap:8px">
+                        <span class="thinking-elapsed-badge">
+                            <i class="far fa-clock"></i> <span id="${id}_timer">1s</span>
+                        </span>
+                        ${jobId ? `<button id="${cancelBtnId}" class="agent-cancel-btn" title="Cancel job" aria-label="Cancel">
+                            <i class="fas fa-xmark"></i>
+                        </button>` : ''}
+                    </div>
                 </div>
 
+                ${jobId ? `
+                <div class="thinking-progress-wrap">
+                    <div class="thinking-progress-track">
+                        <div class="thinking-progress-fill" id="${progressBarId}" style="width:0%"></div>
+                    </div>
+                    <span class="thinking-progress-pct" id="${id}_pct">0%</span>
+                </div>` : `
                 <div class="thinking-shimmer-track">
                     <div class="thinking-shimmer-bar"></div>
-                </div>
+                </div>`}
 
                 <div class="thinking-sub-status" id="${id}_substatus">
                     ${escapeHtml(initialSubstatus)}
@@ -1060,35 +1186,87 @@
         messagesStream.appendChild(row);
         messagesStream.scrollTop = messagesStream.scrollHeight;
 
-        // Start Live Timer & Progression Updates
+        // Cancel button handler
+        if (jobId) {
+            const cancelBtn = document.getElementById(cancelBtnId);
+            if (cancelBtn) {
+                cancelBtn.addEventListener('click', async () => {
+                    cancelBtn.disabled = true;
+                    try { await fetch(`/api/agent/job/${jobId}/cancel`, { method: 'POST' }); } catch (_) {}
+                    const sub = document.getElementById(`${id}_substatus`);
+                    if (sub) sub.textContent = 'Cancelling…';
+                });
+            }
+        }
+
+        // Live timer
         const timerInterval = setInterval(() => {
             elapsed++;
             const timerEl = document.getElementById(`${id}_timer`);
             const titleEl = document.getElementById(`${id}_title`);
             const substatusEl = document.getElementById(`${id}_substatus`);
 
-            if (timerEl) {
-                timerEl.textContent = `${elapsed}s`;
-            }
+            if (timerEl) timerEl.textContent = `${elapsed}s`;
 
-            if (elapsed >= 3 && elapsed < 7) {
-                if (titleEl) titleEl.textContent = hasAttachment ? 'Applying Tool Operations...' : 'Formulating Response...';
-                if (substatusEl) substatusEl.textContent = hasAttachment ? 'Executing media tools & processing transforms...' : 'Synthesizing capabilities & drafting clear reply...';
-            } else if (elapsed >= 7 && elapsed < 12) {
-                if (titleEl) titleEl.textContent = hasAttachment ? 'Rendering Output...' : 'Refining Answer...';
-                if (substatusEl) substatusEl.textContent = hasAttachment ? 'Encoding media and generating preview...' : 'Validating formatting and finalizing...';
-            } else if (elapsed >= 12) {
-                if (titleEl) titleEl.textContent = hasAttachment ? 'Finalizing Preview...' : 'Completing Response...';
-                if (substatusEl) substatusEl.textContent = 'Packaging results...';
+            if (!jobId) {
+                // shimmer mode: cycle status text
+                if (elapsed >= 3 && elapsed < 7) {
+                    if (titleEl) titleEl.textContent = hasAttachment ? 'Applying Tool Operations...' : 'Formulating Response...';
+                    if (substatusEl) substatusEl.textContent = hasAttachment ? 'Executing media tools & processing transforms...' : 'Synthesizing capabilities & drafting clear reply...';
+                } else if (elapsed >= 7 && elapsed < 12) {
+                    if (titleEl) titleEl.textContent = hasAttachment ? 'Rendering Output...' : 'Refining Answer...';
+                    if (substatusEl) substatusEl.textContent = hasAttachment ? 'Encoding media and generating preview...' : 'Validating formatting and finalizing...';
+                } else if (elapsed >= 12) {
+                    if (titleEl) titleEl.textContent = hasAttachment ? 'Finalizing Preview...' : 'Completing Response...';
+                    if (substatusEl) substatusEl.textContent = 'Packaging results...';
+                }
             }
         }, 1000);
 
-        activeThinkingTimers[id] = { timerInterval };
+        // Job polling
+        let pollInterval = null;
+        if (jobId) {
+            pollInterval = setInterval(async () => {
+                try {
+                    const r = await fetch(`/api/agent/job/${jobId}`);
+                    if (!r.ok) return;
+                    const job = await r.json();
+                    const pct = Math.min(100, Math.max(0, job.progress || 0));
+                    const fill = document.getElementById(progressBarId);
+                    const pctEl = document.getElementById(`${id}_pct`);
+                    const subEl = document.getElementById(`${id}_substatus`);
+                    const titleEl = document.getElementById(`${id}_title`);
+                    if (fill) fill.style.width = pct + '%';
+                    if (pctEl) pctEl.textContent = pct + '%';
+                    if (subEl && job.message) subEl.textContent = job.message;
+                    if (titleEl && pct > 0) {
+                        let etaStr = '';
+                        if (pct < 100) {
+                            const totalEst = elapsed / (pct / 100);
+                            const rem = Math.max(0, totalEst - elapsed);
+                            if (rem > 60) {
+                                etaStr = ` (~${Math.floor(rem / 60)}m ${Math.floor(rem % 60)}s remaining)`;
+                            } else if (rem > 0) {
+                                etaStr = ` (~${Math.floor(rem)}s remaining)`;
+                            }
+                        }
+                        titleEl.textContent = `Processing… ${pct}%${etaStr}`;
+                    }
+                    if (['success', 'partial', 'failed', 'error', 'cancelled'].includes(job.status)) {
+                        clearInterval(pollInterval);
+                    }
+                } catch (_) {}
+            }, 1500);
+        }
+
+        activeThinkingTimers[id] = { timerInterval, pollInterval };
     }
+
 
     function removeThinkingBubble(id) {
         if (activeThinkingTimers[id]) {
             if (activeThinkingTimers[id].timerInterval) clearInterval(activeThinkingTimers[id].timerInterval);
+            if (activeThinkingTimers[id].pollInterval) clearInterval(activeThinkingTimers[id].pollInterval);
             delete activeThinkingTimers[id];
         }
         const el = document.getElementById(id);

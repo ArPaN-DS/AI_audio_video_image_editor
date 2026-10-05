@@ -47,7 +47,7 @@ def _run(cmd, timeout=1800):
     job_scheduler.checkpoint()
     child = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                              text=True, encoding="utf-8", errors="replace")
-    remove = job_scheduler.global_job_scheduler.add_cancel_hook(child.kill)
+    remove = job_scheduler.global_scheduler.add_cancel_hook(child.kill)
     try:
         try:
             stdout, stderr = child.communicate(timeout=timeout)
@@ -507,6 +507,19 @@ def export_project(spec, resolve_source, work_dir, output_path):
         w = info["width"] or 1280
         h = info["height"] or 720
         target = (w - w % 2, h - h % 2)  # h264 needs even dimensions
+
+    # Apply chosen aspect ratio (pillarbox / letterbox) from export spec
+    _ASPECT_MAP = {'16:9': (16, 9), '9:16': (9, 16), '1:1': (1, 1), '4:5': (4, 5), '21:9': (21, 9)}
+    ar_str = spec.get('aspect_ratio', '')
+    if ar_str in _ASPECT_MAP:
+        ar_w, ar_h = _ASPECT_MAP[ar_str]
+        tw, th = target
+        if (ar_w / ar_h) > (tw / th):
+            new_h = int(tw * ar_h / ar_w); new_h -= new_h % 2
+            target = (tw, new_h)
+        else:
+            new_w = int(th * ar_w / ar_h); new_w -= new_w % 2
+            target = (new_w, th)
 
     # ── pass 1: render each clip to a normalized intermediate ──
     ext = "wav" if audio_only else "mp4"

@@ -22,7 +22,7 @@ import re
 import branding
 
 from agent_planner import (Clarify, KEEP_ORDER_RE, RANGE_PATTERN, TIME_PATTERN, MULTIPLIER_PATTERN, NUMBER_RE, UNIT_RE, NOT_TIME_AFTER,
-                           SUGGESTIONS_BY_TYPE, time_to_seconds, MediaState, finalize_plan)
+                           SUGGESTIONS_BY_TYPE, SOUNDTRACK_EFFECTS, time_to_seconds, MediaState, finalize_plan)
 
 IMAGE_WORDS = r'\b(?:photo|image|picture|pic|selfie|portrait shot|png|jpe?g)\b'
 AUDIO_WORDS = r'\b(?:voice|speech|vocals?|dialog(?:ue)?|audio|sound|narration|podcast)\b'
@@ -1010,7 +1010,7 @@ def _parse_text(text, media_type):
                 unknown.append(raw_clause)
             continue
         for _, name, args in clause.found:
-            window = find_range(raw_clause) if name in agent_planner.SOUNDTRACK_EFFECTS else None
+            window = find_range(raw_clause) if name in SOUNDTRACK_EFFECTS else None
             if window:
                 args = dict(args, range_start_sec=window[0], range_end_sec=window[1])
             tools.append({'name': name, 'args': dict(args)})

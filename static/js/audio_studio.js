@@ -31,6 +31,10 @@ class AudioStudio {
         this.wavesurfer.on('pause', () => this.updatePlayState(false));
         // Follow the light / dark theme (theme.js broadcasts `themechange`).
         window.addEventListener('themechange', () => this.wavesurfer?.setOptions?.(AudioStudio.waveformColors()));
+
+        this.wavesurfer.on('ready', () => {
+            this.setupWebAudioEQ();
+        });
     }
 
     static waveformColors() {
@@ -41,6 +45,43 @@ class AudioStudio {
             progressColor: token('--track-audio', '#0F9F6E'),
             cursorColor: token('--playhead', '#E11D48')
         };
+    }
+
+    setupWebAudioEQ() {
+        if (!this.wavesurfer) return;
+        const media = this.wavesurfer.getMediaElement();
+        if (!media || this.audioCtx) return;
+
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        this.audioCtx = new AudioContext();
+        this.mediaSource = this.audioCtx.createMediaElementSource(media);
+        
+        this.filters = [];
+        const freqs = [31, 63, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
+        
+        let prevNode = this.mediaSource;
+        freqs.forEach(freq => {
+            const filter = this.audioCtx.createBiquadFilter();
+            filter.type = freq <= 31 ? 'lowshelf' : (freq >= 16000 ? 'highshelf' : 'peaking');
+            filter.frequency.value = freq;
+            filter.Q.value = 1.0;
+            filter.gain.value = this.eqBands[freq.toString()] || 0;
+            
+            prevNode.connect(filter);
+            prevNode = filter;
+            this.filters.push({ freq: freq.toString(), node: filter });
+        });
+        
+        prevNode.connect(this.audioCtx.destination);
+    }
+
+    updateEqAudioNodes() {
+        if (!this.filters) return;
+        this.filters.forEach(f => {
+            if (this.eqBands[f.freq] !== undefined) {
+                f.node.gain.value = this.eqBands[f.freq];
+            }
+        });
     }
 
     loadAudio(url, mediaItem) {
@@ -75,6 +116,7 @@ class AudioStudio {
                         + this.eqBands[frequency];
                 }
             });
+            this.updateEqAudioNodes();
         }
         const media = project?.mediaBin?.find(item => item.id === audioState.activeMediaId);
         if (media?.url) this.loadAudio(media.url, media);
@@ -109,6 +151,7 @@ class AudioStudio {
             slider.addEventListener('input', (e) => {
                 const val = parseFloat(e.target.value);
                 this.eqBands[freq.toString()] = val;
+                this.updateEqAudioNodes();
                 this.syncProjectState();
                 col.querySelector(`.eq-val-${freq}`).textContent = (val > 0 ? '+' : '') + val;
                 slider.setAttribute('aria-valuetext', (val > 0 ? '+' : '') + val + ' dB');

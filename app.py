@@ -1,6 +1,11 @@
 import runtime_tuning  # noqa: F401  (must be first: thread-pool defaults before numeric libraries load)
 
 import os
+import sys
+
+if __name__ == '__main__':
+    sys.modules['app'] = sys.modules['__main__']
+
 import time
 import uuid
 import json
@@ -464,11 +469,6 @@ def studio_landing():
     return render_template('landing.html')
 
 
-@app.route('/agent')
-@app.route('/chat')
-def agent_full_window():
-    _maybe_cleanup_temp_files()
-    return render_template('agent.html')
 
 
 @app.route('/studio')
@@ -547,14 +547,6 @@ def serve_processed_file(filename):
     return send_from_directory(base_dir, rel_path, conditional=True)
 
 
-@app.route('/api/agent/tools', methods=['GET'])
-def agent_get_tools():
-    """Returns registered AI agent tool schemas and active Sub-Agents."""
-    return jsonify({
-        "status": "success",
-        "subagents": ["VisionSubAgent", "VideoSubAgent", "AudioSubAgent", "InspectorSubAgent", "MasterOrchestrator"],
-        "tools": agent_processor.TOOL_DEFINITIONS
-    })
 
 
 def _process_and_register_uploaded_media(saved_path, original_filename):
@@ -610,337 +602,26 @@ def _process_and_register_uploaded_media(saved_path, original_filename):
     })
 
 
-@app.route('/api/agent/upload', methods=['POST'])
-def agent_upload_media():
-    """Direct upload endpoint for AI Agent Full Window workspace."""
-    if 'file' not in request.files:
-        return jsonify({"error": "No file uploaded"}), 400
-    file = request.files['file']
-    if not file or file.filename == '':
-        return jsonify({"error": "No file selected"}), 400
-    if not allowed_file(file.filename):
-        return jsonify({'error': 'Choose a supported audio, video, or image file.'}), 400
-
-    unique_id = str(uuid.uuid4())
-    orig_ext = os.path.splitext(file.filename)[1].lower() or '.bin'
-    saved_filename = f"agent_{unique_id}{orig_ext}"
-    saved_path = os.path.join(app.config['UPLOAD_FOLDER'], saved_filename)
-    file.save(saved_path)
-
-    return _process_and_register_uploaded_media(saved_path, file.filename)
 
 
-@app.route('/api/agent/upload/chunk', methods=['POST'])
-def agent_upload_chunk():
-    """Receives an individual chunk of a large media upload for resilient network transfers."""
-    if 'file' not in request.files:
-        return jsonify({"error": "No chunk payload received"}), 400
-    chunk = request.files['file']
-    upload_id = request.form.get('upload_id', '').strip()
-    if not upload_id or not re.match(r'^[a-zA-Z0-9_\-]+$', upload_id):
-        return jsonify({"error": "Invalid upload session identifier"}), 400
-
-    filename = request.form.get('filename', '').strip()
-    if not filename or not allowed_file(filename):
-        return jsonify({"error": "Unsupported media format"}), 400
-
-    try:
-        chunk_index = int(request.form.get('chunk_index', -1))
-        total_chunks = int(request.form.get('total_chunks', 0))
-    except (ValueError, TypeError):
-        return jsonify({"error": "Invalid chunk coordinates"}), 400
-
-    if chunk_index < 0 or total_chunks <= 0 or chunk_index >= total_chunks:
-        return jsonify({"error": "Chunk index out of bounds"}), 400
-
-    chunk_dir = os.path.join(app.config['UPLOAD_FOLDER'], '.chunks', upload_id)
-    os.makedirs(chunk_dir, exist_ok=True)
-
-    chunk_path = os.path.join(chunk_dir, f"part_{chunk_index:05d}.chunk")
-    chunk.save(chunk_path)
-    received_bytes = os.path.getsize(chunk_path)
-
-    return jsonify({
-        "status": "chunk_received",
-        "upload_id": upload_id,
-        "chunk_index": chunk_index,
-        "total_chunks": total_chunks,
-        "received_bytes": received_bytes
-    })
 
 
-@app.route('/api/agent/upload/complete', methods=['POST'])
-def agent_upload_complete():
-    """Stitches verified upload chunks into final media file and runs probe/perception."""
-    data = request.get_json(silent=True) or {}
-    upload_id = str(data.get('upload_id') or '').strip()
-    filename = str(data.get('filename') or '').strip()
-    try:
-        total_chunks = int(data.get('total_chunks', 0))
-    except (ValueError, TypeError):
-        total_chunks = 0
-
-    if not upload_id or not re.match(r'^[a-zA-Z0-9_\-]+$', upload_id):
-        return jsonify({"error": "Invalid upload session identifier"}), 400
-    if not filename or not allowed_file(filename):
-        return jsonify({"error": "Unsupported media file format"}), 400
-    if total_chunks <= 0:
-        return jsonify({"error": "Invalid total chunks count"}), 400
-
-    chunk_dir = os.path.join(app.config['UPLOAD_FOLDER'], '.chunks', upload_id)
-    if not os.path.isdir(chunk_dir):
-        return jsonify({"error": "Upload session not found or already completed"}), 404
-
-    # Verify all parts exist before stitching
-    for i in range(total_chunks):
-        part_path = os.path.join(chunk_dir, f"part_{i:05d}.chunk")
-        if not os.path.exists(part_path):
-            return jsonify({"error": f"Missing chunk part {i} of {total_chunks}. Please retry."}), 400
-
-    orig_ext = os.path.splitext(filename)[1].lower() or '.bin'
-    saved_filename = f"agent_{uuid.uuid4()}{orig_ext}"
-    saved_path = os.path.join(app.config['UPLOAD_FOLDER'], saved_filename)
-
-    try:
-        with open(saved_path, 'wb') as outfile:
-            for i in range(total_chunks):
-                part_path = os.path.join(chunk_dir, f"part_{i:05d}.chunk")
-                with open(part_path, 'rb') as infile:
-                    while True:
-                        buf = infile.read(1024 * 1024)
-                        if not buf:
-                            break
-                        outfile.write(buf)
-    except Exception as exc:
-        if os.path.exists(saved_path):
-            os.remove(saved_path)
-        return jsonify({"error": f"Failed to assemble media upload: {exc}"}), 500
-    finally:
-        shutil.rmtree(chunk_dir, ignore_errors=True)
-
-    return _process_and_register_uploaded_media(saved_path, filename)
 
 
-@app.route('/api/agent/upload/abort', methods=['POST'])
-def agent_upload_abort():
-    """Cancels and purges temporary chunks for an aborted upload."""
-    data = request.get_json(silent=True) or {}
-    upload_id = str(data.get('upload_id') or '').strip()
-    if upload_id and re.match(r'^[a-zA-Z0-9_\-]+$', upload_id):
-        chunk_dir = os.path.join(app.config['UPLOAD_FOLDER'], '.chunks', upload_id)
-        if os.path.isdir(chunk_dir):
-            shutil.rmtree(chunk_dir, ignore_errors=True)
-    return jsonify({"status": "aborted", "upload_id": upload_id})
 
 
-@app.route('/api/agent/chat', methods=['POST'])
-def agent_chat_endpoint():
-    """
-    AI Multi-Agent Copilot Chatbot Endpoint.
-    Receives user natural language input + media context + conversation history,
-    orchestrates Vision, Video, Audio, and Inspector Sub-Agents.
-    """
-    try:
-        _copilot_memory_ready()
-        data = request.get_json(silent=True) or {}
-        if not isinstance(data, dict):
-            return jsonify({'error': 'Send an object containing your message.'}), 400
-        if (not isinstance(data.get('message', ''), str)
-                or not isinstance(data.get('filename', ''), (str, type(None)))
-                or not isinstance(data.get('context', {}), (dict, type(None)))
-                or not isinstance(data.get('history', []), (list, type(None)))
-                or not isinstance(data.get('session_id', ''), (str, type(None)))):
-            return jsonify({'error': 'Invalid message, media context, or conversation history.'}), 400
-        # Optional conversation id for Copilot Memory; malformed ids simply disable session memory.
-        memory_session = agent_memory.valid_session_id(data.get('session_id'))
-        user_message = (data.get("message") or "").strip()
-        filename = (data.get("filename") or "").strip()
-        media_context = data.get("context") or {}
-        conversation_history = data.get("history") or []
-        if any(not isinstance(item, dict) or not isinstance(item.get('content', ''), str)
-               or not isinstance(item.get('role', ''), str) for item in conversation_history):
-            return jsonify({'error': 'Invalid conversation history.'}), 400
-
-        if not user_message:
-            return jsonify({"error": "Message parameter is required."}), 400
-        # Personal skills: "save this as @name" / "delete skill @name" are handled without planning.
-        skill_command = agent_skills.handle_command(user_message, memory_session or 'default')
-        if skill_command is not None:
-            return jsonify({'status': 'success', 'reply': skill_command['reply'], 'thought': '',
-                            'delegated_subagent': 'Orchestrator', 'clarification_needed': False,
-                            'clarification_options': [], 'tools_planned': [], 'execution_results': [],
-                            'output_file': None, 'output_url': None, 'artifacts': [], 'plan_notes': [],
-                            'skills_used': [], 'skill': skill_command.get('skill'),
-                            'suggested_actions': skill_command.get('suggested_actions', [])})
-        agent_memory.remember_preferences_async(memory_session, user_message)
-
-        # Locate file on disk
-        target_filepath = None
-        if filename:
-            safe_name = os.path.basename(filename)
-            possible_paths = [
-                os.path.join(app.config['UPLOAD_FOLDER'], safe_name),
-                os.path.join(app.config['PROCESSED_FOLDER'], safe_name)
-            ]
-            for p in possible_paths:
-                if safe_name and os.path.isfile(p):
-                    target_filepath = p
-                    _touch_in_use(p)
-                    break
-
-        # Underscore keys are server-internal (e.g. the resolved media path); never accept them from clients.
-        media_context = {key: value for key, value in media_context.items() if not str(key).startswith('_')}
-        if target_filepath:
-            media_context = agent_processor._media_context_for_file(target_filepath, media_context)
-
-        # Query Master Orchestrator Agent. Copilot Memory: an explicit "do the same as before" replays the
-        # last successful edit of this conversation, re-validated by the planner for the current media.
-        with agent_memory.request_scope(target_filepath):
-            agent_plan = _memory_repeat_plan(memory_session, user_message, media_context) if target_filepath else None
-            if agent_plan is None:
-                if memory_session:
-                    agent_plan = agent_processor.query_agent_orchestrator(
-                        user_message, media_context, conversation_history, session_id=memory_session)
-                else:
-                    agent_plan = agent_processor.query_agent_orchestrator(user_message, media_context, conversation_history)
-
-        tools_to_run = agent_plan.get("tools", [])
-        delegated_subagent = agent_plan.get("delegated_subagent", "Orchestrator")
-        clarification_needed = agent_plan.get("clarification_needed", False)
-        clarification_options = agent_plan.get("clarification_options", [])
-        suggested_actions = agent_plan.get("suggested_actions", [])
-        if clarification_needed:
-            tools_to_run = []
-        if tools_to_run and not target_filepath:
-            return jsonify({'error': 'Upload or select media before requesting an edit.'}), 400
-
-        execution_results = []
-        final_output_file = None
-        final_output_url = None
-
-        execution_started = time.perf_counter()
-        if tools_to_run and target_filepath and os.path.exists(target_filepath):
-            execution_results = agent_processor.execute_agent_plan(
-                target_filepath,
-                tools_to_run,
-                app.config['PROCESSED_FOLDER'],
-                context=media_context
-            )
-
-            # Main-chain result (side outputs such as thumbnails are listed as artifacts instead)
-            final_output_file = agent_processor.final_output_of(execution_results)
-            if final_output_file:
-                final_output_url = _agent_public_url(final_output_file)
-
-            # Inspector Sub-Agent checks outputs and generates proactive follow-up suggestions
-            inspection = agent_processor.InspectorSubAgent.inspect(execution_results, final_output_file)
-            if inspection.get("suggested_actions"):
-                suggested_actions = inspection["suggested_actions"]
-
-        failed = any(step.get('status') == 'error' for step in execution_results)
-        status = 'partial' if failed and final_output_file else 'failed' if failed else 'success'
-        reply = agent_processor.execution_reply(agent_plan, execution_results, final_output_file)
-        public_results = [{**{k: v for k, v in step.items() if k != 'extra_outputs'},
-                           'output_file': os.path.basename(step['output_file'])
-                           if step.get('output_file') else None} for step in execution_results]
-        artifacts = []
-        for step in agent_processor.side_outputs_of(execution_results):
-            artifacts.append({'tool': step.get('tool'), 'output_file': os.path.basename(step['output_file']),
-                              'output_url': _agent_public_url(step['output_file'])})
-            for extra in step.get('extra_outputs') or []:
-                artifacts.append({'tool': step.get('tool'), 'label': extra.get('label'),
-                                  'output_file': os.path.basename(extra['output_file']),
-                                  'output_url': _agent_public_url(extra['output_file'])})
-        if status == 'success' and execution_results:
-            agent_skills.remember_plan(memory_session or 'default', tools_to_run, media_context.get('type'))
-        # Copilot Memory records on a background writer; it can never delay or break this reply.
-        agent_memory.observe_chat_async(
-            session_id=memory_session, message=user_message, reply=reply,
-            plan={'tools': tools_to_run}, results=execution_results, media_path=target_filepath,
-            media_context=media_context,
-            elapsed_ms=(time.perf_counter() - execution_started) * 1000.0 if execution_results else None)
-        return jsonify({
-            "status": status,
-            "thought": agent_plan.get("thought", ""),
-            "delegated_subagent": delegated_subagent,
-            "clarification_needed": clarification_needed,
-            "clarification_options": clarification_options,
-            "reply": reply,
-            "tools_planned": tools_to_run,
-            "execution_results": public_results,
-            "output_file": os.path.basename(final_output_file) if final_output_file else None,
-            "output_url": final_output_url,
-            "artifacts": artifacts,
-            "plan_notes": agent_plan.get("plan_notes", []) if isinstance(agent_plan.get("plan_notes"), list) else [],
-            "skills_used": agent_plan.get("skills_used", []) if isinstance(agent_plan.get("skills_used"), list) else [],
-            "auto_skill": agent_plan.get("auto_skill") if isinstance(agent_plan.get("auto_skill"), str) else None,
-            "suggested_actions": suggested_actions
-        })
-
-    except Exception as err:
-        return jsonify({"error": str(err)}), 500
 
 
 # ═══════════════════════════════════════════════════════════════════════════
 #  COPILOT SKILLS (catalog, details, personal skills)
 # ═══════════════════════════════════════════════════════════════════════════
 
-@app.route('/api/agent/skills', methods=['GET'])
-def agent_skills_catalog():
-    """Skill catalog for "@" autocomplete and the Skills library (capability language only)."""
-    media_type = request.args.get('media_type')
-    return jsonify({'status': 'success', **agent_skills.catalog(media_type)})
 
 
-@app.route('/api/agent/skills/import', methods=['POST'])
-def agent_skills_import():
-    """Import a SKILL.md as a personal skill (validated like built-in skills; no code is ever run)."""
-    content = None
-    if 'file' in request.files:
-        upload = request.files['file']
-        raw = upload.read(agent_skills.MAX_SKILL_BYTES + 1)
-        try:
-            content = raw.decode('utf-8')
-        except UnicodeDecodeError:
-            return jsonify({'error': 'The skill file must be UTF-8 text.'}), 400
-    else:
-        data = request.get_json(silent=True) or {}
-        content = data.get('content') if isinstance(data, dict) else None
-    if not isinstance(content, str) or not content.strip():
-        return jsonify({'error': 'Send a SKILL.md file or its text content.'}), 400
-    try:
-        skill = agent_skills.import_user_skill(content)
-    except agent_skills.SkillError as err:
-        return jsonify({'error': str(err)}), 400
-    return jsonify({'status': 'success', 'skill': skill.public()})
 
 
-@app.route('/api/agent/skills/<skill_id>', methods=['GET', 'DELETE'])
-def agent_skill_detail(skill_id):
-    """GET: one skill with its full procedure (read on demand). DELETE: remove a personal skill."""
-    if request.method == 'DELETE':
-        try:
-            agent_skills.delete_user_skill(skill_id)
-        except agent_skills.SkillError as err:
-            return jsonify({'error': str(err)}), 400
-        return jsonify({'status': 'success'})
-    skill = agent_skills.registry().get(skill_id)
-    if not skill:
-        return jsonify({'error': 'Skill not found.'}), 404
-    return jsonify({'status': 'success', 'skill': {**skill.public(), 'procedure': agent_skills.skill_body(skill.id) or ''}})
 
 
-@app.route('/api/agent/skills/<skill_id>/rename', methods=['POST'])
-def agent_skill_rename(skill_id):
-    data = request.get_json(silent=True) or {}
-    if not isinstance(data, dict) or not isinstance(data.get('new_id', ''), str) \
-            or not isinstance(data.get('title', ''), (str, type(None))):
-        return jsonify({'error': 'Send the new skill name.'}), 400
-    try:
-        skill = agent_skills.rename_user_skill(skill_id, data.get('new_id', ''), data.get('title'))
-    except (agent_skills.SkillError, OSError) as err:
-        return jsonify({'error': str(err) if isinstance(err, agent_skills.SkillError) else 'The skill could not be renamed.'}), 400
-    return jsonify({'status': 'success', 'skill': skill.public()})
 
 
 _test_memory_lock = threading.Lock()
@@ -968,22 +649,6 @@ def _memory_repeat_plan(session_id, message, media_context):
         return None
 
 
-@app.route('/api/agent/memory', methods=['GET', 'DELETE'])
-def agent_memory_endpoint():
-    """Copilot Memory status (GET) and user-initiated forgetting (DELETE ?session_id=... or ?scope=all)."""
-    _copilot_memory_ready()
-    if request.method == 'GET':
-        return jsonify(agent_memory.public_status())
-    session_id = request.args.get('session_id')
-    everything = request.args.get('scope') == 'all'
-    if not everything and not agent_memory.valid_session_id(session_id):
-        return jsonify({'error': 'Choose a conversation to forget, or scope=all to clear Copilot Memory.'}), 400
-    try:
-        removed = agent_memory.forget(session_id, everything=everything)
-    except Exception as error:
-        logger.warning('Copilot Memory could not be cleared (%s).', type(error).__name__)
-        return jsonify({'error': 'Copilot Memory could not be cleared. Please try again.'}), 500
-    return jsonify({'status': 'success', 'forgotten': removed})
 
 
 def _agent_public_url(path):
@@ -994,85 +659,69 @@ def _agent_public_url(path):
     return f"/processed/{rel_name}"
 
 
-@app.route('/audio/lufs', methods=['POST'])
-def audio_calculate_lufs():
-    """Calculate integrated LUFS & True Peak loudness metrics."""
-    if 'file' not in request.files: return jsonify({"error": "No file"}), 400
-    file = request.files['file']
-    if file.filename == '': return jsonify({"error": "No file"}), 400
-    
-    temp_path = save_temp_upload(file)
+# ════════════════════════════════════════════════════════════════════════════
+#  BACKGROUND JOBS  (progress · cancel · ETA)
+# ════════════════════════════════════════════════════════════════════════════
+
+_bg_jobs: dict = {}           # job_id -> {status, progress, message, result, error, cancel_event}
+_bg_jobs_lock = threading.Lock()
+
+
+def _bg_job_worker(job_id, file_path, tools_to_run, media_context, processed_folder):
+    """Run execute_agent_plan in a background thread; update _bg_jobs as it progresses."""
+    cancel_event = _bg_jobs[job_id]['cancel_event']
     try:
-        metrics = audio_processor.calculate_lufs(temp_path)
-        return jsonify(metrics)
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-    finally:
-        if os.path.exists(temp_path):
-            os.remove(temp_path)
+        steps = agent_processor.agent_planner.execution_steps(tools_to_run)
+        total = max(len(steps), 1)
+        patched_results = []
+
+        def _step_done(i):
+            pct = round((i + 1) / total * 100)
+            with _bg_jobs_lock:
+                if _bg_jobs.get(job_id):
+                    _bg_jobs[job_id]['progress'] = pct
+                    _bg_jobs[job_id]['message'] = f'Step {i + 1} of {total} complete.'
+
+        results = agent_processor.execute_agent_plan(
+            file_path, tools_to_run, processed_folder,
+            context=media_context,
+        )
+        if cancel_event.is_set():
+            with _bg_jobs_lock:
+                _bg_jobs[job_id]['status'] = 'cancelled'
+            return
+        final_file = agent_processor.final_output_of(results)
+        final_url = _agent_public_url(final_file) if final_file else None
+        public_results = [{**{k: v for k, v in step.items() if k != 'extra_outputs'},
+                           'output_file': os.path.basename(step['output_file']) if step.get('output_file') else None}
+                          for step in results]
+        failed = any(s.get('status') == 'error' for s in results)
+        job_status = 'partial' if failed and final_file else 'failed' if failed else 'success'
+        with _bg_jobs_lock:
+            _bg_jobs[job_id].update({
+                'status': job_status, 'progress': 100, 'message': 'Done.',
+                'result': {'execution_results': public_results, 'output_file': os.path.basename(final_file) if final_file else None,
+                           'output_url': final_url, 'status': job_status},
+            })
+    except Exception as err:
+        with _bg_jobs_lock:
+            if _bg_jobs.get(job_id):
+                _bg_jobs[job_id].update({'status': 'error', 'message': str(err)[:300]})
 
 
-@app.route('/audio/eq', methods=['POST'])
-def audio_apply_eq():
-    """Apply 10-Band Parametric EQ."""
-    if 'file' not in request.files: return jsonify({"error": "No file"}), 400
-    file = request.files['file']
-    if file.filename == '': return jsonify({"error": "No file"}), 400
-    
-    eq_json = request.form.get('eq_bands', '{}')
-    try:
-        eq_bands = json.loads(eq_json)
-    except Exception:
-        eq_bands = {}
-        
-    temp_path = save_temp_upload(file)
-    out_path = os.path.join(app.config['PROCESSED_FOLDER'], f"eq_{uuid.uuid4()}.wav")
-    try:
-        audio_processor.apply_parametric_eq(temp_path, out_path, eq_bands=eq_bands)
-        return send_file(out_path, mimetype='audio/wav', as_attachment=True, download_name="eq_processed.wav")
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-    finally:
-        if os.path.exists(temp_path):
-            os.remove(temp_path)
 
 
-@app.route('/audio/multitrack-mix', methods=['POST'])
-def audio_multitrack_mix():
-    """Mix multiple audio clips according to multitrack specs."""
-    spec = request.get_json(silent=True)
-    if not spec or 'tracks' not in spec:
-        return jsonify({"error": "Invalid mix spec"}), 400
-        
-    out_format = spec.get('format', 'wav')
-    out_name = f"mix_{uuid.uuid4()}.{out_format}"
-    out_path = os.path.join(app.config['PROCESSED_FOLDER'], out_name)
-    
-    # Resolve relative paths inside tracks
-    tracks = spec.get('tracks', [])
-    resolved_tracks = []
-    for t in tracks:
-        media_id = t.get('media_id')
-        p = _media_path(media_id)
-        if p:
-            t_copy = dict(t)
-            t_copy['file_path'] = p
-            resolved_tracks.append(t_copy)
-            
-    if not resolved_tracks:
-        return jsonify({"error": "No valid media found in tracks spec"}), 400
-        
-    try:
-        master_vol = float(spec.get('master_volume', 1.0))
-        audio_processor.mix_audio_tracks(resolved_tracks, out_path, master_volume=master_vol, format=out_format)
-        return send_file(out_path, mimetype=f"audio/{out_format}", as_attachment=True, download_name=f"multitrack_master.{out_format}")
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
 
 
-@app.route('/audio')
-def audio_editor():
-    return render_template('index.html')
+
+
+
+
+
+
+
+
+
 
 def _loudness_normalize_segment(segment, preset='youtube'):
     """Loudness-normalize an in-memory segment (-14 LUFS, true-peak protected)."""
@@ -1098,136 +747,6 @@ def _loudness_normalize_segment(segment, preset='youtube'):
                 pass
 
 
-@app.route('/cut', methods=['POST'])
-def cut_audio():
-    if 'file' not in request.files:
-        return jsonify({"error": "No file uploaded"}), 400
-    file = request.files['file']
-    if not file or file.filename == '':
-        return jsonify({"error": "No file selected"}), 400
-    if not allowed_file(file.filename, ['audio', 'video']):
-        return jsonify({"error": "Unsupported file format"}), 400
-
-    try:
-        # 1. SETUP & SAVE INPUT
-        unique_id = str(uuid.uuid4())
-        original_ext = os.path.splitext(file.filename)[1] or ".webm"
-        input_path = os.path.join(app.config['UPLOAD_FOLDER'], f"{unique_id}{original_ext}")
-        file.save(input_path)
-        
-        # Calculate file size
-        file_size = os.path.getsize(input_path)
-        output_format = request.form.get('format', 'mp3')
-        
-        # Call the robust logger
-        log_upload_details(
-            request=request, 
-            filename=file.filename, 
-            file_size_bytes=file_size, 
-            target_format=output_format
-        )
-        
-        # 2. PARSE REGIONS (Multi-Region Support)
-        regions_json = request.form.get('regions', '[]')
-        regions = json.loads(regions_json)
-        
-        if not regions or len(regions) == 0:
-            return jsonify({"error": "No regions provided"}), 400
-        
-        # 3. GET EXPORT MODE & EFFECTS
-        export_mode = request.form.get('export_mode', 'merged')
-        fade_in = request.form.get('fade_in') == 'true'
-        fade_out = request.form.get('fade_out') == 'true'
-        do_normalize = request.form.get('normalize') == 'true'
-        do_reverse = request.form.get('reverse') == 'true'
-
-        # 4. LOAD AUDIO
-        audio = AudioSegment.from_file(input_path)
-        
-        # 5. PROCESS REGIONS
-        processed_segments = []
-        for region in regions:
-            start_ms = float(region['start']) * 1000
-            end_ms = float(region['end']) * 1000
-            
-            # Validation
-            if end_ms > len(audio): 
-                end_ms = len(audio)
-            if start_ms >= end_ms:
-                continue
-            
-            # Cut
-            segment = audio[start_ms:end_ms]
-            
-            # Apply effects
-            fade_duration = 2000 
-            if len(segment) < 4000:
-                fade_duration = min(2000, len(segment) // 2)
-
-            if fade_in:
-                segment = segment.fade_in(fade_duration)
-            if fade_out:
-                segment = segment.fade_out(fade_duration)
-            if do_normalize:
-                segment = _loudness_normalize_segment(segment)
-            if do_reverse:
-                segment = segment.reverse()
-            
-            processed_segments.append({
-                'name': region.get('name', 'Region'),
-                'audio': segment
-            })
-        
-        if not processed_segments:
-            return jsonify({"error": "No valid regions to process"}), 400
-        
-        # 6. EXPORT
-        export_args = {}
-        if output_format == 'mp3':
-            export_args = {'format': 'mp3', 'bitrate': '320k'}
-        else:
-            export_args = {'format': 'wav'}
-        
-        if export_mode == 'merged' or len(processed_segments) == 1:
-            # MERGE ALL SEGMENTS
-            merged = processed_segments[0]['audio']
-            for seg in processed_segments[1:]:
-                merged += seg['audio']  # Concatenate
-            
-            output_filename = f"merged_{unique_id}.{output_format}"
-            output_path = os.path.join(app.config['PROCESSED_FOLDER'], output_filename)
-            merged.export(output_path, **export_args)
-            
-            return send_file(
-                output_path, 
-                as_attachment=True, 
-                download_name=f'merged_audio.{output_format}'
-            )
-        
-        else:
-            # EXPORT SEPARATE FILES (ZIP)
-            zip_buffer = BytesIO()
-            with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
-                for i, seg_data in enumerate(processed_segments, 1):
-                    temp_buffer = BytesIO()
-                    seg_data['audio'].export(temp_buffer, **export_args)
-                    temp_buffer.seek(0)
-                    
-                    safe_name = seg_data['name'].replace(' ', '_').replace('/', '_')
-                    filename = f"{i:02d}_{safe_name}.{output_format}"
-                    zip_file.writestr(filename, temp_buffer.read())
-            
-            zip_buffer.seek(0)
-            return send_file(
-                zip_buffer,
-                mimetype='application/zip',
-                as_attachment=True,
-                download_name='audio_cuts.zip'
-            )
-
-    except Exception as e:
-        logger.error(f"Error cutting audio: {e}", exc_info=True)
-        return jsonify({"error": f"Server Error: {str(e)}"}), 500
 
 # Helper to validate and save upload file temporarily
 def get_uploaded_file(req, allowed_types=('audio', 'video')):
@@ -1247,181 +766,17 @@ def save_temp_upload(file):
     file.save(temp_path)
     return temp_path
 
-@app.route('/ai/detect-silence', methods=['POST'])
-def ai_detect_silence():
-    file, err = get_uploaded_file(request, ('audio', 'video'))
-    if err: return err
-    
-    min_silence_len = float(request.form.get('min_silence_len', 0.5))
-    silence_thresh = float(request.form.get('silence_thresh', 40))
-    
-    temp_path = save_temp_upload(file)
-    try:
-        results = ai_processor.detect_silence(temp_path, min_silence_len, silence_thresh)
-        return jsonify(results)
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-    finally:
-        if os.path.exists(temp_path):
-            os.remove(temp_path)
-
-@app.route('/ai/auto-trim', methods=['POST'])
-def ai_auto_trim():
-    file, err = get_uploaded_file(request, ('audio', 'video'))
-    if err: return err
-    
-    threshold = float(request.form.get('threshold', 40))
-    
-    temp_path = save_temp_upload(file)
-    try:
-        results = ai_processor.auto_trim_silence(temp_path, threshold)
-        return jsonify(results)
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-    finally:
-        if os.path.exists(temp_path):
-            os.remove(temp_path)
-
-@app.route('/ai/detect-beats', methods=['POST'])
-def ai_detect_beats():
-    file, err = get_uploaded_file(request, ('audio', 'video'))
-    if err: return err
-    
-    temp_path = save_temp_upload(file)
-    try:
-        results = ai_processor.detect_beats(temp_path)
-        return jsonify(results)
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-    finally:
-        if os.path.exists(temp_path):
-            os.remove(temp_path)
-
-@app.route('/ai/detect-vad', methods=['POST'])
-def ai_detect_vad():
-    file, err = get_uploaded_file(request, ('audio', 'video'))
-    if err: return err
-    
-    threshold_db = float(request.form.get('threshold_db', -35.0))
-    
-    temp_path = save_temp_upload(file)
-    try:
-        results = ai_processor.detect_voice_activity(temp_path, threshold_db)
-        return jsonify(results)
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-    finally:
-        if os.path.exists(temp_path):
-            os.remove(temp_path)
-
-@app.route('/ai/transcribe', methods=['POST'])
-def ai_transcribe():
-    file, err = get_uploaded_file(request, ('audio', 'video'))
-    if err: return err
-    
-    temp_path = save_temp_upload(file)
-    try:
-        results = ai_processor.transcribe_audio(temp_path)
-        return jsonify(results)
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-    finally:
-        if os.path.exists(temp_path):
-            os.remove(temp_path)
-
-@app.route('/ai/noise-reduce', methods=['POST'])
-def ai_noise_reduce():
-    file, err = get_uploaded_file(request, ('audio', 'video'))
-    if err: return err
-    
-    temp_path = save_temp_upload(file)
-    try:
-        unique_id = str(uuid.uuid4())
-        output_filename = f"denoised_{unique_id}.wav"
-        output_path = os.path.join(app.config['PROCESSED_FOLDER'], output_filename)
-        
-        ai_processor.reduce_noise(temp_path, output_path)
-        
-        base_name = os.path.splitext(file.filename)[0]
-        return send_file(
-            output_path,
-            as_attachment=True,
-            download_name=f"denoised_{base_name}.wav"
-        )
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-    finally:
-        if os.path.exists(temp_path):
-            os.remove(temp_path)
 
 
-@app.route('/ai/filler-words', methods=['POST'])
-def ai_filler_words():
-    file, err = get_uploaded_file(request, ('audio', 'video'))
-    if err: return err
-
-    temp_path = save_temp_upload(file)
-    try:
-        results = ai_processor.detect_filler_words(temp_path)
-        return jsonify(results)
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-    finally:
-        if os.path.exists(temp_path):
-            os.remove(temp_path)
 
 
-@app.route('/ai/enhance-speech', methods=['POST'])
-def ai_enhance_speech():
-    file, err = get_uploaded_file(request, ('audio', 'video'))
-    if err: return err
-
-    temp_path = save_temp_upload(file)
-    try:
-        unique_id = str(uuid.uuid4())
-        output_filename = f"enhanced_speech_{unique_id}.wav"
-        output_path = os.path.join(app.config['PROCESSED_FOLDER'], output_filename)
-
-        res = ai_processor.enhance_speech_studio(temp_path, output_path)
-
-        base_name = os.path.splitext(file.filename)[0]
-        resp = send_file(
-            output_path,
-            as_attachment=True,
-            download_name=f"enhanced_{base_name}.wav"
-        )
-        resp.headers['X-Enhance-Engine'] = res.get('engine', 'unknown')
-        if res.get('fallback'):
-            resp.headers['X-Enhance-Fallback'] = 'true'
-            resp.headers['X-Enhance-Note'] = res.get('note', '')
-        return resp
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-    finally:
-        if os.path.exists(temp_path):
-            os.remove(temp_path)
 
 
-@app.route('/ai/separate-stems', methods=['POST'])
-def ai_separate_stems():
-    file, err = get_uploaded_file(request, ('audio', 'video'))
-    if err: return err
 
-    temp_path = save_temp_upload(file)
-    out_dir = os.path.join(app.config['PROCESSED_FOLDER'], f"stems_{uuid.uuid4()}")
-    try:
-        res = ai_processor.separate_stems(temp_path, out_dir)
-        return jsonify(res)
-    except ValueError as e:
-        shutil.rmtree(out_dir, ignore_errors=True)
-        return jsonify({"error": str(e)}), 400
-    except Exception as e:
-        shutil.rmtree(out_dir, ignore_errors=True)
-        logger.error('Stem separation failed (%s)', type(e).__name__)
-        return jsonify({"error": "Separation could not be completed. Please try again."}), 500
-    finally:
-        if os.path.exists(temp_path):
-            os.remove(temp_path)
+
+
+
+
 
 
 # ── Source separation (vocals / karaoke / 4 stems / voice) and lyrics ──────
@@ -1437,128 +792,10 @@ def _processed_url(path):
     return f"/processed/{rel}"
 
 
-@app.route('/ai/separate/capabilities', methods=['GET'])
-def ai_separate_capabilities():
-    return jsonify(separation_processor.capability_status())
 
 
-@app.route('/ai/separate', methods=['POST'])
-def ai_separate():
-    """mode: vocals|karaoke|4stem|voice, format: wav|mp3, quality: auto|fast|best,
-    delivery: file (default — ZIP for several stems, the file itself for one) | json."""
-    file, err = get_uploaded_file(request, ('audio', 'video'))
-    if err: return err
-    try:
-        mode, fmt, quality = separation_processor.validate_request(
-            request.form.get('mode'), request.form.get('format'), request.form.get('quality'))
-    except ValueError as e:
-        return jsonify({"error": str(e)}), 400
-    delivery = (request.form.get('delivery') or 'file').strip().lower()
-
-    temp_path = save_temp_upload(file)
-    out_dir = os.path.join(app.config['PROCESSED_FOLDER'], f"stems_{uuid.uuid4().hex}")
-    try:
-        report = separation_processor.separate(temp_path, out_dir, mode=mode, quality=quality, fmt=fmt)
-    except ValueError as e:
-        shutil.rmtree(out_dir, ignore_errors=True)
-        return jsonify({"error": str(e)}), 400
-    except Exception as e:
-        shutil.rmtree(out_dir, ignore_errors=True)
-        logger.error('Separation failed (%s)', type(e).__name__)
-        return jsonify({"error": "Separation could not be completed. Please try again."}), 500
-    finally:
-        if os.path.exists(temp_path):
-            os.remove(temp_path)
-
-    base = _separation_base_name(file.filename)
-    stems = report['stems']
-    zip_path = None
-    if len(stems) > 1:
-        zip_path = os.path.join(out_dir, f"{base}_stems.zip")
-        with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_STORED if fmt == 'mp3' else zipfile.ZIP_DEFLATED) as zf:
-            for name, path in stems.items():
-                zf.write(path, f"{base}_{name}.{fmt}")
-    headers = {
-        'X-Separation-Quality': report['quality']['label'],
-        'X-Separation-Mode': report['mode_label'],
-    }
-
-    if delivery == 'json':
-        payload = {
-            "status": "success",
-            "mode": report['mode'],
-            "mode_label": report['mode_label'],
-            "format": fmt,
-            "quality": report['quality'],
-            "quality_note": report['quality_note'],
-            "duration": report['duration'],
-            "sample_rate": report['sample_rate'],
-            "channels": report['channels'],
-            "checks": report['checks'],
-            "warnings": report['warnings'],
-            "elapsed_sec": report['elapsed_sec'],
-            "realtime_factor": report['realtime_factor'],
-            "stems": [{
-                "name": name,
-                "label": report['stem_labels'][name],
-                "url": _processed_url(path),
-                "download_name": f"{base}_{name}.{fmt}",
-                "loudness": report['loudness'].get(name, {}),
-            } for name, path in stems.items()],
-            "zip_url": _processed_url(zip_path) if zip_path else None,
-        }
-        resp = jsonify(payload)
-    elif zip_path:
-        resp = send_file(zip_path, mimetype='application/zip', as_attachment=True,
-                         download_name=f"{base}_stems.zip")
-    else:
-        name, path = next(iter(stems.items()))
-        resp = send_file(path, mimetype='audio/mpeg' if fmt == 'mp3' else 'audio/wav', as_attachment=True,
-                         download_name=f"{base}_{name}.{fmt}")
-    for key, value in headers.items():
-        resp.headers[key] = value
-    return resp
 
 
-@app.route('/ai/lyrics', methods=['POST'])
-def ai_lyrics():
-    """Isolate the vocals, transcribe them; returns text, timed lines and SRT/VTT links."""
-    file, err = get_uploaded_file(request, ('audio', 'video'))
-    if err: return err
-    try:
-        _, _, quality = separation_processor.validate_request('vocals', 'wav', request.form.get('quality'))
-    except ValueError as e:
-        return jsonify({"error": str(e)}), 400
-
-    temp_path = save_temp_upload(file)
-    try:
-        result = separation_processor.lyrics(temp_path, quality=quality)
-    except ValueError as e:
-        return jsonify({"error": str(e)}), 400
-    except separation_processor.SeparationUnavailableError as e:
-        return jsonify({"error": str(e)}), 422
-    except Exception as e:
-        logger.error('Lyrics extraction failed (%s)', type(e).__name__)
-        return jsonify({"error": "Lyrics could not be extracted. Please try again."}), 500
-    finally:
-        if os.path.exists(temp_path):
-            os.remove(temp_path)
-
-    base = _separation_base_name(file.filename)
-    out_dir = os.path.join(app.config['PROCESSED_FOLDER'], f"lyrics_{uuid.uuid4().hex}")
-    os.makedirs(out_dir, exist_ok=True)
-    links = {}
-    for ext in ('srt', 'vtt', 'txt'):
-        path = os.path.join(out_dir, f"{base}_lyrics.{ext}")
-        body = result['text'] + "\n" if ext == 'txt' else result[ext]
-        with open(path, 'w', encoding='utf-8', newline='\n') as handle:
-            handle.write(body)
-        links[f"{ext}_url"] = _processed_url(path)
-    payload = {key: value for key, value in result.items() if key not in ('srt', 'vtt')}
-    payload.update(links)
-    resp = jsonify(payload)
-    resp.headers['X-Separation-Quality'] = result['quality']['label']
-    return resp
 
 
 # ═══════════════════════════════════════════
@@ -1592,515 +829,51 @@ def _media_path(media_id):
     return path
 
 
-@app.route('/video')
-def video_editor():
-    return render_template('video.html')
 
 
-@app.route('/video/detect-scenes', methods=['POST'])
-def video_detect_scenes():
-    if 'file' not in request.files: return jsonify({"error": "No video file"}), 400
-    file = request.files['file']
-    if file.filename == '': return jsonify({"error": "No file"}), 400
-
-    temp_path = save_temp_upload(file)
-    try:
-        threshold = float(request.form.get('threshold', 27.0))
-        scenes = video_processor.detect_scenes(temp_path, threshold=threshold)
-        return jsonify({"status": "success", "scenes": scenes})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-    finally:
-        if os.path.exists(temp_path):
-            os.remove(temp_path)
 
 
-@app.route('/image')
-def image_editor():
-    # Editing is client-side (HTML Canvas). Only optional AI calls reach backend.
-    return render_template('image.html')
 
 
-@app.route('/image/remove-bg', methods=['POST'])
-def image_remove_bg():
-    if 'file' not in request.files:
-        return jsonify({"error": "No image"}), 400
-    file = request.files['file']
-    if file.filename == '':
-        return jsonify({"error": "No image"}), 400
-
-    model_name = request.form.get('model', 'auto')
-    alpha_matting = request.form.get('alpha_matting', 'true').lower() == 'true'
-
-    uid = uuid.uuid4()
-    in_path = os.path.join(app.config['UPLOAD_FOLDER'], f"bg_in_{uid}.png")
-    out_path = os.path.join(app.config['PROCESSED_FOLDER'], f"bg_out_{uid}.png")
-    file.save(in_path)
-
-    try:
-        image_processor.remove_bg(in_path, out_path, model_name=model_name, alpha_matting=alpha_matting)
-        return send_file(out_path, mimetype='image/png')
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-    finally:
-        if os.path.exists(in_path):
-            os.remove(in_path)
 
 
-@app.route('/image/clarity', methods=['POST'])
-def image_clarity():
-    """Real-time AI Photo Clarity, Denoise & Dynamic Range Polish."""
-    if 'file' not in request.files:
-        return jsonify({"error": "No image"}), 400
-    file = request.files['file']
-    if file.filename == '':
-        return jsonify({"error": "No image"}), 400
-
-    uid = uuid.uuid4()
-    in_path = os.path.join(app.config['UPLOAD_FOLDER'], f"clarity_in_{uid}.png")
-    out_path = os.path.join(app.config['PROCESSED_FOLDER'], f"clarity_out_{uid}.png")
-    file.save(in_path)
-
-    try:
-        image_processor.enhance_photo_clarity(in_path, out_path)
-        return send_file(out_path, mimetype='image/png')
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-    finally:
-        if os.path.exists(in_path):
-            os.remove(in_path)
 
 
-@app.route('/image/inpaint', methods=['POST'])
-def image_inpaint():
-    if 'file' not in request.files or 'mask' not in request.files:
-        return jsonify({"error": "Missing image or mask file"}), 400
-    file = request.files['file']
-    mask = request.files['mask']
-
-    uid = uuid.uuid4()
-    in_path = os.path.join(app.config['UPLOAD_FOLDER'], f"inp_in_{uid}.png")
-    mask_path = os.path.join(app.config['UPLOAD_FOLDER'], f"inp_mask_{uid}.png")
-    out_path = os.path.join(app.config['PROCESSED_FOLDER'], f"inp_out_{uid}.png")
-    file.save(in_path)
-    mask.save(mask_path)
-
-    try:
-        method = request.form.get('method', 'telea')
-        image_processor.inpaint_object(in_path, mask_path, out_path, method=method)
-        return send_file(out_path, mimetype='image/png')
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-    finally:
-        for p in (in_path, mask_path):
-            if os.path.exists(p): os.remove(p)
 
 
-@app.route('/image/restore-faces', methods=['POST'])
-def image_restore_faces():
-    if 'file' not in request.files:
-        return jsonify({"error": "No image file"}), 400
-    file = request.files['file']
-
-    uid = uuid.uuid4()
-    in_path = os.path.join(app.config['UPLOAD_FOLDER'], f"face_in_{uid}.png")
-    out_path = os.path.join(app.config['PROCESSED_FOLDER'], f"face_out_{uid}.png")
-    file.save(in_path)
-
-    try:
-        image_processor.restore_faces(in_path, out_path)
-        return send_file(out_path, mimetype='image/png')
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-    finally:
-        if os.path.exists(in_path): os.remove(in_path)
 
 
-@app.route('/video/burn-subtitles', methods=['POST'])
-def video_burn_subtitles():
-    if 'file' not in request.files:
-        return jsonify({"error": "No video file"}), 400
-    file = request.files['file']
-
-    temp_path = save_temp_upload(file)
-    out_path = os.path.join(app.config['PROCESSED_FOLDER'], f"subbed_{uuid.uuid4()}.mp4")
-    try:
-        style = request.form.get('style', 'yellow_box')
-        video_processor.burn_subtitles(temp_path, out_path, style=style)
-        return send_file(out_path, mimetype='video/mp4', as_attachment=True, download_name="subtitled_video.mp4")
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-    finally:
-        if os.path.exists(temp_path): os.remove(temp_path)
 
 
-@app.route('/video/enhance-quality', methods=['POST'])
-def video_enhance_quality():
-    if 'file' not in request.files:
-        return jsonify({"error": "No video file"}), 400
-    file = request.files['file']
-
-    temp_path = save_temp_upload(file)
-    out_path = os.path.join(app.config['PROCESSED_FOLDER'], f"enhanced_{uuid.uuid4()}.mp4")
-    try:
-        mode = request.form.get('mode', '1080p')
-        video_processor.enhance_video_quality(temp_path, out_path, mode=mode)
-        return send_file(out_path, mimetype='video/mp4', as_attachment=True, download_name="enhanced_quality_video.mp4")
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-    finally:
-        if os.path.exists(temp_path): os.remove(temp_path)
 
 
-@app.route('/video/interpolate', methods=['POST'])
-def video_interpolate():
-    if 'file' not in request.files:
-        return jsonify({"error": "No video file"}), 400
-    file = request.files['file']
-
-    temp_path = save_temp_upload(file)
-    out_path = os.path.join(app.config['PROCESSED_FOLDER'], f"smooth60_{uuid.uuid4()}.mp4")
-    try:
-        target_fps = int(request.form.get('fps', 60))
-        video_processor.interpolate_video_fps(temp_path, out_path, target_fps=target_fps)
-        return send_file(out_path, mimetype='video/mp4', as_attachment=True, download_name="smooth_60fps_video.mp4")
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-    finally:
-        if os.path.exists(temp_path): os.remove(temp_path)
 
 
-@app.route('/image/color-match', methods=['POST'])
-def image_color_match():
-    if 'file' not in request.files:
-        return jsonify({"error": "No image file"}), 400
-    file = request.files['file']
-
-    uid = uuid.uuid4()
-    in_path = os.path.join(app.config['UPLOAD_FOLDER'], f"col_in_{uid}.png")
-    out_path = os.path.join(app.config['PROCESSED_FOLDER'], f"col_out_{uid}.png")
-    file.save(in_path)
-
-    try:
-        palette = request.form.get('palette', 'teal_orange')
-        image_processor.color_match_transfer(in_path, out_path, palette_mode=palette)
-        return send_file(out_path, mimetype='image/png')
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-    finally:
-        if os.path.exists(in_path): os.remove(in_path)
 
 
-@app.route('/ai/auto-duck', methods=['POST'])
-def ai_auto_duck():
-    if 'speech' not in request.files or 'music' not in request.files:
-        return jsonify({"error": "Missing speech or music audio file"}), 400
-    speech_file = request.files['speech']
-    music_file = request.files['music']
-
-    speech_path = save_temp_upload(speech_file)
-    music_path = save_temp_upload(music_file)
-    out_path = os.path.join(app.config['PROCESSED_FOLDER'], f"ducked_{uuid.uuid4()}.wav")
-
-    try:
-        ai_processor.auto_duck_music(speech_path, music_path, out_path)
-        return send_file(out_path, mimetype='audio/wav', as_attachment=True, download_name="auto_ducked_music.wav")
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-    finally:
-        for p in (speech_path, music_path):
-            if os.path.exists(p): os.remove(p)
 
 
-@app.route('/ai/pitch-speed', methods=['POST'])
-def ai_pitch_speed():
-    if 'file' not in request.files:
-        return jsonify({"error": "No audio file"}), 400
-    file = request.files['file']
-
-    temp_path = save_temp_upload(file)
-    out_path = os.path.join(app.config['PROCESSED_FOLDER'], f"speed_{uuid.uuid4()}.wav")
-
-    try:
-        speed = float(request.form.get('speed', 1.25))
-        ai_processor.pitch_preserved_speed(temp_path, out_path, speed=speed)
-        return send_file(out_path, mimetype='audio/wav', as_attachment=True, download_name="pitch_preserved_speed.wav")
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-    finally:
-        if os.path.exists(temp_path): os.remove(temp_path)
 
 
 # ── Voiceover (local text-to-speech). Public capability labels only. ──
-@app.route('/ai/tts/voices', methods=['GET'])
-def ai_tts_voices():
-    import tts_processor
-    voices = tts_processor.list_voices(refresh=request.args.get('refresh') == '1')
-    return jsonify({
-        "status": "success",
-        "available": bool(voices),
-        "voices": voices,
-        "default_voice": next((v["id"] for v in voices if v.get("default")), None),
-        "max_chars": tts_processor.MAX_TEXT_CHARS,
-        "speed_range": [tts_processor.SPEED_MIN, tts_processor.SPEED_MAX],
-        "formats": sorted(tts_processor.OUTPUT_FORMATS),
-    })
 
 
-@app.route('/ai/tts', methods=['POST'])
-def ai_tts():
-    import tts_processor
-    data = request.get_json(silent=True) if request.is_json else None
-    if not isinstance(data, dict):
-        data = request.form
-    fmt = str(data.get('format') or 'wav').strip().lower()
-    if fmt not in tts_processor.OUTPUT_FORMATS:
-        return jsonify({"status": "error", "error": "Choose WAV or MP3 for the voiceover file."}), 400
-    filename = f"voiceover_{uuid.uuid4().hex[:12]}.{fmt}"
-    out_path = os.path.join(app.config['PROCESSED_FOLDER'], filename)
-    try:
-        report = tts_processor.synthesize(
-            data.get('text', ''), out_path, voice=data.get('voice') or None,
-            speed=data.get('speed', 1.0), pitch=data.get('pitch', 0), fmt=fmt,
-            quality=data.get('quality') or 'auto')
-    except tts_processor.VoiceoverUnavailableError as e:
-        return jsonify({"status": "error", "error": str(e)}), 422
-    except ValueError as e:
-        return jsonify({"status": "error", "error": str(e)}), 400
-    except Exception as e:
-        logger.error('Voiceover failed (%s)', type(e).__name__)
-        return jsonify({"status": "error", "error": "The voiceover could not be created. Please try again."}), 500
-    resp = send_file(out_path, mimetype=tts_processor.OUTPUT_FORMATS[fmt], as_attachment=True,
-                     download_name=f"voiceover.{fmt}")
-    resp.headers['X-Voice-Quality'] = report['tier']
-    resp.headers['X-Voice-Label'] = report['voice']
-    resp.headers['X-Audio-Duration'] = f"{report['duration']:.2f}"
-    resp.headers['X-Output-File'] = filename
-    if report.get('notice'):
-        resp.headers['X-Voice-Notice'] = report['notice']
-    resp.headers['Access-Control-Expose-Headers'] = (
-        'X-Voice-Quality, X-Voice-Label, X-Audio-Duration, X-Output-File, X-Voice-Notice')
-    return resp
 
 
-@app.route('/ai/youtube-chapters', methods=['POST'])
-def ai_youtube_chapters():
-    if 'file' not in request.files:
-        return jsonify({"error": "No media file"}), 400
-    file = request.files['file']
-
-    temp_path = save_temp_upload(file)
-    try:
-        res = ai_processor.generate_youtube_chapters(temp_path)
-        return jsonify(res)
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-    finally:
-        if os.path.exists(temp_path): os.remove(temp_path)
 
 
-@app.route('/ai/trim-silence', methods=['POST'])
-def ai_trim_silence():
-    if 'file' not in request.files:
-        return jsonify({"error": "No audio file"}), 400
-    file = request.files['file']
-
-    temp_path = save_temp_upload(file)
-    out_path = os.path.join(app.config['PROCESSED_FOLDER'], f"trimmed_{uuid.uuid4()}.wav")
-    try:
-        min_silence_len = float(request.form.get('min_silence_len', 1.0))
-        ai_processor.trim_silence_gaps(temp_path, out_path, min_silence_len=min_silence_len)
-        return send_file(out_path, mimetype='audio/wav', as_attachment=True, download_name="trimmed_audio.wav")
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-    finally:
-        if os.path.exists(temp_path): os.remove(temp_path)
 
 
-@app.route('/image/enhance', methods=['POST'])
-def image_enhance():
-    """Real local super-resolution ('Increase Quality') via OpenCV dnn_superres."""
-    if 'file' not in request.files:
-        return jsonify({"error": "No image"}), 400
-    file = request.files['file']
-    if file.filename == '':
-        return jsonify({"error": "No image"}), 400
-
-    try:
-        scale = int(request.form.get('scale', 2))
-    except (TypeError, ValueError):
-        scale = 2
-    if scale not in (2, 4):
-        scale = 2
-    model_key = request.form.get('model', 'auto')
-    if model_key not in ('auto', 'fast', 'best'):
-        model_key = 'auto'
-
-    uid = uuid.uuid4()
-    in_path = os.path.join(app.config['UPLOAD_FOLDER'], f"enh_in_{uid}.png")
-    out_path = os.path.join(app.config['PROCESSED_FOLDER'], f"enh_out_{uid}.png")
-    file.save(in_path)
-
-    try:
-        info = image_processor.upscale(in_path, out_path, scale=scale, model_key=model_key)
-        resp = send_file(out_path, mimetype='image/png')
-        public_tiers = {'edsr': 'best', 'fsrcnn': 'fast'}
-        resp.headers['X-Enhance-Engine'] = public_tiers.get(str(info.get('engine', '')).lower(), 'standard')
-        resp.headers['X-Enhance-Scale'] = str(info.get('scale', scale))
-        resp.headers['X-Enhance-Downgraded'] = '1' if info.get('downgraded') else '0'
-        return resp
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-    finally:
-        if os.path.exists(in_path):
-            os.remove(in_path)
 
 
-@app.route('/video/upload', methods=['POST'])
-def video_upload():
-    if 'file' not in request.files: return jsonify({"error": "No file"}), 400
-    file = request.files['file']
-    if file.filename == '': return jsonify({"error": "No file"}), 400
-
-    if not allowed_file(file.filename, ('audio', 'video')):
-        return jsonify({"error": "Unsupported file type. Upload a video or audio file."}), 400
-
-    unique_id = str(uuid.uuid4())
-    ext = os.path.splitext(file.filename)[1].lower()
-    media_id = f"{unique_id}{ext}"
-    path = os.path.join(app.config['UPLOAD_FOLDER'], media_id)
-    file.save(path)
-
-    try:
-        log_upload_details(
-            request=request,
-            filename=file.filename,
-            file_size_bytes=os.path.getsize(path),
-            target_format='video-editor-upload'
-        )
-    except Exception:
-        pass  # logging must never block an upload
-
-    try:
-        info = video_processor.probe_media(path)
-    except Exception as e:
-        logger.warning("Uploaded media could not be read (%s)", type(e).__name__)
-        try:
-            os.remove(path)
-        except OSError:
-            pass
-        return jsonify({"error": "Could not read this media file. It may be corrupt or in an unsupported format."}), 400
-
-    thumbs = []
-    if info['has_video']:
-        thumb_dir = os.path.join(THUMBS_FOLDER, unique_id)
-        made = video_processor.generate_filmstrip(path, thumb_dir, info['duration'])
-        thumbs = [f"/video/thumb/{unique_id}/{i}" for i in range(len(made))]
-
-    return jsonify({
-        "id": media_id,
-        "name": file.filename,
-        "url": f"/media/{media_id}",
-        "size": os.path.getsize(path),
-        "thumbs": thumbs,
-        **info,
-    })
 
 
-@app.route('/media/<media_id>')
-def serve_media(media_id):
-    path = _media_path(media_id)
-    if not path: abort(404)
-    return send_file(path, conditional=True)  # range requests for <video> seek
 
 
-@app.route('/video/thumb/<uid>/<int:n>')
-def serve_thumb(uid, n):
-    if not re.match(r'^[A-Za-z0-9-]+$', uid) or n < 0 or n > 50: abort(404)
-    path = os.path.join(THUMBS_FOLDER, uid, f"thumb_{n}.jpg")
-    if not os.path.exists(path): abort(404)
-    return send_file(path, max_age=86400)
 
 
-@app.route('/video/extract-audio', methods=['POST'])
-def video_extract_audio():
-    """Quick tool: extract the audio track from an uploaded video."""
-    media_id = request.form.get('media_id', '')
-    path = _media_path(media_id)
-    if not path:
-        return jsonify({"error": "Media not found — upload it first."}), 404
-
-    fmt = request.form.get('format', 'mp3')
-    if fmt not in ('mp3', 'wav'): fmt = 'mp3'
-    bitrate = request.form.get('bitrate', '192k')
-    if bitrate not in ('128k', '192k', '256k', '320k'): bitrate = '192k'
-
-    out_name = f"extracted_{uuid.uuid4()}.{fmt}"
-    out_path = os.path.join(app.config['PROCESSED_FOLDER'], out_name)
-    try:
-        video_processor.extract_audio(path, out_path, fmt=fmt, bitrate=bitrate)
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-    base = os.path.splitext(request.form.get('name', 'video'))[0] or 'video'
-    return send_file(out_path, as_attachment=True,
-                     download_name=f"{base}_audio.{fmt}")
 
 
-@app.route('/video/quick', methods=['POST'])
-def video_quick():
-    """One-click beginner tools: gif / compress / convert / frame / mute."""
-    media_id = request.form.get('media_id', '')
-    path = _media_path(media_id)
-    if not path:
-        return jsonify({"error": "Media not found — upload it first."}), 404
-
-    op = request.form.get('op', '')
-    base = os.path.splitext(request.form.get('name', 'video'))[0] or 'video'
-    uid = uuid.uuid4()
-
-    def _num(key, default):
-        try:
-            return float(request.form.get(key, default))
-        except (TypeError, ValueError):
-            return default
-
-    try:
-        if op == 'gif':
-            out = os.path.join(PROCESSED_FOLDER, f"gif_{uid}.gif")
-            video_processor.quick_to_gif(
-                path, out, start=_num('start', 0), duration=_num('duration', 5))
-            return send_file(out, as_attachment=True, download_name=f"{base}.gif")
-
-        if op == 'compress':
-            level = request.form.get('level', 'balanced')
-            out = os.path.join(PROCESSED_FOLDER, f"compressed_{uid}.mp4")
-            video_processor.quick_compress(path, out, level=level)
-            return send_file(out, as_attachment=True,
-                             download_name=f"{base}_compressed.mp4")
-
-        if op == 'convert':
-            container = request.form.get('container', 'mp4')
-            if container not in ('mp4', 'webm', 'mkv'): container = 'mp4'
-            quality = request.form.get('quality', '720p')
-            out = os.path.join(PROCESSED_FOLDER, f"converted_{uid}.{container}")
-            video_processor.quick_convert(path, out, container=container, quality=quality)
-            return send_file(out, as_attachment=True,
-                             download_name=f"{base}.{container}")
-
-        if op == 'frame':
-            out = os.path.join(PROCESSED_FOLDER, f"frame_{uid}.jpg")
-            video_processor.quick_extract_frame(path, out, t=_num('t', 0))
-            return send_file(out, as_attachment=True, download_name=f"{base}_frame.jpg")
-
-        if op == 'mute':
-            out = os.path.join(PROCESSED_FOLDER, f"muted_{uid}.mp4")
-            video_processor.quick_mute(path, out)
-            return send_file(out, as_attachment=True, download_name=f"{base}_muted.mp4")
-
-        return jsonify({"error": f"Unknown operation: {op}"}), 400
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
 
 
 EXPORT_FORMATS = {
@@ -2113,46 +886,10 @@ EXPORT_FORMATS = {
 GIF_EXPORT_MAX_SECONDS = 30.0
 
 
-@app.route('/video/export', methods=['POST'])
-def video_export():
-    """Render the full timeline (clips + text + music) via FFmpeg."""
-    spec = request.get_json(silent=True)
-    if not spec:
-        return jsonify({"error": "Invalid export request."}), 400
 
-    fmt = str(spec.get('format', 'mp4')).lower()
-    if fmt not in EXPORT_FORMATS:
-        return jsonify({"error": "Unsupported export format. Choose MP4, WebM, GIF, MP3, or WAV."}), 400
-    # WebM and GIF are transcoded from a master MP4 render.
-    spec['format'] = 'mp4' if fmt in ('webm', 'gif') else fmt
 
-    work_dir = tempfile.mkdtemp(prefix='vexport_', dir=app.config['PROCESSED_FOLDER'])
-    out_name = f"video_export_{uuid.uuid4()}.{fmt}"
-    out_path = os.path.join(app.config['PROCESSED_FOLDER'], out_name)
-
-    try:
-        if fmt in ('webm', 'gif'):
-            master_path = os.path.join(work_dir, 'master.mp4')
-            video_processor.export_project(spec, _media_path, work_dir, master_path)
-            if fmt == 'webm':
-                video_processor.quick_convert(master_path, out_path, container='webm', quality='original')
-            else:
-                duration = video_processor.probe_media(master_path).get('duration') or GIF_EXPORT_MAX_SECONDS
-                video_processor.quick_to_gif(master_path, out_path, start=0.0,
-                                             duration=min(float(duration), GIF_EXPORT_MAX_SECONDS),
-                                             fps=15, width=640)
-        else:
-            video_processor.export_project(spec, _media_path, work_dir, out_path)
-        return send_file(out_path, as_attachment=True,
-                         mimetype=EXPORT_FORMATS[fmt],
-                         download_name=f"edited_video.{fmt}")
-    except ValueError as e:
-        return jsonify({"error": str(e)}), 400
-    except Exception as e:
-        logger.error("Master export failed (%s)", type(e).__name__)
-        return jsonify({"error": "Export failed."}), 500
-    finally:
-        shutil.rmtree(work_dir, ignore_errors=True)
+from routes import register_blueprints
+register_blueprints(app)
 
 
 if __name__ == '__main__':

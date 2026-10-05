@@ -1975,6 +1975,56 @@
     100% { left: 100%; }
 }
 
+/* Background job progress bar */
+.thinking-progress-wrap {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 10px 0 8px;
+}
+.thinking-progress-track {
+    flex: 1;
+    height: 3px;
+    background: var(--surface-3);
+    border-radius: 999px;
+    overflow: hidden;
+}
+.thinking-progress-fill {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 999px;
+    transition: width 0.3s ease-out;
+}
+.thinking-progress-pct {
+    font-size: 10px;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-3);
+    min-width: 28px;
+    text-align: right;
+}
+
+.agent-cancel-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 4px;
+    border: none;
+    background: var(--surface-2);
+    color: var(--text-3);
+    cursor: pointer;
+    transition: all var(--dur-1) ease;
+}
+.agent-cancel-btn:hover:not(:disabled) {
+    background: var(--surface-3);
+    color: var(--text);
+}
+.agent-cancel-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
 .thinking-sub-status {
     min-height: 1.3em;
     color: var(--text-3);

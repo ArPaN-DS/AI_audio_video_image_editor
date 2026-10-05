@@ -131,7 +131,12 @@ class StudioCore {
         const btnStartExport = document.getElementById('btnStartExport');
 
         if (btnExport && exportModal) {
-            btnExport.addEventListener('click', () => exportModal.classList.add('active'));
+            btnExport.addEventListener('click', () => {
+                // Pre-fill aspect ratio from current project setting
+                const aspectSel = document.getElementById('exportAspectSelect');
+                if (aspectSel) aspectSel.value = this.project.aspectRatio || '16:9';
+                exportModal.classList.add('active');
+            });
             [btnCloseExport, btnCancelExport].forEach(b => b?.addEventListener('click', () => exportModal.classList.remove('active')));
             btnStartExport?.addEventListener('click', () => this.executeMasterExport());
         }
@@ -599,13 +604,14 @@ class StudioCore {
         
         const format = document.getElementById('exportFormatSelect').value;
         const quality = document.getElementById('exportQualitySelect').value;
+        const aspectRatio = document.getElementById('exportAspectSelect')?.value || this.project.aspectRatio || '16:9';
 
-        showProcessingOverlay("Rendering Master Export...", `Encoding final project as ${format.toUpperCase()} (${quality})`);
+        showProcessingOverlay("Rendering Master Export...", `Encoding final project as ${format.toUpperCase()} (${quality}, ${aspectRatio})`);
 
         if (window.videoStudio && (format === 'mp4' || format === 'webm' || format === 'gif')) {
-            window.videoStudio.exportVideoTimeline(format, quality);
+            window.videoStudio.exportVideoTimeline(format, quality, aspectRatio);
         } else if (window.videoStudio && (format === 'mp3' || format === 'wav')) {
-            window.videoStudio.exportVideoTimeline(format, quality);
+            window.videoStudio.exportVideoTimeline(format, quality, aspectRatio);
         } else if (window.imageStudio && format === 'png') {
             window.imageStudio.exportImageSnapshot()
                 .catch(() => alert('The image could not be exported.'))

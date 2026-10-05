@@ -462,6 +462,35 @@ def _load_audio(src_file):
         return AudioSegment.from_file(source)
 
 
+def _apply_effect_with_range(src_file, out_path, effect_fn, range_start_sec, range_end_sec, processed_dir):
+    """Apply *effect_fn(tmp_in, tmp_out) -> str* only to [range_start_sec, range_end_sec] ms;
+    concatenate before + processed_range + after and write to out_path.
+    effect_fn receives and returns file paths (WAV).
+    Falls back to full-file effect when no range is specified.
+    """
+    audio = _load_audio(src_file)
+    total_ms = len(audio)
+    r_start = int(round(range_start_sec * 1000))
+    r_end = int(round(range_end_sec * 1000))
+    r_start = max(0, min(r_start, total_ms))
+    r_end = max(r_start, min(r_end, total_ms))
+    if r_start == 0 and r_end >= total_ms:
+        # Range covers the whole file — skip splice overhead
+        return effect_fn(src_file, out_path)
+    with tempfile.TemporaryDirectory(dir=processed_dir, prefix='agent-range-') as td:
+        before = audio[:r_start]
+        segment = audio[r_start:r_end]
+        after = audio[r_end:]
+        seg_in = os.path.join(td, 'seg_in.wav')
+        seg_out = os.path.join(td, 'seg_out.wav')
+        _export_segment(segment, seg_in)
+        effect_fn(seg_in, seg_out)
+        processed = _load_audio(seg_out)
+        combined = before + processed + after
+        _export_segment(combined, out_path)
+    return out_path
+
+
 def _separate_stem(src_file, processed_dir, stem):
     """Vocal / instrumental separation. Raises StepUnavailableError when separation cannot run here."""
     with tempfile.TemporaryDirectory(dir=processed_dir, prefix='agent-stems-') as work_dir:
@@ -555,9 +584,17 @@ class AudioSubAgent:
 
         elif tool_name == "reduce_noise":
             out_path = os.path.join(processed_dir, f"denoised_{base_name}.wav")
-            res_path = ai_processor.reduce_noise(src_file, out_path)
+            r_start = args.get('range_start_sec')
+            r_end = args.get('range_end_sec')
+            if r_start is not None and r_end is not None:
+                res_path = _apply_effect_with_range(
+                    src_file, out_path, ai_processor.reduce_noise,
+                    float(r_start), float(r_end), processed_dir)
+                step_res["message"] = f"Removed background noise from {float(r_start):g}s to {float(r_end):g}s."
+            else:
+                res_path = ai_processor.reduce_noise(src_file, out_path)
+                step_res["message"] = "Removed steady background noise."
             step_res["output_file"] = res_path
-            step_res["message"] = "Removed steady background noise."
 
         elif tool_name == "auto_trim_silence":
             threshold = int(args.get("threshold", 40))
@@ -575,9 +612,17 @@ class AudioSubAgent:
 
         elif tool_name == "enhance_speech":
             out_path = os.path.join(processed_dir, f"speech_enhanced_{base_name}.wav")
-            ai_processor.enhance_speech_studio(src_file, out_path)
+            r_start = args.get('range_start_sec')
+            r_end = args.get('range_end_sec')
+            if r_start is not None and r_end is not None:
+                _apply_effect_with_range(
+                    src_file, out_path, ai_processor.enhance_speech_studio,
+                    float(r_start), float(r_end), processed_dir)
+                step_res["message"] = f"Enhanced speech clarity from {float(r_start):g}s to {float(r_end):g}s."
+            else:
+                ai_processor.enhance_speech_studio(src_file, out_path)
+                step_res["message"] = "Applied studio speech clarity enhancement."
             step_res["output_file"] = out_path
-            step_res["message"] = "Applied studio speech clarity enhancement."
 
         elif tool_name == "isolate_voice":
             step_res["output_file"] = _separate_stem(src_file, processed_dir, 'vocals')
@@ -658,49 +703,90 @@ class AudioSubAgent:
         elif tool_name == "normalize_audio":
             out_path = os.path.join(processed_dir, f"normalized_{base_name}.wav")
             target_lufs, preset, target_dbfs = args.get('target_lufs'), args.get('preset'), args.get('target_dbfs')
+            r_start = args.get('range_start_sec')
+            r_end = args.get('range_end_sec')
             if target_lufs is not None:
-                res_path = _normalize_loudness(src_file, out_path, float(target_lufs))
-                step_res["message"] = f"Normalized loudness to {float(target_lufs):g} LUFS with true-peak protection."
+                def _norm_lufs(i, o): return _normalize_loudness(i, o, float(target_lufs))
+                if r_start is not None and r_end is not None:
+                    res_path = _apply_effect_with_range(src_file, out_path, _norm_lufs, float(r_start), float(r_end), processed_dir)
+                    step_res["message"] = f"Normalized loudness to {float(target_lufs):g} LUFS from {float(r_start):g}s to {float(r_end):g}s."
+                else:
+                    res_path = _norm_lufs(src_file, out_path)
+                    step_res["message"] = f"Normalized loudness to {float(target_lufs):g} LUFS with true-peak protection."
             elif preset:
-                res_path = audio_processor.normalize_audio(src_file, out_path, preset=preset)
-                step_res["message"] = (f"Normalized loudness for {agent_planner.PRESET_LABELS.get(preset, preset)} "
-                                       f"({agent_planner.LOUDNESS_PRESET_LUFS.get(preset, -14.0):g} LUFS) with true-peak protection.")
+                import functools
+                _norm_preset = functools.partial(audio_processor.normalize_audio, preset=preset)
+                if r_start is not None and r_end is not None:
+                    res_path = _apply_effect_with_range(src_file, out_path, _norm_preset, float(r_start), float(r_end), processed_dir)
+                    step_res["message"] = f"Normalized for {agent_planner.PRESET_LABELS.get(preset, preset)} from {float(r_start):g}s to {float(r_end):g}s."
+                else:
+                    res_path = audio_processor.normalize_audio(src_file, out_path, preset=preset)
+                    step_res["message"] = (f"Normalized loudness for {agent_planner.PRESET_LABELS.get(preset, preset)} "
+                                           f"({agent_planner.LOUDNESS_PRESET_LUFS.get(preset, -14.0):g} LUFS) with true-peak protection.")
             elif target_dbfs is not None:
-                res_path = audio_processor.normalize_audio(src_file, out_path, target_dbfs=float(target_dbfs))
-                step_res["message"] = f"Normalized peak level to {float(target_dbfs):g} dBFS."
+                import functools
+                _norm_dbfs = functools.partial(audio_processor.normalize_audio, target_dbfs=float(target_dbfs))
+                if r_start is not None and r_end is not None:
+                    res_path = _apply_effect_with_range(src_file, out_path, _norm_dbfs, float(r_start), float(r_end), processed_dir)
+                    step_res["message"] = f"Normalized peak to {float(target_dbfs):g} dBFS from {float(r_start):g}s to {float(r_end):g}s."
+                else:
+                    res_path = audio_processor.normalize_audio(src_file, out_path, target_dbfs=float(target_dbfs))
+                    step_res["message"] = f"Normalized peak level to {float(target_dbfs):g} dBFS."
             else:
-                res_path = audio_processor.normalize_audio(src_file, out_path)
-                step_res["message"] = "Normalized loudness to −14 LUFS with true-peak protection."
+                if r_start is not None and r_end is not None:
+                    res_path = _apply_effect_with_range(src_file, out_path, audio_processor.normalize_audio, float(r_start), float(r_end), processed_dir)
+                    step_res["message"] = f"Normalized loudness from {float(r_start):g}s to {float(r_end):g}s."
+                else:
+                    res_path = audio_processor.normalize_audio(src_file, out_path)
+                    step_res["message"] = "Normalized loudness to −14 LUFS with true-peak protection."
             step_res["output_file"] = res_path
 
         elif tool_name == "adjust_volume":
             gain = float(args.get('gain_db', 0.0))
             if not math.isfinite(gain) or not -30 <= gain <= 30 or gain == 0:
                 raise StepInputError('Choose a volume change between -30 dB and +30 dB.')
-            audio = _load_audio(src_file)
+            r_start = args.get('range_start_sec')
+            r_end = args.get('range_end_sec')
             note = ''
-            if gain > 0 and math.isfinite(audio.max_dBFS):
-                headroom = -audio.max_dBFS - 0.1
-                if headroom < gain:
-                    if headroom < 0.5:
-                        raise StepInputError('The audio already peaks at full scale; try "normalize loudness to -14 LUFS" instead.')
-                    gain, note = round(headroom, 1), ' (limited to avoid clipping)'
             out_path = os.path.join(processed_dir, f"volume_{base_name}.wav")
-            _export_segment(audio.apply_gain(gain), out_path)
+            if r_start is not None and r_end is not None:
+                def _vol_range(i, o, _gain=gain):
+                    seg = _load_audio(i)
+                    return _export_segment(seg.apply_gain(_gain), o)
+                _apply_effect_with_range(src_file, out_path, _vol_range, float(r_start), float(r_end), processed_dir)
+                step_res["message"] = (f"{'Raised' if gain > 0 else 'Lowered'} volume by {abs(gain):g} dB"
+                                       f" from {float(r_start):g}s to {float(r_end):g}s.")
+            else:
+                audio = _load_audio(src_file)
+                if gain > 0 and math.isfinite(audio.max_dBFS):
+                    headroom = -audio.max_dBFS - 0.1
+                    if headroom < gain:
+                        if headroom < 0.5:
+                            raise StepInputError('The audio already peaks at full scale; try "normalize loudness to -14 LUFS" instead.')
+                        gain, note = round(headroom, 1), ' (limited to avoid clipping)'
+                _export_segment(audio.apply_gain(gain), out_path)
+                step_res["message"] = f"{'Raised' if gain > 0 else 'Lowered'} the volume by {abs(gain):g} dB{note}."
             step_res["output_file"] = out_path
-            step_res["message"] = f"{'Raised' if gain > 0 else 'Lowered'} the volume by {abs(gain):g} dB{note}."
 
         elif tool_name == "apply_audio_fade":
             fade_in = float(args.get("fade_in_sec", 2.0) or 0.0)
             fade_out = float(args.get("fade_out_sec", 2.0) or 0.0)
             if not (math.isfinite(fade_in) and math.isfinite(fade_out)) or fade_in < 0 or fade_out < 0 or fade_in + fade_out <= 0:
                 raise StepInputError('Choose a fade length greater than zero.')
+            r_start = args.get('range_start_sec')
+            r_end = args.get('range_end_sec')
             out_path = os.path.join(processed_dir, f"faded_{base_name}.wav")
-            res_path = audio_processor.apply_fades(src_file, out_path, fade_in, fade_out)
-            step_res["output_file"] = res_path
             parts = [f"{fade_in:g}s fade-in"] if fade_in else []
             parts += [f"{fade_out:g}s fade-out"] if fade_out else []
-            step_res["message"] = f"Applied {' and '.join(parts)}."
+            if r_start is not None and r_end is not None:
+                import functools
+                _fade_fn = functools.partial(audio_processor.apply_fades, fade_in_sec=fade_in, fade_out_sec=fade_out)
+                _apply_effect_with_range(src_file, out_path, _fade_fn, float(r_start), float(r_end), processed_dir)
+                step_res["message"] = f"Applied {' and '.join(parts)} within {float(r_start):g}s–{float(r_end):g}s."
+            else:
+                res_path = audio_processor.apply_fades(src_file, out_path, fade_in, fade_out)
+                step_res["message"] = f"Applied {' and '.join(parts)}."
+            step_res["output_file"] = out_path
 
         else:
             step_res["status"] = "skipped"
@@ -1319,6 +1405,27 @@ def execute_agent_plan(file_path: str, tools_list: list, processed_dir: str, con
             res['reason'] = step['reason']
             res['message'] = f"{step['reason']} {res.get('message', '')}".strip()
         results.append(res)
+
+        # Shift transcript timestamps when a time-altering edit precedes or follows transcription.
+        if tool_name in ('trim_audio', 'trim_video') and spec.kind == 'edit':
+            trim_start = float(args.get('start_sec') or 0.0)
+            for prior in results:
+                if prior.get('tool') == 'transcribe_audio' and isinstance((prior.get('data') or {}).get('segments'), list):
+                    prior['data']['segments'] = [
+                        {**seg, 'start': max(0.0, seg['start'] - trim_start),
+                         'end': max(0.0, seg['end'] - trim_start)}
+                        for seg in prior['data']['segments']
+                        if seg.get('end', 0) > trim_start
+                    ]
+        elif tool_name in ('adjust_audio_speed',) and spec.kind == 'edit':
+            speed = float(args.get('speed') or 1.0)
+            if speed and speed != 1.0:
+                for prior in results:
+                    if prior.get('tool') == 'transcribe_audio' and isinstance((prior.get('data') or {}).get('segments'), list):
+                        prior['data']['segments'] = [
+                            {**seg, 'start': seg['start'] / speed, 'end': seg['end'] / speed}
+                            for seg in prior['data']['segments']
+                        ]
         index += 1
 
     return results

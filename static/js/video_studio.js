@@ -206,6 +206,7 @@ class VideoStudio {
         this.isPlaying = false;
         this.currentTime = 0.0;
         this.selectedClip = null;
+        this.pxPerSec = 40;
         this.preview = new TimelinePreview(this);
 
         this.initPlayerEvents();
@@ -233,6 +234,16 @@ class VideoStudio {
     }
 
     initTimelineEvents() {
+        const zoomSlider = document.getElementById('tlZoomSlider');
+        if (zoomSlider) {
+            zoomSlider.addEventListener('input', (e) => {
+                this.pxPerSec = parseInt(e.target.value, 10) || 40;
+                this.renderTimelineTrackClips();
+                this.updatePlayheadUI();
+            });
+            this.pxPerSec = parseInt(zoomSlider.value, 10) || 40;
+        }
+
         const btnSplit = document.getElementById('btnTlSplit');
         if (btnSplit) btnSplit.addEventListener('click', () => this.splitSelectedClip());
 
@@ -248,21 +259,59 @@ class VideoStudio {
         document.querySelectorAll('.track-timeline-content').forEach(container => {
             container.addEventListener('click', event => {
                 const bounds = container.getBoundingClientRect();
-                this.preview.seek((event.clientX - bounds.left) / 40);
+                this.preview.seek((event.clientX - bounds.left) / this.pxPerSec);
             });
             container.addEventListener('dragover', event => event.preventDefault());
             container.addEventListener('drop', event => {
                 event.preventDefault();
-                const clipId = event.dataTransfer.getData('text/x-studio-clip');
-                const clip = this.clips.find(item => item.id === clipId);
                 const trackId = container.closest('.track-row')?.dataset.trackId;
                 const track = this.getProjectTrack(trackId);
-                if (!clip || !trackId || track?.locked || this.getProjectTrack(clip.trackId)?.locked) return;
-                if ((clip.trackId === 't1') !== (trackId === 't1')) return;
-                clip.trackId = trackId;
-                clip.start = Math.max(0, (event.clientX - container.getBoundingClientRect().left) / 40);
-                this.syncProjectState();
-                this.renderTimelineTrackClips();
+                if (!trackId || track?.locked) return;
+
+                const dropX = event.clientX - container.getBoundingClientRect().left;
+                const startTime = Math.max(0, dropX / this.pxPerSec);
+
+                const clipId = event.dataTransfer.getData('text/x-studio-clip');
+                if (clipId) {
+                    // Move existing clip
+                    const clip = this.clips.find(item => item.id === clipId);
+                    if (!clip || this.getProjectTrack(clip.trackId)?.locked) return;
+                    if ((clip.trackId === 't1') !== (trackId === 't1')) return;
+                    clip.trackId = trackId;
+                    clip.start = startTime;
+                    this.syncProjectState();
+                    this.renderTimelineTrackClips();
+                    return;
+                }
+
+                const jsonStr = event.dataTransfer.getData('application/json');
+                if (jsonStr) {
+                    try {
+                        const mediaItem = JSON.parse(jsonStr);
+                        // Make sure audio only drops on audio, video on video
+                        if (trackId === 'a1' && !mediaItem.has_audio) return;
+                        if (trackId === 'v1' && !mediaItem.has_video && !mediaItem.has_audio && !mediaItem.url.match(/\.(jpg|jpeg|png|webp|gif)/i)) return; // Allow images on video track too
+                        if (trackId === 't1') return; // Cannot drop media on text track
+
+                        this.clips.push({
+                            id: 'c_' + Date.now() + Math.random().toString(36).substr(2, 5),
+                            trackId: trackId,
+                            mediaId: mediaItem.id,
+                            name: mediaItem.name,
+                            start: startTime,
+                            duration: mediaItem.duration || 5, // Default 5s for images without duration
+                            offset: 0,
+                            speed: 1,
+                            volume: 1.0,
+                            pan: 0.0,
+                            muted: false
+                        });
+                        this.syncProjectState();
+                        this.renderTimelineTrackClips();
+                    } catch (e) {
+                        console.error('Failed to parse media drop', e);
+                    }
+                }
             });
         });
     }
@@ -441,8 +490,7 @@ class VideoStudio {
 
         const playhead = document.getElementById('timelinePlayhead');
         if (playhead) {
-            const pps = 40; // pixels per second
-            playhead.style.left = (160 + (this.currentTime * pps)) + 'px';
+            playhead.style.left = (160 + (this.currentTime * this.pxPerSec)) + 'px';
         }
     }
 
@@ -492,14 +540,13 @@ class VideoStudio {
             if (!container) return;
             container.innerHTML = '';
 
-            const pps = 40;
             this.clips.filter(c => c.trackId === trId).forEach(c => {
                 const div = document.createElement('div');
                 div.className = 'timeline-clip';
                 div.draggable = true;
                 div.dataset.clipId = c.id;
-                div.style.left = (c.start * pps) + 'px';
-                div.style.width = (c.duration * pps) + 'px';
+                div.style.left = (c.start * this.pxPerSec) + 'px';
+                div.style.width = (c.duration * this.pxPerSec) + 'px';
                 const safeName = window.studioCore
                     ? StudioCore.escapeHtml(c.name || 'Untitled clip')
                     : 'Untitled clip';
@@ -674,7 +721,7 @@ class VideoStudio {
         });
     }
 
-    async exportVideoTimeline(format = 'mp4', quality = '1080p') {
+    async exportVideoTimeline(format = 'mp4', quality = '1080p', aspectRatio = '16:9') {
         this.syncProjectState();
         const tracks = window.studioCore?.project.tracks || [];
         const hasSoloTrack = tracks.some(track => track.type === 'audio' && track.solo);
@@ -698,6 +745,7 @@ class VideoStudio {
         const spec = {
             format,
             resolution: quality,
+            aspect_ratio: aspectRatio,
             clips: mediaClips,
             texts: this.clips
                 .filter(clip => clip.trackId === 't1' && !this.getProjectTrack('t1')?.muted)

@@ -167,6 +167,9 @@
                         <button type="button" class="ai-action-btn" id="btnAiPhotoClarity" data-copilot-prompt="Improve the clarity and dynamic range of this photo">
                             <i class="fa-solid fa-sun" aria-hidden="true"></i><span>Enhance photo</span><i class="fa-solid fa-comment-dots tool-route" aria-hidden="true" title="Opens in {{ brand.assistant }}"></i>
                         </button>
+                        <button type="button" class="ai-action-btn" id="btnAiMagicEraser">
+                            <i class="fa-solid fa-eraser" aria-hidden="true"></i><span>Magic Eraser</span>
+                        </button>
                     </section>
 
                     <p class="tools-footnote"><i class="fa-solid fa-comment-dots" aria-hidden="true"></i> Opens {{ brand.assistant }} with the request filled in, ready to review and send.</p>
@@ -233,6 +236,16 @@
                         <p class="viewport-empty-title">Nothing to preview yet</p>
                         <p>Import a file in Media, then add it to the timeline.</p>
                     </div>
+
+                    <!-- Magic Eraser UI overlay -->
+                    <div id="eraserToolbar" class="viewport-overlay-toolbar" style="display: none; position: absolute; top: 1rem; left: 50%; transform: translateX(-50%); background: var(--bg-tertiary); padding: 0.5rem 1rem; border-radius: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); z-index: 50; gap: 0.5rem; align-items: center; pointer-events: auto;">
+                        <span style="font-weight: 500; font-size: 0.875rem; color: var(--text-primary);">Draw over objects to remove</span>
+                        <div style="width: 1px; height: 20px; background: var(--border-color); margin: 0 0.5rem;"></div>
+                        <label for="eraserSize" class="sr-only">Eraser size</label>
+                        <input type="range" id="eraserSize" min="10" max="150" value="50" style="width: 80px;">
+                        <button type="button" class="btn btn-primary btn-sm" id="btnApplyEraser">Apply</button>
+                        <button type="button" class="btn btn-secondary btn-sm" id="btnCancelEraser">Cancel</button>
+                    </div>
                 </div>
             </div>
 
@@ -257,6 +270,11 @@
                         <button type="button" class="tl-btn" id="btnTlAddTextTrack" title="Add a caption at the playhead"><i class="fa-solid fa-font" aria-hidden="true"></i><span class="tl-label-text">Add caption</span></button>
                     </div>
                     <div class="tl-right">
+                        <label for="tlZoomSlider" class="sr-only">Zoom timeline</label>
+                        <i class="fa-solid fa-magnifying-glass-minus tl-zoom-icon" aria-hidden="true"></i>
+                        <input type="range" id="tlZoomSlider" class="styled-range tl-zoom-slider" min="10" max="200" value="40" title="Timeline zoom">
+                        <i class="fa-solid fa-magnifying-glass-plus tl-zoom-icon" aria-hidden="true"></i>
+                        <span class="tl-divider" aria-hidden="true"></span>
                         <span class="tl-hint">Click the ruler or a track to move the playhead</span>
                     </div>
                 </div>
@@ -467,6 +485,16 @@
                         <option value="1080p">1080p Full HD</option>
                         <option value="720p">720p HD</option>
                         <option value="4k">2160p 4K UHD</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="exportAspectSelect">Aspect Ratio</label>
+                    <select id="exportAspectSelect" class="select-full">
+                        <option value="16:9">16:9 Landscape</option>
+                        <option value="9:16">9:16 Vertical</option>
+                        <option value="1:1">1:1 Square</option>
+                        <option value="4:5">4:5 Portrait</option>
+                        <option value="21:9">21:9 Cinema</option>
                     </select>
                 </div>
             </div>

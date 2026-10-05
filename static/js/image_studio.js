@@ -13,6 +13,13 @@ class ImageStudio {
         this.ready = Promise.resolve();
         this.loadRevision = 0;
 
+        // Magic Eraser
+        this.eraserMode = false;
+        this.isErasing = false;
+        this.maskCanvas = document.createElement('canvas');
+        this.maskCtx = this.maskCanvas.getContext('2d');
+        this.eraserSize = 50;
+
         this.initCanvasEvents();
         this.initAiImageButtons();
     }
@@ -34,6 +41,53 @@ class ImageStudio {
                 slider.addEventListener('input', () => this.renderCanvasLayers());
             }
         });
+
+        // Magic Eraser drawing events
+        this.canvas.addEventListener('mousedown', (e) => this.handleEraserInput(e, 'start'));
+        this.canvas.addEventListener('mousemove', (e) => this.handleEraserInput(e, 'move'));
+        window.addEventListener('mouseup', (e) => this.handleEraserInput(e, 'end'));
+
+        const sizeSlider = document.getElementById('eraserSize');
+        if (sizeSlider) {
+            sizeSlider.addEventListener('input', (e) => {
+                this.eraserSize = parseInt(e.target.value);
+            });
+        }
+    }
+
+    handleEraserInput(e, type) {
+        if (!this.eraserMode) return;
+        
+        const rect = this.canvas.getBoundingClientRect();
+        if (type === 'start') {
+            if (e.target !== this.canvas) return;
+            this.isErasing = true;
+            this.maskCtx.beginPath();
+        }
+        
+        if (!this.isErasing) return;
+        
+        const x = (e.clientX - rect.left) * (this.canvas.width / rect.width);
+        const y = (e.clientY - rect.top) * (this.canvas.height / rect.height);
+        
+        this.maskCtx.lineCap = 'round';
+        this.maskCtx.lineJoin = 'round';
+        this.maskCtx.lineWidth = this.eraserSize;
+        this.maskCtx.strokeStyle = 'rgba(255, 0, 0, 1.0)';
+        
+        if (type === 'start') {
+            this.maskCtx.moveTo(x, y);
+            this.maskCtx.lineTo(x, y);
+            this.maskCtx.stroke();
+        } else if (type === 'move') {
+            this.maskCtx.lineTo(x, y);
+            this.maskCtx.stroke();
+        } else if (type === 'end') {
+            this.maskCtx.closePath();
+            this.isErasing = false;
+        }
+        
+        this.renderCanvasLayers();
     }
 
     initAiImageButtons() {
@@ -51,6 +105,15 @@ class ImageStudio {
         if (chipRemoveBg) {
             chipRemoveBg.addEventListener('click', () => this.triggerRemoveBg());
         }
+
+        const btnEraser = document.getElementById('btnAiMagicEraser');
+        if (btnEraser) btnEraser.addEventListener('click', () => this.toggleMagicEraser(true));
+
+        const btnApplyEraser = document.getElementById('btnApplyEraser');
+        if (btnApplyEraser) btnApplyEraser.addEventListener('click', () => this.applyMagicEraser());
+
+        const btnCancelEraser = document.getElementById('btnCancelEraser');
+        if (btnCancelEraser) btnCancelEraser.addEventListener('click', () => this.toggleMagicEraser(false));
     }
 
     addNewLayer(imgElement = null, name = 'New Layer', source = null, mediaId = null) {
@@ -232,6 +295,11 @@ class ImageStudio {
             }
         });
 
+        if (this.eraserMode && this.maskCanvas) {
+            this.ctx.globalAlpha = 0.5;
+            this.ctx.drawImage(this.maskCanvas, 0, 0);
+        }
+
         this.ctx.filter = 'none';
         this.ctx.globalAlpha = 1.0;
     }
@@ -272,6 +340,67 @@ class ImageStudio {
         } finally {
             if (resultUrl) URL.revokeObjectURL(resultUrl);
             hideProcessingOverlay();
+        }
+    }
+
+    toggleMagicEraser(state) {
+        if (state) {
+            if (!this.layers.find(l => l.visible && l.image)) {
+                alert("Add an image to the canvas first.");
+                return;
+            }
+            this.eraserMode = true;
+            this.maskCanvas.width = this.canvas.width;
+            this.maskCanvas.height = this.canvas.height;
+            this.maskCtx.clearRect(0, 0, this.maskCanvas.width, this.maskCanvas.height);
+            document.getElementById('eraserToolbar').style.display = 'flex';
+            this.canvas.style.cursor = 'crosshair';
+            this.renderCanvasLayers();
+        } else {
+            this.eraserMode = false;
+            this.isErasing = false;
+            document.getElementById('eraserToolbar').style.display = 'none';
+            this.canvas.style.cursor = 'default';
+            this.renderCanvasLayers();
+        }
+    }
+
+    async applyMagicEraser() {
+        showProcessingOverlay('Magic Eraser', 'Inpainting removed objects locally...');
+        let resultUrl = null;
+        try {
+            await this.ready;
+            
+            // Render just the image layers to a temporary canvas (no mask overlay)
+            this.eraserMode = false; 
+            this.renderCanvasLayers();
+            const imgBlob = await new Promise(resolve => this.canvas.toBlob(resolve, 'image/png'));
+            
+            // Get mask blob
+            const maskBlob = await new Promise(resolve => this.maskCanvas.toBlob(resolve, 'image/png'));
+            
+            if (!imgBlob || !maskBlob) throw new Error('Could not prepare image and mask.');
+            
+            const formData = new FormData();
+            formData.append('file', imgBlob, 'image.png');
+            formData.append('mask', maskBlob, 'mask.png');
+            formData.append('method', 'telea');
+
+            const response = await fetch('/image/inpaint', { method: 'POST', body: formData });
+            if (!response.ok) throw new Error('Object removal failed.');
+            
+            resultUrl = URL.createObjectURL(await response.blob());
+            const image = await this.loadImage(resultUrl);
+            
+            this.layers.forEach(layer => { layer.visible = false; });
+            this.addNewLayer(image, 'Inpainted Object');
+            
+        } catch (err) {
+            alert('Object removal failed. Please try again.');
+        } finally {
+            if (resultUrl) URL.revokeObjectURL(resultUrl);
+            hideProcessingOverlay();
+            this.toggleMagicEraser(false);
         }
     }
 
