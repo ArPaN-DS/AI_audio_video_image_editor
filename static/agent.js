@@ -1096,6 +1096,19 @@
         row.querySelectorAll('[data-agent-prompt]').forEach(button => {
             button.addEventListener('click', () => {
                 const prompt = button.dataset.agentPrompt;
+
+                // Immediately lock the clarification area so it can't be clicked again
+                const clarifBlock = row.querySelector('.clarification-box');
+                if (clarifBlock) {
+                    // Mark which option was chosen, then fade out the whole block
+                    button.classList.add('chosen');
+                    button.textContent = `✓ ${button.textContent}`;
+                    row.querySelectorAll('[data-agent-prompt]').forEach(b => {
+                        b.disabled = true;
+                        if (b !== button) b.style.opacity = '0.35';
+                    });
+                }
+
                 if (prompt === "Yes, start the background job" && msg.tools_planned && msg.tools_planned.length > 0) {
                     submitBackgroundJob(msg.tools_planned);
                 } else {

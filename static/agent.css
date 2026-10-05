@@ -1835,6 +1835,9 @@
 }
 .clarification-btn:hover { border-color: var(--accent-border); background: var(--accent-soft); color: var(--accent-text); }
 .clarification-btn:active { transform: scale(0.97); }
+.clarification-btn.chosen { border-color: #22c55e; background: rgba(34,197,94,.12); color: #22c55e; cursor: default; }
+.clarification-btn:disabled { cursor: not-allowed; pointer-events: none; }
+
 
 /* ── Suggested next steps ── */
 .suggested-actions-tray { display: flex; flex-wrap: wrap; gap: var(--space-1-5); margin-top: var(--space-4); }
