@@ -118,6 +118,16 @@ def upscale(src, out_path, scale=2, model_key="auto"):
         if in_pixels * scale * scale > MAX_OUTPUT_PIXELS:
             return _lanczos_upscale(src, out_path, scale)
 
+    if model_key in ("auto", "best", "realesrgan"):
+        try:
+            import realesrgan_processor
+            from model_manager import global_quality_governor, TIER_MAX, TIER_BALANCED
+            tier = global_quality_governor.current_tier()
+            if realesrgan_processor.is_available() and (model_key in ("realesrgan", "best") or tier in (TIER_MAX, TIER_BALANCED)):
+                return realesrgan_processor.upscale_realesrgan(src, out_path, scale=scale)
+        except Exception as err:
+            _log.warning("Real-ESRGAN inference failed (%s); falling back to classical pipeline.", err)
+
     if model_key == "auto":
         return _adaptive_upscale(cv2, img, src, out_path, scale, in_pixels)
 
@@ -179,6 +189,11 @@ def available_engines():
     """Report which upscalers are usable right now (for the UI/health check)."""
     engines = {"lanczos": True}
     try:
+        import realesrgan_processor
+        engines["realesrgan"] = bool(realesrgan_processor.is_available())
+    except ImportError:
+        engines["realesrgan"] = False
+    try:
         import cv2
         engines["opencv_superres"] = hasattr(cv2, "dnn_superres")
     except ImportError:
@@ -190,10 +205,10 @@ def available_engines():
 
 def enhance_photo_clarity(src, out_path, denoise_strength=5, sharpen_strength=1.2):
     """
-    Applies real-time AI-style photo clarity enhancement:
-    - Removes JPEG compression noise & grain (Bilateral Filtering)
-    - Enhances micro-contrast & edge sharpness (Unsharp Masking)
-    - Auto-corrects dynamic range and histogram contrast (CLAHE)
+    Applies professional halo-free photo clarity enhancement:
+    - Gentle grain reduction (subtle bilateral smoothing)
+    - Natural micro-contrast without ringing halos
+    - Dynamic range and histogram polish (CLAHE)
     """
     try:
         import cv2
@@ -204,20 +219,22 @@ def enhance_photo_clarity(src, out_path, denoise_strength=5, sharpen_strength=1.
             img_pil = Image.open(src).convert("RGB")
             img = cv2.cvtColor(np.array(img_pil), cv2.COLOR_RGB2BGR)
 
-        # 1. Bilateral Denoise (preserves sharp edges while smoothing flat noise/grain)
+        # 1. Subtle Bilateral Denoise
         if denoise_strength > 0:
-            denoised = cv2.bilateralFilter(img, d=5, sigmaColor=denoise_strength * 10, sigmaSpace=5)
+            sigma = min(denoise_strength * 5, 25)
+            denoised = cv2.bilateralFilter(img, d=5, sigmaColor=sigma, sigmaSpace=5)
         else:
             denoised = img
 
-        # 2. Detail Sharpening & Micro-contrast
-        gaussian = cv2.GaussianBlur(denoised, (0, 0), 3)
-        sharpened = cv2.addWeighted(denoised, 1.0 + sharpen_strength, gaussian, -sharpen_strength, 0)
+        # 2. Detail Sharpening & Micro-contrast (Halo-free unsharp mask)
+        gaussian = cv2.GaussianBlur(denoised, (0, 0), 1.5)
+        sharpen_factor = min(max(float(sharpen_strength), 0.0), 0.5)
+        sharpened = cv2.addWeighted(denoised, 1.0 + sharpen_factor, gaussian, -sharpen_factor, 0)
 
         # 3. Dynamic Range & Contrast Polish (CLAHE on L-channel of LAB color space)
         lab = cv2.cvtColor(sharpened, cv2.COLOR_BGR2LAB)
         l, a, b = cv2.split(lab)
-        clahe = cv2.createCLAHE(clipLimit=1.5, tileGridSize=(8, 8))
+        clahe = cv2.createCLAHE(clipLimit=1.2, tileGridSize=(8, 8))
         l_opt = clahe.apply(l)
         enhanced_lab = cv2.merge((l_opt, a, b))
         final_img = cv2.cvtColor(enhanced_lab, cv2.COLOR_LAB2BGR)
@@ -227,7 +244,7 @@ def enhance_photo_clarity(src, out_path, denoise_strength=5, sharpen_strength=1.
     except Exception as e:
         # Fallback using PIL
         pil_img = Image.open(src).convert("RGB")
-        pil_img = pil_img.filter(ImageFilter.UnsharpMask(radius=2, percent=120, threshold=3))
+        pil_img = pil_img.filter(ImageFilter.UnsharpMask(radius=1.5, percent=50, threshold=2))
         pil_img.save(out_path, quality=95)
         return {"status": "success", "engine": "pil_fallback"}
 

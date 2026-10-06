@@ -251,7 +251,9 @@ class VisionSubAgent:
             info = image_processor.upscale(src_file, out_path, scale=scale, model_key="auto") or {}
             step_res["output_file"] = out_path
             size = info.get('size') if isinstance(info, dict) else None
-            step_res["message"] = f"Resolution enhancement completed at {scale}x" + (f" ({size})." if size else ".")
+            engine = str(info.get('engine', ''))
+            label = "Real-ESRGAN GPU neural upscale" if "realesrgan" in engine else "Resolution enhancement"
+            step_res["message"] = f"{label} completed at {scale}x" + (f" ({size})." if size else ".")
 
         elif tool_name == "enhance_photo_clarity":
             out_path = os.path.join(processed_dir, f"clarity_{base_name}.png")
