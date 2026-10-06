@@ -1054,17 +1054,17 @@
         const timeStr = msg.timestamp ? `<div class="user-message-time">${escapeHtml(msg.timestamp)}</div>` : '';
 
         row.innerHTML = `
+            <div class="user-actions-toolbar">
+                <button type="button" class="user-action-btn edit-prompt-btn" title="Edit prompt in composer" aria-label="Edit prompt in composer">
+                    <i class="fas fa-pen"></i>
+                </button>
+                <button type="button" class="user-action-btn copy-prompt-btn" title="Copy prompt text" aria-label="Copy prompt text">
+                    <i class="fas fa-copy"></i>
+                </button>
+            </div>
             <div class="message-bubble">
                 ${fileChipHtml}
                 <div class="user-text">${escapeHtml(msg.content)}</div>
-                <div class="user-actions-toolbar">
-                    <button type="button" class="user-action-btn edit-prompt-btn" title="Edit this prompt in composer">
-                        <i class="fas fa-pen"></i> <span>Edit</span>
-                    </button>
-                    <button type="button" class="user-action-btn copy-prompt-btn" title="Copy prompt text">
-                        <i class="fas fa-copy"></i> <span>Copy</span>
-                    </button>
-                </div>
                 ${timeStr}
             </div>
             <div class="message-avatar" title="You">

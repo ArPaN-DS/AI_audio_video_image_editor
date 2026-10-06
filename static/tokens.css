@@ -91,137 +91,137 @@
     --z-toast: 1200;
     --z-tooltip: 1300;
 
-    /* ── Colour: LIGHT (default) ── */
-    --bg: #F4F5F7;
+    /* ── Colour: LIGHT (Editorial Pearl & Studio Luminous) ── */
+    --bg: #F8FAFD;
     --surface-1: #FFFFFF;
-    --surface-2: #F1F2F5;
-    --surface-3: #E6E8ED;
-    --surface-sunken: #ECEEF2;
+    --surface-2: #F1F4FA;
+    --surface-3: #E2E8F4;
+    --surface-sunken: #EDF2F9;
     --field: #FFFFFF;
-    --stage: #E9EBEF;          /* media canvas backdrop */
+    --stage: #E9EFF8;          /* media canvas backdrop */
 
-    --text: #12151C;
-    --text-2: #3B4250;
-    --text-3: #5A6273;
-    --text-disabled: #8A92A1;
+    --text: #0F172A;
+    --text-2: #334155;
+    --text-3: #64748B;
+    --text-disabled: #94A3B8;
 
-    --border: #E0E3E9;
-    --border-strong: #C7CCD6;
-    --divider: #E8EAEF;
+    --border: rgba(15, 23, 42, 0.08);
+    --border-strong: rgba(15, 23, 42, 0.16);
+    --divider: rgba(15, 23, 42, 0.06);
 
-    --accent: #4F46E5;
-    --accent-hover: #4338CA;
-    --accent-active: #3730A3;
-    --accent-text: #4338CA;     /* accent as foreground on neutral surfaces */
-    --accent-soft: rgba(79, 70, 229, 0.08);
-    --accent-soft-strong: rgba(79, 70, 229, 0.14);
-    --accent-border: rgba(79, 70, 229, 0.32);
+    --accent: #6366F1;
+    --accent-hover: #4F46E5;
+    --accent-active: #4338CA;
+    --accent-text: #4F46E5;     /* accent as foreground on neutral surfaces */
+    --accent-soft: rgba(99, 102, 241, 0.08);
+    --accent-soft-strong: rgba(99, 102, 241, 0.15);
+    --accent-border: rgba(99, 102, 241, 0.28);
     --on-accent: #FFFFFF;
-    --focus-ring: #4F46E5;
+    --focus-ring: #6366F1;
 
-    --success: #15803D;
-    --success-soft: rgba(21, 128, 61, 0.10);
-    --warning: #B45309;
-    --warning-soft: rgba(180, 83, 9, 0.10);
-    --danger: #DC2626;
-    --danger-hover: #B91C1C;
-    --danger-soft: rgba(220, 38, 38, 0.08);
+    --success: #10B981;
+    --success-soft: rgba(16, 185, 129, 0.10);
+    --warning: #F59E0B;
+    --warning-soft: rgba(245, 158, 11, 0.10);
+    --danger: #EF4444;
+    --danger-hover: #DC2626;
+    --danger-soft: rgba(239, 68, 68, 0.08);
 
     /* Timeline / data-viz hues (state-free, distinguishable in both themes) */
-    --track-video: #4F46E5;
-    --track-audio: #0F9F6E;
-    --track-text: #C2410C;
-    --track-image: #0E7490;
-    --playhead: #E11D48;
+    --track-video: #6366F1;
+    --track-audio: #10B981;
+    --track-text: #F97316;
+    --track-image: #06B6D4;
+    --playhead: #F43F5E;
 
-    --scrim: rgba(10, 12, 18, 0.48);
-    --checker-a: #E6E8ED;
-    --checker-b: #F4F5F7;
+    --scrim: rgba(15, 23, 42, 0.48);
+    --checker-a: #E2E8F0;
+    --checker-b: #F8FAFC;
 
-    --shadow-1: 0 1px 2px rgba(18, 21, 28, 0.06), 0 0 0 1px rgba(18, 21, 28, 0.02);
-    --shadow-2: 0 2px 4px -1px rgba(18, 21, 28, 0.06), 0 4px 10px -2px rgba(18, 21, 28, 0.08);
-    --shadow-3: 0 8px 16px -4px rgba(18, 21, 28, 0.12), 0 2px 6px -1px rgba(18, 21, 28, 0.06);
+    --shadow-1: 0 1px 3px rgba(15, 23, 42, 0.04), 0 1px 2px rgba(15, 23, 42, 0.02);
+    --shadow-2: 0 4px 12px -2px rgba(15, 23, 42, 0.06), 0 2px 6px -1px rgba(15, 23, 42, 0.03);
+    --shadow-3: 0 12px 28px -4px rgba(15, 23, 42, 0.09), 0 4px 10px -2px rgba(15, 23, 42, 0.04);
 
     /* ── Chat surface tokens (Light) ── */
-    --chat-user-bg: linear-gradient(135deg, #4338CA 0%, #4F46E5 100%);
+    --chat-user-bg: linear-gradient(135deg, #4f46e5 0%, #6366f1 55%, #7c3aed 100%);
     --chat-user-text: #FFFFFF;
-    --chat-user-border: rgba(67, 56, 202, 0.35);
-    --chat-user-shadow: 0 4px 16px rgba(79, 70, 229, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.22);
+    --chat-user-border: rgba(255, 255, 255, 0.2);
+    --chat-user-shadow: 0 6px 20px -3px rgba(79, 70, 229, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.25);
     --chat-agent-bg: #FFFFFF;
-    --chat-agent-border: #E0E3E9;
-    --chat-agent-shadow: 0 2px 10px rgba(18, 21, 28, 0.05);
-    --chat-code-bg: #0F141F;
-    --chat-code-header: #171E2D;
-    --chat-code-border: #263147;
-    --chat-dock-bg: rgba(255, 255, 255, 0.88);
-    --chat-dock-border: rgba(199, 204, 214, 0.8);
+    --chat-agent-border: rgba(99, 102, 241, 0.12);
+    --chat-agent-shadow: 0 8px 30px -4px rgba(15, 23, 42, 0.05), 0 2px 6px -1px rgba(0, 0, 0, 0.02);
+    --chat-code-bg: #0F172A;
+    --chat-code-header: #1E293B;
+    --chat-code-border: #334155;
+    --chat-dock-bg: rgba(255, 255, 255, 0.92);
+    --chat-dock-border: rgba(99, 102, 241, 0.18);
 
     color-scheme: light;
 }
 
 :root[data-theme="dark"] {
-    --bg: #0C0E13;
-    --surface-1: #13161D;
-    --surface-2: #1A1E27;
-    --surface-3: #232835;
-    --surface-sunken: #0F1117;
-    --field: #191D26;
-    --stage: #08090C;
+    --bg: #0A0D14;
+    --surface-1: #101420;
+    --surface-2: #161B2B;
+    --surface-3: #1F263B;
+    --surface-sunken: #080B10;
+    --field: #131724;
+    --stage: #07090E;
 
-    --text: #ECEEF3;
-    --text-2: #B7BDC9;
-    --text-3: #8E95A4;
-    --text-disabled: #5E6574;
+    --text: #F8FAFC;
+    --text-2: #CBD5E1;
+    --text-3: #94A3B8;
+    --text-disabled: #64748B;
 
-    --border: #262B37;
-    --border-strong: #363C4B;
-    --divider: #1F232D;
+    --border: rgba(255, 255, 255, 0.08);
+    --border-strong: rgba(255, 255, 255, 0.14);
+    --divider: rgba(255, 255, 255, 0.06);
 
-    --accent: #5B5FEF;
-    --accent-hover: #6B70F5;
+    --accent: #6366F1;
+    --accent-hover: #818CF8;
     --accent-active: #4F46E5;
-    --accent-text: #A5ADFF;
-    --accent-soft: rgba(124, 131, 255, 0.10);
-    --accent-soft-strong: rgba(124, 131, 255, 0.18);
-    --accent-border: rgba(124, 131, 255, 0.38);
+    --accent-text: #A5B4FC;
+    --accent-soft: rgba(99, 102, 241, 0.14);
+    --accent-soft-strong: rgba(99, 102, 241, 0.22);
+    --accent-border: rgba(99, 102, 241, 0.36);
     --on-accent: #FFFFFF;
-    --focus-ring: #8E96FF;
+    --focus-ring: #818CF8;
 
-    --success: #4ADE80;
-    --success-soft: rgba(74, 222, 128, 0.12);
+    --success: #34D399;
+    --success-soft: rgba(52, 211, 153, 0.14);
     --warning: #FBBF24;
-    --warning-soft: rgba(251, 191, 36, 0.12);
+    --warning-soft: rgba(251, 191, 36, 0.14);
     --danger: #F87171;
     --danger-hover: #FCA5A5;
-    --danger-soft: rgba(248, 113, 113, 0.12);
+    --danger-soft: rgba(248, 113, 113, 0.14);
 
-    --track-video: #7C83FF;
+    --track-video: #818CF8;
     --track-audio: #34D399;
     --track-text: #FB923C;
-    --track-image: #22D3EE;
+    --track-image: #38BDF8;
     --playhead: #FB7185;
 
-    --scrim: rgba(4, 5, 8, 0.66);
-    --checker-a: #1A1E27;
-    --checker-b: #13161D;
+    --scrim: rgba(2, 4, 8, 0.72);
+    --checker-a: #161B2B;
+    --checker-b: #101420;
 
-    --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
-    --shadow-2: 0 2px 4px -1px rgba(0, 0, 0, 0.45), 0 6px 12px -4px rgba(0, 0, 0, 0.45);
-    --shadow-3: 0 10px 20px -6px rgba(0, 0, 0, 0.6), 0 2px 6px rgba(0, 0, 0, 0.4);
+    --shadow-1: 0 1px 3px rgba(0, 0, 0, 0.4);
+    --shadow-2: 0 4px 16px -2px rgba(0, 0, 0, 0.5);
+    --shadow-3: 0 16px 36px -6px rgba(0, 0, 0, 0.65);
 
     /* ── Chat surface tokens (Dark) ── */
-    --chat-user-bg: linear-gradient(135deg, rgba(99, 102, 241, 0.24) 0%, rgba(139, 92, 246, 0.16) 100%);
-    --chat-user-text: #F1F4FA;
-    --chat-user-border: rgba(139, 92, 246, 0.38);
-    --chat-user-shadow: 0 4px 22px rgba(0, 0, 0, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.14);
-    --chat-agent-bg: rgba(19, 22, 29, 0.76);
-    --chat-agent-border: rgba(40, 46, 60, 0.9);
-    --chat-agent-shadow: 0 4px 18px rgba(0, 0, 0, 0.32);
-    --chat-code-bg: #0A0D14;
-    --chat-code-header: #121622;
-    --chat-code-border: #1E2536;
-    --chat-dock-bg: rgba(19, 22, 29, 0.88);
-    --chat-dock-border: rgba(54, 60, 75, 0.78);
+    --chat-user-bg: linear-gradient(135deg, #4338ca 0%, #5850ec 60%, #6d28d9 100%);
+    --chat-user-text: #F8FAFC;
+    --chat-user-border: rgba(255, 255, 255, 0.18);
+    --chat-user-shadow: 0 6px 24px -2px rgba(79, 70, 229, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    --chat-agent-bg: rgba(18, 22, 34, 0.88);
+    --chat-agent-border: rgba(255, 255, 255, 0.08);
+    --chat-agent-shadow: 0 12px 36px -4px rgba(0, 0, 0, 0.45);
+    --chat-code-bg: #07090F;
+    --chat-code-header: #0F131D;
+    --chat-code-border: #1B2130;
+    --chat-dock-bg: rgba(18, 22, 34, 0.90);
+    --chat-dock-border: rgba(99, 102, 241, 0.22);
 
     color-scheme: dark;
 }

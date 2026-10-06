@@ -91,7 +91,9 @@ function createHarness(messages = []) {
         },
         deleteSession(id) {
             const index = readSessions().findIndex(session => session.id === id);
-            elements.get('sessionsList').children[index].children[1].onclick({ stopPropagation() {} });
+            const item = elements.get('sessionsList').children[index];
+            const delTarget = item.children[1].onclick ? item.children[1] : (item.children[1].children.find(c => c.title === 'Delete chat') || item.children[1].children[2]);
+            delTarget.onclick({ stopPropagation() {} });
         },
         upload(filename) {
             windowListeners.drop({ preventDefault() {}, dataTransfer: { files: [{ name: filename, size: 10 }] } });
