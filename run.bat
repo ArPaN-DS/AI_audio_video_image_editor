@@ -20,6 +20,10 @@ echo [✓] Starting local server at http://127.0.0.1:5000
 echo [✓] Opening web browser...
 echo.
 
+REM Pin maximum quality for RTX 5050
+set MEDIA_QUALITY_TIER=max
+set LOCAL_REASONING_TIER=max
+
 start "" cmd /c "timeout /t 2 >nul && start http://127.0.0.1:5000"
 
 .\venv\Scripts\python.exe app.py
