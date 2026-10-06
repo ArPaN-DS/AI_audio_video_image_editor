@@ -77,6 +77,11 @@
                 </div>
             </section>
 
+            <div class="sidebar-search-box">
+                <i class="fas fa-magnifying-glass search-icon" aria-hidden="true"></i>
+                <input type="search" id="sessionSearchInput" class="session-search-input" placeholder="Search chats..." aria-label="Search conversations">
+            </div>
+
             <nav class="sessions-list-container" aria-labelledby="sessionsHeading">
                 <h2 id="sessionsHeading" class="sidebar-label">Recent</h2>
                 <div id="sessionsList" class="sessions-list">
@@ -122,6 +127,12 @@
                     <h1 id="sessionHeaderTitle" class="session-header-title">{{ brand.assistant }}</h1>
                 </div>
                 <div class="top-bar-right">
+                    <button type="button" id="openMemoryBtn" class="icon-btn" title="Agent Memory & Preferences" aria-label="Agent memory" aria-haspopup="dialog" aria-controls="memoryModal">
+                        <i class="fas fa-brain" aria-hidden="true"></i>
+                    </button>
+                    <button type="button" id="openToolsBtn" class="icon-btn hide-on-phone" title="Tools & Capabilities Directory" aria-label="Tool directory" aria-haspopup="dialog" aria-controls="capabilitiesModal">
+                        <i class="fas fa-toolbox" aria-hidden="true"></i>
+                    </button>
                     <button type="button" id="shortcutsBtn" class="icon-btn hide-on-phone" title="Keyboard shortcuts (?)" aria-label="Keyboard shortcuts" aria-haspopup="dialog" aria-controls="shortcutsModal">
                         <i class="fas fa-keyboard" aria-hidden="true"></i>
                     </button>
@@ -146,6 +157,11 @@
             <!-- ─── Composer ─── -->
             <div class="bottom-command-dock">
                 <div class="dock-content-wrapper">
+                    <!-- Context-Aware Dynamic Suggestion Tray -->
+                    <div id="adaptivePromptTray" class="adaptive-prompt-tray" aria-label="Suggested prompt shortcuts">
+                        <!-- Populated dynamically by agent.js based on activeMedia.type -->
+                    </div>
+
                     <div class="input-capsule">
                         <!-- File attached to the next message (agent.js toggles display) -->
                         <div id="pendingAttachmentCard" class="pending-attachment-card" style="display: none;">
@@ -204,6 +220,17 @@
                                 <button type="button" id="skillsBtn" class="dock-btn" title="Skills (Ctrl+/)" aria-label="Browse skills" aria-haspopup="dialog">
                                     <i class="fas fa-bolt" aria-hidden="true"></i>
                                 </button>
+                            </div>
+                            <div id="voiceWaveVisualizer" class="voice-wave-visualizer" style="display: none;" aria-live="polite">
+                                <span class="voice-wave-dot"></span>
+                                <span class="voice-wave-status" id="voiceWaveStatus">Listening...</span>
+                                <div class="voice-wave-bars">
+                                    <span class="v-bar"></span>
+                                    <span class="v-bar"></span>
+                                    <span class="v-bar"></span>
+                                    <span class="v-bar"></span>
+                                    <span class="v-bar"></span>
+                                </div>
                             </div>
                             <span class="composer-hint" aria-hidden="true"><kbd>Enter</kbd> to send · <kbd>Shift</kbd> <kbd>Enter</kbd> for a new line</span>
                             <button type="button" id="sendBtn" class="send-btn" title="Send (Enter)" aria-label="Send message">
@@ -321,6 +348,58 @@
                     <!-- Actions like 'Open in Studio', 'Open in Image Editor' injected dynamically -->
                 </div>
             </footer>
+        </div>
+    </div>
+
+    <!-- ─── Copilot Memory & Preferences Modal ─── -->
+    <div id="memoryModal" class="app-dialog-backdrop" role="dialog" aria-modal="true" aria-labelledby="memoryTitle" style="display: none;">
+        <div class="app-dialog-card">
+            <div class="app-dialog-header">
+                <div class="app-dialog-title-group">
+                    <i class="fas fa-brain tone-indigo"></i>
+                    <div>
+                        <h2 class="app-dialog-title" id="memoryTitle">Copilot Memory & Preferences</h2>
+                        <p class="app-dialog-subtitle">Preferences remembered automatically on this device to streamline future edits.</p>
+                    </div>
+                </div>
+                <button type="button" id="closeMemoryBtn" class="icon-btn" title="Close" aria-label="Close dialog">
+                    <i class="fas fa-xmark"></i>
+                </button>
+            </div>
+            <div class="app-dialog-body" id="memoryModalBody">
+                <div class="dialog-empty-state">Loading memory status...</div>
+            </div>
+            <div class="app-dialog-footer">
+                <button type="button" id="clearAllMemoryBtn" class="dialog-btn-danger">
+                    <i class="fas fa-trash-alt"></i> Clear All Memories
+                </button>
+                <button type="button" id="doneMemoryBtn" class="dialog-btn-primary">Done</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ─── Tools & Capabilities Directory Modal ─── -->
+    <div id="capabilitiesModal" class="app-dialog-backdrop" role="dialog" aria-modal="true" aria-labelledby="toolsTitle" style="display: none;">
+        <div class="app-dialog-card app-dialog-wide">
+            <div class="app-dialog-header">
+                <div class="app-dialog-title-group">
+                    <i class="fas fa-toolbox tone-sky"></i>
+                    <div>
+                        <h2 class="app-dialog-title" id="toolsTitle">Sub-Agents & Capabilities</h2>
+                        <p class="app-dialog-subtitle">Tools registered with the Master Orchestrator for autonomous local execution.</p>
+                    </div>
+                </div>
+                <button type="button" id="closeCapabilitiesBtn" class="icon-btn" title="Close" aria-label="Close dialog">
+                    <i class="fas fa-xmark"></i>
+                </button>
+            </div>
+            <div class="app-dialog-body" id="capabilitiesModalBody">
+                <div class="dialog-empty-state">Loading registered tools...</div>
+            </div>
+            <div class="app-dialog-footer">
+                <span class="dialog-footnote"><i class="fas fa-microchip"></i> All tools run locally via GPU/CPU acceleration.</span>
+                <button type="button" id="doneCapabilitiesBtn" class="dialog-btn-primary">Close</button>
+            </div>
         </div>
     </div>
 

@@ -68,6 +68,63 @@ def agent_get_tools():
         "tools": agent_processor.TOOL_DEFINITIONS
     })
 
+@assistant_bp.route('/api/agent/samples', methods=['GET'])
+def agent_get_samples():
+    """Returns list of bundled demo media available for immediate testing."""
+    samples = [
+        {
+            "id": "sample_clip",
+            "type": "video",
+            "title": "Sample Video Clip",
+            "description": "1080p clip with speech and scene motion for trimming, speed, and GIF",
+            "icon": "fa-film",
+            "filename": "sample_clip.mp4"
+        },
+        {
+            "id": "sample_portrait",
+            "type": "image",
+            "title": "Sample Portrait Photo",
+            "description": "High-res portrait photo for background cutout, enhance, and 4x upscaling",
+            "icon": "fa-image",
+            "filename": "sample_portrait.png"
+        },
+        {
+            "id": "sample_voiceover",
+            "type": "audio",
+            "title": "Sample Voice Recording",
+            "description": "Spoken voice track with ambient noise for denoise, STT, and isolation",
+            "icon": "fa-wave-square",
+            "filename": "sample_voiceover.wav"
+        }
+    ]
+    return jsonify({"status": "success", "samples": samples})
+
+@assistant_bp.route('/api/agent/sample/load', methods=['POST'])
+def agent_load_sample():
+    """Loads a demo sample media item directly into the active upload workspace."""
+    data = request.get_json(silent=True) or {}
+    sample_id = str(data.get("sample_id") or "").strip()
+    sample_map = {
+        "sample_clip": "sample_clip.mp4",
+        "sample_portrait": "sample_portrait.png",
+        "sample_voiceover": "sample_voiceover.wav"
+    }
+    sample_file = sample_map.get(sample_id)
+    if not sample_file:
+        return jsonify({"error": "Invalid or unknown sample identifier."}), 400
+
+    static_sample_path = os.path.join(app.root_path, "static", "samples", sample_file)
+    if not os.path.exists(static_sample_path):
+        return jsonify({"error": f"Sample asset '{sample_file}' not found on server."}), 404
+
+    unique_id = str(uuid.uuid4())
+    orig_ext = os.path.splitext(sample_file)[1].lower() or ".bin"
+    saved_filename = f"agent_{unique_id}{orig_ext}"
+    saved_path = os.path.join(app.config['UPLOAD_FOLDER'], saved_filename)
+    shutil.copyfile(static_sample_path, saved_path)
+
+    return _process_and_register_uploaded_media(saved_path, sample_file)
+
 @assistant_bp.route('/api/agent/upload', methods=['POST'])
 def agent_upload_media():
     """Direct upload endpoint for AI Agent Full Window workspace."""
@@ -349,7 +406,8 @@ def agent_chat_endpoint():
             "plan_notes": agent_plan.get("plan_notes", []) if isinstance(agent_plan.get("plan_notes"), list) else [],
             "skills_used": agent_plan.get("skills_used", []) if isinstance(agent_plan.get("skills_used"), list) else [],
             "auto_skill": agent_plan.get("auto_skill") if isinstance(agent_plan.get("auto_skill"), str) else None,
-            "suggested_actions": suggested_actions
+            "suggested_actions": suggested_actions,
+            "elapsed_seconds": round(time.perf_counter() - execution_started, 2) if execution_results else 0
         })
 
     except Exception as err:

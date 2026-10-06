@@ -42,6 +42,13 @@
     const dragOverlay = document.getElementById('dragOverlay');
     const sessionHeaderTitle = document.getElementById('sessionHeaderTitle');
     const clearChatBtn = document.getElementById('clearChatBtn');
+    const adaptivePromptTray = document.getElementById('adaptivePromptTray');
+    const sessionSearchInput = document.getElementById('sessionSearchInput');
+    const openMemoryBtn = document.getElementById('openMemoryBtn');
+    const openToolsBtn = document.getElementById('openToolsBtn');
+    const memoryModal = document.getElementById('memoryModal');
+    const capabilitiesModal = document.getElementById('capabilitiesModal');
+    const voiceWaveVisualizer = document.getElementById('voiceWaveVisualizer');
 
     // ─── INITIALIZATION ───
     function init() {
@@ -49,12 +56,16 @@
         setupEventListeners();
         setupVoiceRecognition();
         setupDragAndDrop();
+        setupSessionSearch();
+        setupMemoryModal();
+        setupCapabilitiesModal();
 
         if (sessions.length === 0) {
             createNewSession();
         } else {
             switchSession(sessions[0].id);
         }
+        renderAdaptivePrompts();
 
         // Check if user dropped a file on the landing page
         try {
@@ -128,6 +139,7 @@
         activeMedia = session.activeMedia || null;
         updateActiveMediaDisplay();
         updateSubAgentChipStatus(activeMedia ? activeMedia.type : null);
+        renderAdaptivePrompts();
         renderMessages();
         renderSessionsList();
         chatInput.focus();
@@ -146,13 +158,80 @@
         }
     }
 
+    function renameSession(id) {
+        const session = sessions.find(s => s.id === id);
+        if (!session) return;
+        const newTitle = prompt('Rename conversation:', session.title || 'Conversation');
+        if (newTitle && newTitle.trim()) {
+            session.title = newTitle.trim();
+            saveSessionsToStorage();
+            if (currentSessionId === id) sessionHeaderTitle.textContent = session.title;
+            renderSessionsList();
+        }
+    }
+
+    function exportSessionMarkdown(id) {
+        const session = sessions.find(s => s.id === id) || getCurrentSession();
+        if (!session) return;
+        let md = `# ${session.title || 'Conversation'}\n\n`;
+        md += `*Exported from Universal AI Agent on ${new Date().toLocaleString()}*\n\n---\n\n`;
+        (session.messages || []).forEach(m => {
+            if (m.role === 'user') {
+                md += `### 👤 You (${m.timestamp || ''})\n\n${m.content || ''}\n\n`;
+                if (m.attachedMedia) {
+                    md += `*Attached Media: ${m.attachedMedia.original_name || m.attachedMedia.filename} (${(m.attachedMedia.type || 'file').toUpperCase()})*\n\n`;
+                }
+            } else {
+                md += `### 🤖 ${m.delegated_subagent || assistantName()} (${m.timestamp || ''})\n\n`;
+                if (m.thought) md += `> **Reasoning:** ${m.thought}\n\n`;
+                md += `${m.reply || ''}\n\n`;
+                if (m.output_url) md += `*Generated Output: ${m.output_url}*\n\n`;
+            }
+            md += `---\n\n`;
+        });
+        const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${(session.title || 'conversation').replace(/[^a-z0-9]/gi, '_').toLowerCase()}.md`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        showToast('Conversation exported as Markdown.', 'success');
+    }
+
+    function setupSessionSearch() {
+        if (!sessionSearchInput) return;
+        sessionSearchInput.addEventListener('input', () => {
+            renderSessionsList();
+        });
+    }
+
     function setAttr(element, name, value) {
         if (element && typeof element.setAttribute === 'function') element.setAttribute(name, value);
     }
 
     function renderSessionsList() {
         sessionsList.innerHTML = '';
-        sessions.forEach(sess => {
+        const query = sessionSearchInput ? (sessionSearchInput.value || '').trim().toLowerCase() : '';
+        const filtered = sessions.filter(sess => {
+            if (!query) return true;
+            const inTitle = (sess.title || '').toLowerCase().includes(query);
+            const inMessages = (sess.messages || []).some(m => (m.content || m.reply || '').toLowerCase().includes(query));
+            return inTitle || inMessages;
+        });
+
+        if (filtered.length === 0) {
+            const empty = document.createElement('div');
+            empty.className = 'sessions-empty-state';
+            empty.style.cssText = 'padding: 12px; font-size: 12px; color: var(--text-3); text-align: center;';
+            empty.textContent = query ? 'No matching conversations' : 'No conversations yet';
+            sessionsList.appendChild(empty);
+            return;
+        }
+
+        filtered.forEach(sess => {
             const item = document.createElement('div');
             item.className = `session-item ${sess.id === currentSessionId ? 'active' : ''}`;
             item.onclick = () => {
@@ -167,6 +246,36 @@
             if (sess.id === currentSessionId) setAttr(titleSpan, 'aria-current', 'true');
             titleSpan.innerHTML = `<i class="fas fa-message" aria-hidden="true"></i> ${escapeHtml(sess.title || 'Conversation')}`;
 
+            titleSpan.ondblclick = (e) => {
+                e.stopPropagation();
+                renameSession(sess.id);
+            };
+
+            const actionsWrap = document.createElement('div');
+            actionsWrap.style.cssText = 'display: inline-flex; align-items: center; gap: 2px;';
+
+            const editBtn = document.createElement('button');
+            editBtn.type = 'button';
+            editBtn.className = 'session-del-btn';
+            editBtn.title = 'Rename conversation';
+            setAttr(editBtn, 'aria-label', `Rename: ${sess.title || 'Conversation'}`);
+            editBtn.innerHTML = '<i class="fas fa-pen" style="font-size: 10px;"></i>';
+            editBtn.onclick = (e) => {
+                e.stopPropagation();
+                renameSession(sess.id);
+            };
+
+            const exportBtn = document.createElement('button');
+            exportBtn.type = 'button';
+            exportBtn.className = 'session-del-btn';
+            exportBtn.title = 'Export as Markdown';
+            setAttr(exportBtn, 'aria-label', `Export: ${sess.title || 'Conversation'}`);
+            exportBtn.innerHTML = '<i class="fas fa-arrow-down-to-bracket" style="font-size: 10px;"></i>';
+            exportBtn.onclick = (e) => {
+                e.stopPropagation();
+                exportSessionMarkdown(sess.id);
+            };
+
             const delBtn = document.createElement('button');
             delBtn.type = 'button';
             delBtn.className = 'session-del-btn';
@@ -175,8 +284,12 @@
             delBtn.innerHTML = '<i class="fas fa-trash-alt"></i>';
             delBtn.onclick = (e) => deleteSession(sess.id, e);
 
+            actionsWrap.appendChild(editBtn);
+            actionsWrap.appendChild(exportBtn);
+            actionsWrap.appendChild(delBtn);
+
             item.appendChild(titleSpan);
-            item.appendChild(delBtn);
+            item.appendChild(actionsWrap);
             sessionsList.appendChild(item);
         });
     }
@@ -191,6 +304,7 @@
             activeMedia = mediaObj;
             updateActiveMediaDisplay();
             updateSubAgentChipStatus(mediaObj ? mediaObj.type : null);
+            renderAdaptivePrompts();
         }
     }
 
@@ -735,6 +849,89 @@
         messagesStream.scrollTop = messagesStream.scrollHeight;
     }
 
+    async function loadSampleMedia(sampleId) {
+        showToast('Loading demo media...', 'info');
+        try {
+            const resp = await fetch('/api/agent/sample/load', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sample_id: sampleId })
+            });
+            if (!resp.ok) {
+                const err = await resp.json().catch(() => ({}));
+                throw new Error(err.error || 'Failed to load demo sample.');
+            }
+            const data = await resp.json();
+            setActiveMedia({
+                id: data.id,
+                filename: data.filename,
+                original_name: data.original_name,
+                type: data.type,
+                size: data.size,
+                url: data.url
+            });
+            showToast(`Loaded demo ${data.type}: ${data.original_name}`, 'success');
+            return data;
+        } catch (e) {
+            console.error('Failed to load demo sample:', e);
+            showToast(e.message || 'Error loading demo media', 'error');
+            return null;
+        }
+    }
+
+    const ADAPTIVE_PROMPTS_BY_TYPE = {
+        video: [
+            { label: 'Trim silence', icon: 'fa-scissors', prompt: 'Auto trim silence from start and end' },
+            { label: 'Speed up 1.5×', icon: 'fa-gauge-high', prompt: 'Speed up video by 1.5x' },
+            { label: 'Make GIF', icon: 'fa-film', prompt: 'Export first 4 seconds as a high quality GIF' },
+            { label: 'Extract audio', icon: 'fa-wave-square', prompt: 'Extract audio track as MP3' },
+            { label: 'Mute audio', icon: 'fa-volume-xmark', prompt: 'Mute audio and export silent video' }
+        ],
+        audio: [
+            { label: 'Clean noise', icon: 'fa-wand-magic-sparkles', prompt: 'Remove background noise and clean audio' },
+            { label: 'Isolate voice', icon: 'fa-user-voice', prompt: 'Isolate vocal speech track' },
+            { label: 'Transcribe speech', icon: 'fa-file-lines', prompt: 'Transcribe speech with timestamped subtitles' },
+            { label: 'Trim silence', icon: 'fa-scissors', prompt: 'Auto trim silence at beginning and end' },
+            { label: 'Normalize volume', icon: 'fa-sliders', prompt: 'Normalize loudness to -14 LUFS' }
+        ],
+        image: [
+            { label: 'Cutout background', icon: 'fa-wand-magic-sparkles', prompt: 'Remove background and isolate subject' },
+            { label: 'Upscale 4×', icon: 'fa-expand-alt', prompt: 'Upscale image to 4x high resolution' },
+            { label: 'Enhance clarity', icon: 'fa-sparkles', prompt: 'Enhance image clarity and contrast' },
+            { label: 'Convert to PNG', icon: 'fa-image', prompt: 'Convert image to PNG format' }
+        ],
+        none: [
+            { label: 'What can you do?', icon: 'fa-circle-question', prompt: 'What tools and editing capabilities do you have?' },
+            { label: 'Try sample video', icon: 'fa-film', sample: 'sample_clip', prompt: 'Trim video from 2.3 second to 5.3 second' },
+            { label: 'Try sample portrait', icon: 'fa-image', sample: 'sample_portrait', prompt: 'Remove background and isolate subject' },
+            { label: 'Try sample audio', icon: 'fa-wave-square', sample: 'sample_voiceover', prompt: 'Remove background noise and transcribe speech' }
+        ]
+    };
+
+    function renderAdaptivePrompts() {
+        if (!adaptivePromptTray) return;
+        adaptivePromptTray.innerHTML = '';
+        const type = activeMedia && activeMedia.type ? activeMedia.type : 'none';
+        const prompts = ADAPTIVE_PROMPTS_BY_TYPE[type] || ADAPTIVE_PROMPTS_BY_TYPE.none;
+
+        prompts.forEach(p => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'adaptive-pill-btn';
+            btn.innerHTML = `<i class="fas ${p.icon || 'fa-bolt'}"></i> <span>${escapeHtml(p.label)}</span>`;
+            btn.onclick = async () => {
+                if (p.sample && !activeMedia) {
+                    await loadSampleMedia(p.sample);
+                }
+                chatInput.value = p.prompt;
+                chatInput.style.height = 'auto';
+                chatInput.style.height = Math.min(chatInput.scrollHeight, 180) + 'px';
+                chatInput.focus();
+            };
+            adaptivePromptTray.appendChild(btn);
+        });
+    }
+
     function renderWelcomeHero() {
         messagesStream.innerHTML = `
             <div class="welcome-hero">
@@ -746,23 +943,49 @@
                     Add a video, audio clip or image, then describe the edit in plain language.
                     You can chain several edits in one message, or type <kbd>@</kbd> to use a skill.
                 </p>
+
+                <!-- Instant Demo Presets -->
+                <div class="welcome-demo-section">
+                    <span class="welcome-demo-label"><i class="fas fa-wand-magic-sparkles tone-indigo"></i> Try Instant Demo Media (1-click test):</span>
+                    <div class="welcome-demo-chips">
+                        <button type="button" class="demo-chip-btn" data-sample-id="sample_clip">
+                            <i class="fas fa-film"></i> <span>Sample Video Clip</span>
+                        </button>
+                        <button type="button" class="demo-chip-btn" data-sample-id="sample_portrait">
+                            <i class="fas fa-image"></i> <span>Sample Portrait Photo</span>
+                        </button>
+                        <button type="button" class="demo-chip-btn" data-sample-id="sample_voiceover">
+                            <i class="fas fa-wave-square"></i> <span>Sample Voice Recording</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Inline Hero Dropzone -->
+                <div class="hero-dropzone" id="heroDropZone" tabindex="0" role="button" aria-label="Drop media here to start editing">
+                    <div class="hero-dropzone-icon"><i class="fas fa-cloud-arrow-up"></i></div>
+                    <div class="hero-dropzone-text">
+                        <span class="hero-dropzone-title">Drop your file here to edit</span>
+                        <span class="hero-dropzone-hint">Video, Audio, or Images · or <button type="button" class="hero-dropzone-browse-btn" id="heroBrowseBtn">browse files</button></span>
+                    </div>
+                </div>
+
                 <div class="starter-cards-grid">
-                    <button type="button" class="starter-card" data-prompt="Trim video from 2.3 second to 5.3 second">
+                    <button type="button" class="starter-card" data-prompt="Trim video from 2.3 second to 5.3 second" data-sample="sample_clip">
                         <span class="starter-card-icon tone-indigo" aria-hidden="true"><i class="fas fa-scissors"></i></span>
                         <span class="starter-card-title">Trim a video</span>
                         <span class="starter-card-desc">Keep an exact range, to the millisecond.</span>
                     </button>
-                    <button type="button" class="starter-card" data-prompt="Remove background and isolate subject">
+                    <button type="button" class="starter-card" data-prompt="Remove background and isolate subject" data-sample="sample_portrait">
                         <span class="starter-card-icon tone-rose" aria-hidden="true"><i class="fas fa-wand-magic-sparkles"></i></span>
                         <span class="starter-card-title">Remove a background</span>
                         <span class="starter-card-desc">Cut out the subject with clean edges.</span>
                     </button>
-                    <button type="button" class="starter-card" data-prompt="Transcribe speech to text and clean background noise">
+                    <button type="button" class="starter-card" data-prompt="Transcribe speech to text and clean background noise" data-sample="sample_voiceover">
                         <span class="starter-card-icon tone-sky" aria-hidden="true"><i class="fas fa-microphone-lines"></i></span>
                         <span class="starter-card-title">Transcribe speech</span>
                         <span class="starter-card-desc">Text plus SRT and VTT subtitles.</span>
                     </button>
-                    <button type="button" class="starter-card" data-prompt="Upscale image to 4x high resolution">
+                    <button type="button" class="starter-card" data-prompt="Upscale image to 4x high resolution" data-sample="sample_portrait">
                         <span class="starter-card-icon tone-green" aria-hidden="true"><i class="fas fa-expand-alt"></i></span>
                         <span class="starter-card-title">Upscale an image</span>
                         <span class="starter-card-desc">Enlarge 2x or 4x with restored detail.</span>
@@ -771,9 +994,41 @@
             </div>
         `;
 
+        // Wire up demo chips
+        document.querySelectorAll('.demo-chip-btn').forEach(btn => {
+            btn.onclick = async () => {
+                const sampleId = btn.getAttribute('data-sample-id');
+                btn.disabled = true;
+                await loadSampleMedia(sampleId);
+                btn.disabled = false;
+            };
+        });
+
+        // Wire up hero dropzone
+        const heroDrop = document.getElementById('heroDropZone');
+        const heroBrowse = document.getElementById('heroBrowseBtn');
+        if (heroBrowse) heroBrowse.onclick = (e) => { e.stopPropagation(); filePicker.click(); };
+        if (heroDrop) {
+            heroDrop.onclick = () => filePicker.click();
+            heroDrop.addEventListener('dragover', (e) => { e.preventDefault(); heroDrop.classList.add('drag-active'); });
+            heroDrop.addEventListener('dragleave', () => heroDrop.classList.remove('drag-active'));
+            heroDrop.addEventListener('drop', (e) => {
+                e.preventDefault();
+                heroDrop.classList.remove('drag-active');
+                if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                    uploadMediaFile(e.dataTransfer.files[0]);
+                }
+            });
+        }
+
         document.querySelectorAll('.starter-card').forEach(card => {
-            card.onclick = () => {
+            card.onclick = async () => {
                 const prompt = card.getAttribute('data-prompt');
+                const sample = card.getAttribute('data-sample');
+                if (!activeMedia && sample) {
+                    showToast('Loading demo media for this edit...', 'info');
+                    await loadSampleMedia(sample);
+                }
                 handleSendMessage(prompt);
             };
         });
@@ -802,6 +1057,14 @@
             <div class="message-bubble">
                 ${fileChipHtml}
                 <div class="user-text">${escapeHtml(msg.content)}</div>
+                <div class="user-actions-toolbar">
+                    <button type="button" class="user-action-btn edit-prompt-btn" title="Edit this prompt in composer">
+                        <i class="fas fa-pen"></i> <span>Edit</span>
+                    </button>
+                    <button type="button" class="user-action-btn copy-prompt-btn" title="Copy prompt text">
+                        <i class="fas fa-copy"></i> <span>Copy</span>
+                    </button>
+                </div>
                 ${timeStr}
             </div>
             <div class="message-avatar" title="You">
@@ -809,6 +1072,24 @@
             </div>
         `;
         messagesStream.appendChild(row);
+
+        row.querySelector('.edit-prompt-btn')?.addEventListener('click', () => {
+            chatInput.value = msg.content;
+            chatInput.style.height = 'auto';
+            chatInput.style.height = Math.min(chatInput.scrollHeight, 180) + 'px';
+            chatInput.focus();
+            chatInput.scrollIntoView({ behavior: 'smooth' });
+            showToast('Prompt placed in composer for editing.', 'info');
+        });
+
+        row.querySelector('.copy-prompt-btn')?.addEventListener('click', async () => {
+            try {
+                await navigator.clipboard.writeText(msg.content);
+                showToast('Prompt copied to clipboard.', 'success');
+            } catch (_) {
+                showToast('Could not copy prompt.', 'error');
+            }
+        });
     }
 
     function assistantName() {
@@ -859,9 +1140,34 @@
             skills_used: (Array.isArray(msg.skills_used) ? msg.skills_used : [])
                 .filter(item => item && typeof item.id === 'string')
                 .map(item => ({ id: item.id, title: asText(item.title) || item.id })),
-            auto_skill: typeof msg.auto_skill === 'string' ? msg.auto_skill : null
+            auto_skill: typeof msg.auto_skill === 'string' ? msg.auto_skill : null,
+            elapsed_seconds: typeof msg.elapsed_seconds === 'number' ? msg.elapsed_seconds : null
         };
     }
+
+    function formatToolName(tool) {
+        if (!tool) return 'Tool Operation';
+        return String(tool)
+            .replace(/_/g, ' ')
+            .replace(/\b\w/g, c => c.toUpperCase());
+    }
+
+    window.handoffMediaToStudio = function (url, workspace, filename) {
+        if (!url) return;
+        try {
+            localStorage.setItem('avi_studio_pending_import', JSON.stringify({
+                url: url,
+                workspace: workspace || 'combo',
+                filename: filename || url.split('/').pop()
+            }));
+            showToast(`Opening in ${workspace === 'combo' ? 'Multitrack Studio' : workspace.toUpperCase()}...`, 'success');
+            setTimeout(() => {
+                window.location.href = '/studio';
+            }, 250);
+        } catch (_) {
+            window.location.href = '/studio';
+        }
+    };
 
     function renderAgentMessage(rawMsg) {
         const msg = normalizeAgentMessage(rawMsg && typeof rawMsg === 'object' ? rawMsg : {});
@@ -892,6 +1198,64 @@
                     </summary>
                     <div class="cot-content">${escapeHtml(msg.thought)}</div>
                 </details>
+            `;
+        }
+
+        // Pipeline Stepper Summary (Transparent Multi-Step Execution)
+        let pipelineHtml = '';
+        if (msg.execution_results && msg.execution_results.length > 0) {
+            const count = msg.execution_results.length;
+            const timeTag = msg.elapsed_seconds ? `in ${msg.elapsed_seconds}s` : 'completed';
+            const steps = msg.execution_results.map((st, i) => {
+                const isErr = st.status === 'error';
+                const icon = isErr ? 'fa-circle-xmark tone-rose' : 'fa-circle-check tone-emerald';
+                return `
+                    <div class="pipeline-step-item ${isErr ? 'has-error' : 'is-success'}">
+                        <i class="fas ${icon}" aria-hidden="true"></i>
+                        <span class="pipeline-step-num">Step ${i + 1}</span>
+                        <span class="pipeline-step-title">${escapeHtml(formatToolName(st.tool))}</span>
+                        <span class="pipeline-step-badge">${isErr ? 'Failed' : 'Executed'}</span>
+                    </div>
+                `;
+            }).join('');
+
+            pipelineHtml = `
+                <details class="pipeline-summary-accordion">
+                    <summary class="pipeline-summary-header">
+                        <span class="pipeline-badge"><i class="fas fa-layer-group"></i> ${count} ${count === 1 ? 'tool' : 'tools'} ${timeTag}</span>
+                        <span class="pipeline-agent-tag"><i class="fas ${subagentIcon}"></i> ${escapeHtml(subagentLabel)}</span>
+                        <i class="fas fa-chevron-down pipeline-chevron"></i>
+                    </summary>
+                    <div class="pipeline-steps-list">${steps}</div>
+                </details>
+            `;
+        }
+
+        // Interactive micro-controls on result cards (speed, denoise, etc.)
+        let microControlsHtml = '';
+        const toolsUsed = (msg.execution_results || []).map(r => r.tool);
+        if (toolsUsed.includes('change_speed') || /speed/i.test(msg.reply || '')) {
+            microControlsHtml = `
+                <div class="interactive-micro-controls">
+                    <span class="micro-control-label"><i class="fas fa-gauge-high"></i> Fine-tune Speed:</span>
+                    <div class="micro-control-chips">
+                        <button type="button" class="micro-chip-btn" data-agent-prompt="Speed up video by 1.25x">1.25×</button>
+                        <button type="button" class="micro-chip-btn" data-agent-prompt="Speed up video by 1.5x">1.5×</button>
+                        <button type="button" class="micro-chip-btn" data-agent-prompt="Speed up video by 2.0x">2.0×</button>
+                        <button type="button" class="micro-chip-btn" data-agent-prompt="Reset speed to 1.0x normal">1.0× Normal</button>
+                    </div>
+                </div>
+            `;
+        } else if (toolsUsed.includes('reduce_noise') || /noise/i.test(msg.reply || '')) {
+            microControlsHtml = `
+                <div class="interactive-micro-controls">
+                    <span class="micro-control-label"><i class="fas fa-sliders"></i> Denoise Intensity:</span>
+                    <div class="micro-control-chips">
+                        <button type="button" class="micro-chip-btn" data-agent-prompt="Apply light subtle noise reduction">Mild</button>
+                        <button type="button" class="micro-chip-btn" data-agent-prompt="Apply standard balanced noise reduction">Standard</button>
+                        <button type="button" class="micro-chip-btn" data-agent-prompt="Apply aggressive maximum noise reduction">Heavy</button>
+                    </div>
+                </div>
             `;
         }
 
@@ -995,6 +1359,27 @@
                     <i class="fas fa-image"></i> ${item.tool === 'extract_frame' ? 'Download thumbnail' : 'Download extra file'}
                 </a>`).join('');
 
+            // Cross-studio handoff buttons
+            const studioMultitrackBtn = (isVideoOutput || isAudioOutput) ? `
+                <button type="button" class="btn-handoff-studio" onclick="window.handoffMediaToStudio('${escapeHtml(url)}', 'combo', '${escapeHtml(msg.output_file || '')}')" title="Open in Multitrack Timeline Studio">
+                    <i class="fas fa-layer-group"></i> Open in Studio
+                </button>
+            ` : '';
+
+            const studioSpecificBtn = isVideoOutput ? `
+                <button type="button" class="btn-handoff-studio" onclick="window.handoffMediaToStudio('${escapeHtml(url)}', 'video', '${escapeHtml(msg.output_file || '')}')" title="Open in Video Editor">
+                    <i class="fas fa-film"></i> Video Editor
+                </button>
+            ` : (isAudioOutput ? `
+                <button type="button" class="btn-handoff-studio" onclick="window.handoffMediaToStudio('${escapeHtml(url)}', 'audio', '${escapeHtml(msg.output_file || '')}')" title="Open in Audio Editor">
+                    <i class="fas fa-wave-square"></i> Audio Editor
+                </button>
+            ` : (isImageOutput ? `
+                <button type="button" class="btn-handoff-studio" onclick="window.handoffMediaToStudio('${escapeHtml(url)}', 'image', '${escapeHtml(msg.output_file || '')}')" title="Open in Image Editor">
+                    <i class="fas fa-image"></i> Image Editor
+                </button>
+            ` : ''));
+
             mediaHtml = `
                 <div class="media-output-card">
                     <div class="media-output-preview" id="previewBox_${Date.now()}">
@@ -1006,6 +1391,8 @@
                             <i class="fas fa-download"></i> Download Export
                         </a>
                         <div class="media-actions-group">
+                            ${studioMultitrackBtn}
+                            ${studioSpecificBtn}
                             ${compareBtn}
                             ${copyBtn}
                             ${snapshotBtn}
@@ -1016,6 +1403,7 @@
                             </button>
                         </div>
                     </div>
+                    ${microControlsHtml}
                     ${transcriptHtml}
                 </div>
             `;
@@ -1059,6 +1447,7 @@
             </div>
             <div class="message-bubble">
                 ${skillsHeaderHtml}
+                ${pipelineHtml}
                 ${cotHtml}
                 <div class="agent-text">${formatMarkdown(msg.reply || '')}</div>
                 ${mediaHtml}
@@ -1068,11 +1457,32 @@
                     <button type="button" class="bubble-action-btn copy-msg-btn" onclick="window.copyAgentReply(this)" title="Copy response text" aria-label="Copy response">
                         <i class="fas fa-copy"></i> <span>Copy text</span>
                     </button>
+                    <button type="button" class="bubble-action-btn retry-msg-btn" title="Retry last user prompt" aria-label="Retry response">
+                        <i class="fas fa-rotate-right"></i> <span>Retry</span>
+                    </button>
+                    <button type="button" class="bubble-action-btn export-md-btn" title="Export conversation as Markdown" aria-label="Export Markdown">
+                        <i class="fas fa-arrow-down-to-bracket"></i> <span>Export</span>
+                    </button>
                     ${timeMetaHtml}
                 </div>
             </div>
         `;
         messagesStream.appendChild(row);
+
+        row.querySelector('.retry-msg-btn')?.addEventListener('click', () => {
+            const session = getCurrentSession();
+            if (!session) return;
+            const lastUser = [...session.messages].reverse().find(m => m.role === 'user');
+            if (lastUser && lastUser.content) {
+                handleSendMessage(lastUser.content);
+            } else {
+                showToast('No previous user message found to retry.', 'info');
+            }
+        });
+
+        row.querySelector('.export-md-btn')?.addEventListener('click', () => {
+            exportSessionMarkdown(currentSessionId);
+        });
         if (row.querySelectorAll) {
             row.querySelectorAll('.audio-embed-wrapper').forEach(w => {
                 if (window.renderStudioAudioPlayer) {
@@ -2468,10 +2878,18 @@
         // Global Keyboard Hotkeys
         window.addEventListener('keydown', (e) => {
             const inspectorModal = document.getElementById('mediaInspectorModal');
-            // Escape closes inspector first, then shortcuts modal
+            // Escape closes inspector first, then memory/capabilities/shortcuts modal
             if (e.key === 'Escape') {
                 if (inspectorModal && !inspectorModal.classList.contains('hidden')) {
                     window.closeMediaInspector();
+                    return;
+                }
+                if (memoryModal && memoryModal.style.display !== 'none') {
+                    memoryModal.style.display = 'none';
+                    return;
+                }
+                if (capabilitiesModal && capabilitiesModal.style.display !== 'none') {
+                    capabilitiesModal.style.display = 'none';
                     return;
                 }
                 if (shortcutsModal && shortcutsModal.classList.contains('active')) {
@@ -2634,33 +3052,256 @@
     }
     window.showAgentToast = showToast;
 
-    // ─── VOICE RECOGNITION (WEB SPEECH API) ───
+    // ─── VOICE RECOGNITION (LOCAL AUDIO / SPEECH-TO-TEXT) ───
     function setupVoiceRecognition() {
+        if (!micBtn) return;
         if (!window.LocalVoiceInput) {
             micBtn.disabled = true;
             micBtn.title = 'Local voice input is unavailable';
             return;
         }
         let dictationSession = null;
+        const statusEl = document.getElementById('voiceWaveStatus');
+        const bars = voiceWaveVisualizer ? voiceWaveVisualizer.querySelectorAll('.v-bar') : [];
+
         const voice = window.LocalVoiceInput.create({
             onState(state) {
-                if (state === 'recording') dictationSession = currentSessionId;
+                if (state === 'recording') {
+                    dictationSession = currentSessionId;
+                    if (voiceWaveVisualizer) voiceWaveVisualizer.style.display = 'inline-flex';
+                    if (statusEl) statusEl.textContent = 'Listening...';
+                } else if (state === 'transcribing') {
+                    if (voiceWaveVisualizer) voiceWaveVisualizer.style.display = 'inline-flex';
+                    if (statusEl) statusEl.textContent = 'Transcribing...';
+                } else {
+                    if (voiceWaveVisualizer) voiceWaveVisualizer.style.display = 'none';
+                    bars.forEach(b => { b.style.height = '6px'; });
+                }
                 micBtn.classList.toggle('recording', state === 'recording');
                 micBtn.disabled = state === 'transcribing';
                 micBtn.title = state === 'recording' ? 'Recording locally — click to transcribe'
                     : state === 'transcribing' ? 'Transcribing locally...' : 'Local voice input';
             },
+            onAudioLevel(level) {
+                if (!bars || bars.length === 0) return;
+                bars.forEach((bar, idx) => {
+                    const factor = [0.6, 1.1, 1.5, 0.9, 0.5][idx] || 1;
+                    const h = Math.max(4, Math.min(20, Math.round(4 + level * 26 * factor)));
+                    bar.style.height = `${h}px`;
+                });
+            },
             onTranscript(transcript) {
                 if (currentSessionId !== dictationSession || !transcript) return;
                 chatInput.value = chatInput.value ? chatInput.value + ' ' + transcript : transcript;
                 chatInput.focus();
+                chatInput.dispatchEvent(new Event('input', { bubbles: true }));
                 sendBtn.disabled = isProcessing;
             },
-            onError(message) { showToast(message, 'error'); }
+            onError(message) {
+                if (voiceWaveVisualizer) voiceWaveVisualizer.style.display = 'none';
+                showToast(message, 'error');
+            }
         });
+
         micBtn.disabled = !voice.supported;
         micBtn.title = voice.supported ? 'Local voice input' : 'Microphone recording is unavailable in this browser';
         micBtn.onclick = () => voice.toggle();
+        if (voiceWaveVisualizer) {
+            voiceWaveVisualizer.onclick = () => voice.toggle();
+        }
+    }
+
+    // ─── COPILOT MEMORY & PREFERENCES MODAL ───
+    function setupMemoryModal() {
+        if (!memoryModal || !openMemoryBtn) return;
+        const closeBtn = document.getElementById('closeMemoryBtn');
+        const doneBtn = document.getElementById('doneMemoryBtn');
+        const clearBtn = document.getElementById('clearAllMemoryBtn');
+        const bodyEl = document.getElementById('memoryModalBody');
+
+        const openModal = async () => {
+            memoryModal.style.display = 'flex';
+            if (bodyEl) bodyEl.innerHTML = '<div class="dialog-empty-state"><i class="fas fa-spinner fa-spin"></i> Loading copilot memory...</div>';
+            try {
+                const resp = await fetch('/api/agent/memory');
+                if (!resp.ok) throw new Error('Failed to load memory');
+                const data = await resp.json();
+                renderMemoryContent(data);
+            } catch (err) {
+                if (bodyEl) bodyEl.innerHTML = `<div class="dialog-empty-state" style="color:var(--error);">${escapeHtml(err.message)}</div>`;
+            }
+        };
+
+        const closeModal = () => {
+            memoryModal.style.display = 'none';
+        };
+
+        const renderMemoryContent = (data) => {
+            if (!bodyEl) return;
+            const memoriesCount = data.memories || 0;
+            const collections = data.collections || {};
+            const enabled = data.enabled !== false;
+
+            let colHtml = '';
+            const labels = {
+                conversation: 'Turn History',
+                preference: 'User Preferences',
+                media_fact: 'Media Facts',
+                edit_outcome: 'Edit Outcomes',
+                job: 'Orchestration Plans',
+                session_summary: 'Session Summaries'
+            };
+
+            Object.entries(collections).forEach(([k, v]) => {
+                const title = labels[k] || k;
+                colHtml += `
+                    <div class="memory-item-row">
+                        <div>
+                            <div class="memory-key">${escapeHtml(title)}</div>
+                            <div class="memory-val">${v} recorded items</div>
+                        </div>
+                        <span class="pipeline-step-badge">${v}</span>
+                    </div>`;
+            });
+
+            const currentSession = getCurrentSession();
+            const sessionForgetHtml = currentSession ? `
+                <div class="memory-item-row" style="margin-top: 14px; border-color: rgba(99,102,241,0.3); background: var(--surface-1);">
+                    <div>
+                        <div class="memory-key"><i class="fas fa-comment-dots tone-indigo"></i> Active Conversation</div>
+                        <div class="memory-val">Forget memories only from "${escapeHtml(currentSession.title || 'current conversation')}"</div>
+                    </div>
+                    <button type="button" class="memory-forget-btn" id="forgetCurrentSessionBtn">Forget Chat</button>
+                </div>` : '';
+
+            bodyEl.innerHTML = `
+                <div style="margin-bottom: 14px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                        <span style="font-size:13px; font-weight:600; color:var(--text);">${escapeHtml(data.name || 'Copilot Memory')}</span>
+                        <span class="pipeline-step-badge" style="background:${enabled ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)'}; color:${enabled ? 'var(--success)' : 'var(--error)'};">
+                            ${enabled ? '● Active On-Device' : 'Disabled'}
+                        </span>
+                    </div>
+                    <p style="font-size:12px; color:var(--text-3); margin:0;">
+                        ${escapeHtml(data.retrieval || '100% on-device private memory store')} (${memoriesCount} memories stored).
+                    </p>
+                </div>
+                <div style="font-size:11px; font-weight:600; text-transform:uppercase; color:var(--text-3); margin-bottom:6px; letter-spacing:0.5px;">Collections Breakdown</div>
+                ${colHtml || '<div class="dialog-empty-state">No long-term memories stored yet.</div>'}
+                ${sessionForgetHtml}
+            `;
+
+            const forgetCurrBtn = document.getElementById('forgetCurrentSessionBtn');
+            if (forgetCurrBtn && currentSession) {
+                forgetCurrBtn.onclick = async () => {
+                    try {
+                        const delResp = await fetch(`/api/agent/memory?session_id=${encodeURIComponent(currentSession.id)}`, { method: 'DELETE' });
+                        if (!delResp.ok) throw new Error('Failed to forget session');
+                        showToast('Forgotten memory for this conversation', 'success');
+                        openModal();
+                    } catch (e) {
+                        showToast(e.message, 'error');
+                    }
+                };
+            }
+        };
+
+        openMemoryBtn.addEventListener('click', openModal);
+        if (closeBtn) closeBtn.addEventListener('click', closeModal);
+        if (doneBtn) doneBtn.addEventListener('click', closeModal);
+        memoryModal.addEventListener('click', (e) => {
+            if (e.target === memoryModal) closeModal();
+        });
+
+        if (clearBtn) {
+            clearBtn.addEventListener('click', () => {
+                showInlineConfirm('Are you sure you want to clear ALL memories? This will reset learned preferences across all sessions.', 'Clear All', async () => {
+                    try {
+                        const resp = await fetch('/api/agent/memory?scope=all', { method: 'DELETE' });
+                        if (!resp.ok) throw new Error('Failed to clear memory');
+                        showToast('All copilot memories erased', 'success');
+                        openModal();
+                    } catch (e) {
+                        showToast(e.message, 'error');
+                    }
+                });
+            });
+        }
+    }
+
+    // ─── TOOLS & SUBAGENTS CAPABILITIES MODAL ───
+    function setupCapabilitiesModal() {
+        if (!capabilitiesModal || !openToolsBtn) return;
+        const closeBtn = document.getElementById('closeCapabilitiesBtn');
+        const doneBtn = document.getElementById('doneCapabilitiesBtn');
+        const bodyEl = document.getElementById('capabilitiesModalBody');
+
+        const openModal = async () => {
+            capabilitiesModal.style.display = 'flex';
+            if (bodyEl) bodyEl.innerHTML = '<div class="dialog-empty-state"><i class="fas fa-spinner fa-spin"></i> Loading registered tools...</div>';
+            try {
+                const resp = await fetch('/api/agent/tools');
+                if (!resp.ok) throw new Error('Failed to load tool catalog');
+                const data = await resp.json();
+                renderCapabilities(data);
+            } catch (err) {
+                if (bodyEl) bodyEl.innerHTML = `<div class="dialog-empty-state" style="color:var(--error);">${escapeHtml(err.message)}</div>`;
+            }
+        };
+
+        const closeModal = () => {
+            capabilitiesModal.style.display = 'none';
+        };
+
+        const renderCapabilities = (data) => {
+            if (!bodyEl) return;
+            const subagents = data.subagents || [];
+            const tools = data.tools || [];
+
+            const subagentBadges = subagents.map(sa => {
+                const icon = sa.includes('Vision') ? 'fa-eye' :
+                    sa.includes('Video') ? 'fa-film' :
+                    sa.includes('Audio') ? 'fa-wave-square' :
+                    sa.includes('Inspector') ? 'fa-magnifying-glass' : 'fa-brain';
+                return `<span class="pipeline-step-badge" style="padding:4px 10px; font-size:11px;"><i class="fas ${icon}"></i> ${escapeHtml(sa)}</span>`;
+            }).join(' ');
+
+            let toolsHtml = '';
+            tools.forEach(t => {
+                const name = formatToolName(t.name);
+                const accepts = (t.accepts || []).join(', ');
+                const icon = t.kind === 'analysis' ? 'fa-chart-simple' :
+                    (t.accepts || []).includes('video') ? 'fa-film' :
+                    (t.accepts || []).includes('audio') ? 'fa-wave-square' : 'fa-wand-magic-sparkles';
+
+                toolsHtml += `
+                    <div class="tool-catalog-card">
+                        <div class="tool-catalog-title">
+                            <i class="fas ${icon} tone-indigo"></i>
+                            <span>${escapeHtml(name)}</span>
+                            <span class="pipeline-step-badge" style="margin-left:auto; font-size:10px;">${escapeHtml(t.agent || 'Agent')}</span>
+                        </div>
+                        <div class="tool-catalog-desc">${escapeHtml(t.description || '')}</div>
+                        ${accepts ? `<div style="margin-top:6px; font-size:10px; color:var(--text-3);"><i class="fas fa-arrow-right"></i> Accepts: <strong>${escapeHtml(accepts.toUpperCase())}</strong></div>` : ''}
+                    </div>`;
+            });
+
+            bodyEl.innerHTML = `
+                <div style="margin-bottom:16px;">
+                    <div style="font-size:11px; font-weight:600; text-transform:uppercase; color:var(--text-3); margin-bottom:8px; letter-spacing:0.5px;">Active Autonomous Sub-Agents</div>
+                    <div style="display:flex; flex-wrap:wrap; gap:6px;">${subagentBadges}</div>
+                </div>
+                <div style="font-size:11px; font-weight:600; text-transform:uppercase; color:var(--text-3); margin-bottom:8px; letter-spacing:0.5px;">Registered Execution Tools (${tools.length})</div>
+                <div class="tools-catalog-grid">${toolsHtml}</div>
+            `;
+        };
+
+        openToolsBtn.addEventListener('click', openModal);
+        if (closeBtn) closeBtn.addEventListener('click', closeModal);
+        if (doneBtn) doneBtn.addEventListener('click', closeModal);
+        capabilitiesModal.addEventListener('click', (e) => {
+            if (e.target === capabilitiesModal) closeModal();
+        });
     }
 
     // ─── WINDOW DRAG & DROP ───

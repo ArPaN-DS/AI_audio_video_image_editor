@@ -626,4 +626,28 @@ class StudioCore {
 
 document.addEventListener('DOMContentLoaded', () => {
     window.studioCore = new StudioCore();
+
+    // Check for pending handoff from AI Agent
+    try {
+        const pending = localStorage.getItem('avi_studio_pending_import');
+        if (pending) {
+            localStorage.removeItem('avi_studio_pending_import');
+            const data = JSON.parse(pending);
+            if (data && data.url) {
+                setTimeout(() => {
+                    if (window.studioCore?.loadProcessedMedia) {
+                        window.studioCore.loadProcessedMedia(data.url).then(() => {
+                            if (data.workspace && window.studioCore?.switchWorkspace) {
+                                window.studioCore.switchWorkspace(data.workspace);
+                            }
+                        }).catch(err => {
+                            console.error('Failed to import pending media into studio:', err);
+                        });
+                    }
+                }, 300);
+            }
+        }
+    } catch (e) {
+        console.error('Pending import error:', e);
+    }
 });

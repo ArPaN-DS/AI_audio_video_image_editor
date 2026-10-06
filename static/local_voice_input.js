@@ -6,7 +6,7 @@
         'audio/ogg;codecs=opus', 'audio/ogg', 'audio/mp4'
     ];
 
-    function create({ onTranscript, onState, onError } = {}) {
+    function create({ onTranscript, onState, onError, onAudioLevel } = {}) {
         let mimeType = null;
         try {
             mimeType = formats.find(format => window.MediaRecorder?.isTypeSupported(format)) || null;
@@ -22,6 +22,9 @@
         let recorder = null;
         let recordingTimer = null;
         let requestController = null;
+        let audioCtx = null;
+        let analyser = null;
+        let animFrame = null;
 
         function notify(callback, value) {
             if (disposed || typeof callback !== 'function') return;
@@ -58,6 +61,15 @@
 
         function cleanup() {
             clearRecordingTimer();
+            if (animFrame) {
+                window.cancelAnimationFrame(animFrame);
+                animFrame = null;
+            }
+            if (audioCtx) {
+                try { audioCtx.close(); } catch (_) {}
+                audioCtx = null;
+                analyser = null;
+            }
             if (recorder) {
                 recorder.ondataavailable = null;
                 recorder.onstop = null;
@@ -184,6 +196,29 @@
                 };
                 activeRecorder.start();
                 if (!isCurrent(token)) return;
+
+                try {
+                    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+                    if (AudioContextClass) {
+                        audioCtx = new AudioContextClass();
+                        const sourceNode = audioCtx.createMediaStreamSource(stream);
+                        analyser = audioCtx.createAnalyser();
+                        analyser.fftSize = 64;
+                        sourceNode.connect(analyser);
+                        const freqData = new Uint8Array(analyser.frequencyBinCount);
+                        const pumpLevel = () => {
+                            if (!isCurrent(token) || state !== 'recording') return;
+                            analyser.getByteFrequencyData(freqData);
+                            let total = 0;
+                            for (let i = 0; i < freqData.length; i++) total += freqData[i];
+                            const avg = total / (freqData.length * 255);
+                            notify(onAudioLevel, avg);
+                            animFrame = window.requestAnimationFrame(pumpLevel);
+                        };
+                        pumpLevel();
+                    }
+                } catch (_) {}
+
                 setState('recording');
                 if (isCurrent(token)) recordingTimer = window.setTimeout(stopRecording, 60000);
             } catch (error) {
