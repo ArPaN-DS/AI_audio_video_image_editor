@@ -56,11 +56,11 @@ DEFAULT_BASE_URL = "http://127.0.0.1:8000/v1"
 DEFAULT_MODEL_ID = "local-media-copilot"
 DISCOVERY_TTL_SEC = 60.0
 DISCOVERY_OFFLINE_TTL_SEC = 15.0   # re-check a down server sooner
-DISCOVERY_TIMEOUT_SEC = 2.0
+DISCOVERY_TIMEOUT_SEC = 5.0
 
 # Larger models think longer; give them proportionally more time before
 # treating the tier as too slow for this machine.
-TIER_TIMEOUTS_SEC = {TIER_LITE: 15, TIER_BALANCED: 25, TIER_MAX: 45}
+TIER_TIMEOUTS_SEC = {TIER_LITE: 30, TIER_BALANCED: 45, TIER_MAX: 60}
 TIER_PUBLIC_LABELS = {
     TIER_LITE: "Standard Reasoning",
     TIER_BALANCED: "Enhanced Reasoning",
@@ -76,14 +76,15 @@ def _env(name, *fallbacks, default=""):
     return default
 
 
+DEFAULT_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+
+
 def normalize_base_url(base_url):
-    """Return the base URL if it points at a loopback host, else None."""
+    """Return the base URL if it points at a valid HTTP/HTTPS host, else None."""
     try:
         parsed = urlparse((base_url or "").strip())
         hostname = parsed.hostname
         if parsed.scheme not in {"http", "https"} or not hostname:
-            return None
-        if hostname.lower() != "localhost" and not ipaddress.ip_address(hostname).is_loopback:
             return None
         return base_url.strip().rstrip("/")
     except ValueError:
@@ -146,7 +147,8 @@ class ServedModelDiscovery:
         self._meta = {}     # base_url -> {model id: raw /models item} (context length, owner, params)
 
     def _fetch_models(self, base_url):
-        req = urllib.request.Request(f"{base_url}/models", headers={"Accept": "application/json"})
+        headers = {"Accept": "application/json", "User-Agent": DEFAULT_USER_AGENT}
+        req = urllib.request.Request(f"{base_url}/models", headers=headers)
         with urllib.request.urlopen(req, timeout=DISCOVERY_TIMEOUT_SEC) as resp:
             body = json.loads(resp.read().decode("utf-8"))
         data = body.get("data") if isinstance(body, dict) else None
@@ -298,10 +300,11 @@ def _post(variant, payload, _recovered=False):
 
 def _post_once(variant, payload):
     body_out = attempt_payload(variant, payload)
+    headers = {"Content-Type": "application/json", "User-Agent": DEFAULT_USER_AGENT}
     req = urllib.request.Request(
         variant.options["url"],
         data=json.dumps(body_out).encode("utf-8"),
-        headers={"Content-Type": "application/json"},
+        headers=headers,
     )
     started = time.monotonic()
     try:

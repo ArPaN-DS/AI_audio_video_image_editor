@@ -34,7 +34,7 @@ NUMBER_WORDS = {'one': 1, 'two': 2, 'three': 3, 'four': 4, 'five': 5, 'six': 6, 
                 'forty': 40, 'fifty': 50, 'sixty': 60}
 
 GREETING_RE = re.compile(r"^(?:hi+|hello|hey+|howdy|sup|yo|hiya|greetings|good (?:morning|afternoon|evening))\b[\s!,.:-]*"
-                         r"(?:there\b|copilot\b|team\b)?[\s!,.:-]*")
+                         r"(?:there\b|copilot\b|team\b|rini\b)?[\s!,.:-]*", re.IGNORECASE)
 FILLER_WORDS = {
     'the', 'a', 'an', 'it', 'its', "it's", 'this', 'that', 'these', 'those', 'please', 'pls', 'plz', 'now', 'then',
     'also', 'and', 'to', 'for', 'me', 'my', 'of', 'in', 'on', 'with', 'just', 'can', 'you', 'could', 'would', 'will',
@@ -883,10 +883,10 @@ KNOWLEDGE = [
 
 def _question_reply(text, media_type):
     # 1. Capabilities / Help queries
-    if re.search(r"\b(?:what can you do|what do you do|help me|features|capabilit\w*|how does this work|who are you)\b", text) \
-            or text.strip(' ?!.') in ('help', 'menu', 'options'):
-        return {'reply': CAPABILITIES_REPLY, 'suggested_actions': SUGGESTIONS_BY_TYPE.get(media_type, SUGGESTIONS_BY_TYPE[None]),
-                'thought': 'Capability overview requested.'}
+    if re.search(r"\b(?:what can you do|what do you do|help me|features|capabilit\w*|how does this work|who are you|who r u|your name|what is your name|who is rini)\b", text, re.IGNORECASE) \
+            or text.strip(' ?!.') in ('help', 'menu', 'options', 'rini'):
+        return {'reply': f"I'm {branding.assistant_name()}!\n\n" + CAPABILITIES_REPLY, 'suggested_actions': SUGGESTIONS_BY_TYPE.get(media_type, SUGGESTIONS_BY_TYPE[None]),
+                'thought': 'Capability and identity overview requested.'}
 
     # 2. Check curated knowledge directly (supports "MP4 vs WebM", "what is mp3", "lufs", etc.)
     for pattern, reply, suggestions in KNOWLEDGE:

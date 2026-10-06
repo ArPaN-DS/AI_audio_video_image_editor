@@ -14,7 +14,7 @@ import os
 import re
 
 DEFAULT_PRODUCT_NAME = "Media Studio"
-DEFAULT_ASSISTANT_NAME = "AI Assistant"
+DEFAULT_ASSISTANT_NAME = "Rini"
 _MAX_NAME_LENGTH = 40
 _SAFE_NAME = re.compile(r"[^\w .&'+-]", re.UNICODE)
 

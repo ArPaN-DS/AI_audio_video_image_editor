@@ -96,13 +96,16 @@ def profile_for(variant):
 def local_confident(plan):
     """
     A validated, unambiguous rule-based answer (the parser clarifies whenever unsure): either a
-    non-empty plan, or an explained refusal (unsupported operation / wrong media type) — a model
-    cannot do better than that explanation, and would lose the planner's specific note.
+    non-empty plan, or an explained refusal (unsupported operation / wrong media type).
     """
     if not isinstance(plan, dict) or plan.get("clarification_needed") or not plan.get("validated", True):
         return False
-    if not plan.get("tools") and str(plan.get("thought", "")).startswith(CONFIDENT_CHAT_THOUGHTS):
-        return True       # greeting / capability overview / curated media knowledge: exact, product-true answers
+    ladder = current_ladder()
+    if not plan.get("tools"):
+        if ladder:
+            return False
+        if str(plan.get("thought", "")).startswith(CONFIDENT_CHAT_THOUGHTS):
+            return True
     return bool(plan.get("tools") or plan.get("plan_notes"))
 
 
