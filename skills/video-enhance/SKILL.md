@@ -1,8 +1,7 @@
 ---
 name: video-enhance
 title: Video enhance
-description: Use when footage looks soft, grainy or low resolution; denoises, sharpens and resizes while keeping
-  the aspect ratio.
+description: Use when footage looks soft, grainy or low resolution; denoises, sharpens, reconstructs detail and resizes while keeping the aspect ratio.
 category: enhance
 media_types:
 - video
@@ -28,6 +27,9 @@ params:
   sharpen:
     type: boolean
     default: true
+  ai:
+    type: boolean
+    default: false
 example: '@video-enhance 1080p'
 steps:
 - tool: enhance_video
@@ -35,10 +37,10 @@ steps:
     mode: '{{resolution}}'
     denoise: '{{denoise}}'
     sharpen: '{{sharpen}}'
+    ai: '{{ai}}'
 ---
 
 # Video enhance
 
 ## Procedure
-Gentle temporal grain reduction, micro-contrast sharpening and a mild contrast lift, then resize so the short
-edge matches the target (vertical stays vertical). Use `original` to keep the size.
+Gentle temporal grain reduction, micro-contrast sharpening and a mild contrast lift, or neural detail reconstruction, then resize so the short edge matches the target (vertical stays vertical). Use `original` to keep the size.

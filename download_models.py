@@ -37,6 +37,11 @@ IMAGE_MODELS = {
     # Best quality (sharpest text/edges) — larger + slower on CPU
     "EDSR_x2.pb": "https://github.com/Saafke/EDSR_Tensorflow/raw/master/models/EDSR_x2.pb",
     "EDSR_x4.pb": "https://github.com/Saafke/EDSR_Tensorflow/raw/master/models/EDSR_x4.pb",
+    # SOTA Models
+    "face_detection_yunet_2023mar.onnx": "https://github.com/opencv/opencv_zoo/raw/main/models/face_detection_yunet/face_detection_yunet_2023mar.onnx",
+    "codeformer.onnx": "https://github.com/harisreedhar/Face-Upscalers-ONNX/releases/download/v1.0.0/codeformer.onnx",
+    "lama_fp32.onnx": "https://github.com/Carve/LaMa-ONNX/raw/main/lama_fp32.onnx",
+    "transnetv2.onnx": "https://huggingface.co/elya5/transnetv2/resolve/main/transnetv2.onnx",
 }
 
 WHISPER_MODELS = ["large-v3-turbo", "medium", "small"]

@@ -287,6 +287,12 @@
                         <button type="button" id="veEnhanceQualityBtn" class="btn-outline" title="Reduce noise and sharpen, then download an enhanced copy">
                             <i class="fas fa-wand-magic-sparkles" aria-hidden="true"></i> Enhance quality
                         </button>
+                        <button type="button" id="veInterpolateBtn" class="btn-outline" title="Smooth motion to 60 FPS using AI frame interpolation">
+                            <i class="fas fa-gauge-high" aria-hidden="true"></i> Smooth 60 FPS
+                        </button>
+                        <button type="button" id="veRemoveBgBtn" class="btn-outline" title="Extract video subjects and remove background / green screen">
+                            <i class="fas fa-person-rays" aria-hidden="true"></i> Green screen
+                        </button>
                     </div>
                     <div class="ve-tl-right">
                         <i class="fas fa-magnifying-glass-minus" aria-hidden="true"></i>
@@ -352,6 +358,16 @@
                         <strong>Remove sound</strong>
                         <span>Copy of the video without audio</span>
                     </button>
+                    <button type="button" class="ve-quick-tool" data-op="interpolate">
+                        <i class="fas fa-gauge-high" aria-hidden="true"></i>
+                        <strong>Smooth 60 FPS</strong>
+                        <span>AI frame interpolation</span>
+                    </button>
+                    <button type="button" class="ve-quick-tool" data-op="greenscreen">
+                        <i class="fas fa-person-rays" aria-hidden="true"></i>
+                        <strong>Green screen</strong>
+                        <span>AI video background cutout</span>
+                    </button>
                 </div>
 
                 <!-- Per-tool options -->
@@ -377,6 +393,15 @@
                             <button type="button" class="ve-chip active" data-quality="720p">720p</button>
                             <button type="button" class="ve-chip" data-quality="480p">480p</button>
                             <button type="button" class="ve-chip" data-quality="360p">360p</button>
+                        </div>
+                    </div>
+                    <div class="ve-quick-opt hidden" data-for="greenscreen">
+                        <span class="ve-label">Background style</span>
+                        <div class="ve-chip-row ve-seg" id="veQuickBgRow">
+                            <button type="button" class="ve-chip active" data-bg="green">Green screen (MP4)</button>
+                            <button type="button" class="ve-chip" data-bg="transparent">Transparent (WebM)</button>
+                            <button type="button" class="ve-chip" data-bg="black">Black</button>
+                            <button type="button" class="ve-chip" data-bg="white">White</button>
                         </div>
                     </div>
                     <button type="button" id="veRunQuickBtn" class="ve-export-btn ve-export-btn-big">
@@ -408,6 +433,73 @@
                     <i class="fas fa-download" aria-hidden="true"></i> <span id="veExportBtnText">Export and download</span>
                 </button>
                 <small class="ve-hint ve-hint-center">Rendering runs on this computer. Longer timelines take longer.</small>
+            </div>
+        </div>
+    </div>
+
+    <!-- ENHANCE QUALITY MODAL -->
+    <div id="veEnhanceOverlay" class="shortcuts-overlay hidden">
+        <div class="shortcuts-panel ve-export-panel" role="dialog" aria-modal="true" aria-labelledby="veEnhanceTitle">
+            <div class="shortcuts-header">
+                <div class="ve-dialog-titles">
+                    <h3 id="veEnhanceTitle">Enhance video quality</h3>
+                    <p class="ve-dialog-sub">AI detail reconstruction & studio polish</p>
+                </div>
+                <button type="button" id="veCloseEnhance" class="close-btn" aria-label="Close" title="Close (Esc)"><i class="fas fa-xmark" aria-hidden="true"></i></button>
+            </div>
+            <div class="ve-export-body">
+                <div class="ve-prop-group ve-prop-plain">
+                    <span class="ve-label">Target resolution</span>
+                    <div class="ve-chip-row ve-seg" id="veEnhanceResRow">
+                        <button type="button" class="ve-chip active" data-res="1080p">1080p Full HD</button>
+                        <button type="button" class="ve-chip" data-res="720p">720p HD</button>
+                        <button type="button" class="ve-chip" data-res="original">Original</button>
+                        <button type="button" class="ve-chip" data-res="4k">4K Ultra HD</button>
+                    </div>
+                </div>
+                <div class="ve-prop-group ve-prop-plain">
+                    <span class="ve-label">Enhancement engine</span>
+                    <div class="ve-chip-row ve-seg" id="veEnhanceEngineRow">
+                        <button type="button" class="ve-chip active" data-ai="false">
+                            <i class="fas fa-bolt" aria-hidden="true"></i> Fast studio polish
+                        </button>
+                        <button type="button" class="ve-chip" data-ai="true">
+                            <i class="fas fa-microchip" aria-hidden="true"></i> AI Neural Mode
+                        </button>
+                    </div>
+                    <small class="ve-hint" id="veEnhanceHint">Temporal noise suppression and adaptive edge clarity.</small>
+                </div>
+                <button type="button" id="veStartEnhanceBtn" class="ve-export-btn ve-export-btn-big">
+                    <i class="fas fa-wand-magic-sparkles" aria-hidden="true"></i> <span>Enhance and download</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- GREEN SCREEN / CUTOUT MODAL -->
+    <div id="veGreenScreenOverlay" class="shortcuts-overlay hidden">
+        <div class="shortcuts-panel ve-export-panel" role="dialog" aria-modal="true" aria-labelledby="veGsTitle">
+            <div class="shortcuts-header">
+                <div class="ve-dialog-titles">
+                    <h3 id="veGsTitle">Video background cutout</h3>
+                    <p class="ve-dialog-sub">AI neural matting (RobustVideoMatting)</p>
+                </div>
+                <button type="button" id="veCloseGreenScreen" class="close-btn" aria-label="Close" title="Close (Esc)"><i class="fas fa-xmark" aria-hidden="true"></i></button>
+            </div>
+            <div class="ve-export-body">
+                <div class="ve-prop-group ve-prop-plain">
+                    <span class="ve-label">Output background</span>
+                    <div class="ve-chip-row ve-seg" id="veGsTypeRow">
+                        <button type="button" class="ve-chip active" data-bg="green">Green screen (MP4)</button>
+                        <button type="button" class="ve-chip" data-bg="transparent">Transparent (WebM)</button>
+                        <button type="button" class="ve-chip" data-bg="black">Black</button>
+                        <button type="button" class="ve-chip" data-bg="white">White</button>
+                    </div>
+                    <small class="ve-hint" id="veGsHint">Green screen is ready for chroma-key compositing in any editor.</small>
+                </div>
+                <button type="button" id="veStartGreenScreenBtn" class="ve-export-btn ve-export-btn-big">
+                    <i class="fas fa-person-rays" aria-hidden="true"></i> <span>Generate cutout and download</span>
+                </button>
             </div>
         </div>
     </div>

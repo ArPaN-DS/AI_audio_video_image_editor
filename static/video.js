@@ -863,21 +863,27 @@
     function pickQuickTool(op, btn) {
         quickOp = op;
         document.querySelectorAll('.ve-quick-tool').forEach(b => b.classList.toggle('selected', b === btn));
-        // Extract & mute & frame have no options → run immediately
+        // Extract & mute & frame & interpolate have no options → run immediately
         if (op === 'extract') { closeDialog('veQuickOverlay'); extractAudio(quickMediaId); return; }
-        if (op === 'mute' || op === 'frame' || op === 'gif') { runQuick(); return; }
-        // compress / convert show options
+        if (op === 'mute' || op === 'frame' || op === 'gif' || op === 'interpolate') { runQuick(); return; }
+        // compress / convert / greenscreen show options
         $('veQuickOptions').classList.remove('hidden');
         document.querySelectorAll('.ve-quick-opt').forEach(o =>
             o.classList.toggle('hidden', o.dataset.for !== op));
-        $('veRunQuickText').textContent = op === 'compress' ? 'Compress and download' : 'Convert and download';
+        $('veRunQuickText').textContent = op === 'compress' ? 'Compress and download' :
+            (op === 'greenscreen' ? 'Cutout and download' : 'Convert and download');
     }
 
     async function runQuick() {
         const m = media[quickMediaId];
         if (!m || !quickOp) return;
         closeDialog('veQuickOverlay');
-        const labels = { gif: 'Making a GIF', compress: 'Compressing', convert: 'Converting', frame: 'Saving the frame', mute: 'Removing sound' };
+        const labels = {
+            gif: 'Making a GIF', compress: 'Compressing', convert: 'Converting',
+            frame: 'Saving the frame', mute: 'Removing sound',
+            interpolate: 'Smoothing to 60 FPS (RIFE AI)',
+            greenscreen: 'Removing video background (RVM AI)'
+        };
         showLoading((labels[quickOp] || 'Working') + '…');
         try {
             const fd = new FormData();
@@ -891,9 +897,20 @@
                 fd.append('container', document.querySelector('#veConvContainer .ve-chip.active').dataset.container);
                 fd.append('quality', document.querySelector('#veConvQuality .ve-chip.active').dataset.quality);
             }
+            if (quickOp === 'interpolate') fd.append('fps', 60);
+            if (quickOp === 'greenscreen') {
+                const bg = (document.querySelector('#veQuickBgRow .ve-chip.active') || {}).dataset?.bg || 'green';
+                fd.append('bg_type', bg);
+            }
             const res = await fetch('/video/quick', { method: 'POST', body: fd });
             if (!res.ok) { const err = await res.json().catch(() => ({})); toast(err.error || 'That tool couldn’t process this file. Try another format or a shorter clip.', 'error'); return; }
-            const ext = { gif: 'gif', compress: 'mp4', frame: 'jpg', mute: 'mp4', convert: (document.querySelector('#veConvContainer .ve-chip.active') || {}).dataset?.container || 'mp4' }[quickOp];
+            const bgVal = (document.querySelector('#veQuickBgRow .ve-chip.active') || {}).dataset?.bg || 'green';
+            const ext = {
+                gif: 'gif', compress: 'mp4', frame: 'jpg', mute: 'mp4',
+                interpolate: 'mp4',
+                greenscreen: bgVal === 'transparent' ? 'webm' : 'mp4',
+                convert: (document.querySelector('#veConvContainer .ve-chip.active') || {}).dataset?.container || 'mp4'
+            }[quickOp];
             downloadBlob(await res.blob(), m.name.replace(/\.[^.]+$/, '') + '_' + quickOp + '.' + ext);
             toast('Done. Your file is downloading.', 'success');
         } catch (e) { toast('Couldn’t finish: ' + e.message + '. Try again.', 'error'); }
@@ -962,15 +979,62 @@
         });
     }
 
-    function enhanceQuality() {
+    function interpolateVideo() {
+        return processSourceCopy({
+            endpoint: '/video/interpolate',
+            fields: { fps: 60 },
+            title: 'Smoothing to 60 FPS',
+            stageText: 'Synthesizing intermediate frames with RIFE AI…',
+            fileName: 'smooth_60fps_video.mp4',
+            doneMsg: 'Smooth 60 FPS video is downloading.',
+            failMsg: 'Couldn’t interpolate video. Try a shorter clip.',
+        });
+    }
+
+    function openEnhanceDialog() {
+        const videoClips = clips.filter(c => c.hasVideo);
+        if (videoClips.length === 0) {
+            toast('Add a video clip to the timeline first.', 'warning'); return;
+        }
+        openDialog('veEnhanceOverlay');
+    }
+
+    function doEnhanceQuality() {
+        closeDialog('veEnhanceOverlay');
+        const mode = (document.querySelector('#veEnhanceResRow .ve-chip.active') || {}).dataset?.res || '1080p';
+        const ai = (document.querySelector('#veEnhanceEngineRow .ve-chip.active') || {}).dataset?.ai || 'false';
+        const isAi = ai === 'true';
         return processSourceCopy({
             endpoint: '/video/enhance-quality',
-            fields: { mode: '1080p' },
-            title: 'Enhancing quality',
-            stageText: 'Reducing noise and sharpening detail…',
-            fileName: 'enhanced_video.mp4',
-            doneMsg: 'Enhanced copy is downloading.',
+            fields: { mode, ai },
+            title: isAi ? 'AI Neural Super-Resolution' : 'Enhancing quality',
+            stageText: isAi ? 'Reconstructing micro-detail with Real-ESRGAN GPU…' : 'Reducing noise and sharpening detail…',
+            fileName: isAi ? `enhanced_neural_${mode}.mp4` : `enhanced_${mode}.mp4`,
+            doneMsg: 'Enhanced video is downloading.',
             failMsg: 'Couldn’t enhance this video. Try a shorter clip.',
+        });
+    }
+
+    function openGreenScreenDialog() {
+        const videoClips = clips.filter(c => c.hasVideo);
+        if (videoClips.length === 0) {
+            toast('Add a video clip to the timeline first.', 'warning'); return;
+        }
+        openDialog('veGreenScreenOverlay');
+    }
+
+    function doGreenScreen() {
+        closeDialog('veGreenScreenOverlay');
+        const bg = (document.querySelector('#veGsTypeRow .ve-chip.active') || {}).dataset?.bg || 'green';
+        const ext = bg === 'transparent' ? 'webm' : 'mp4';
+        return processSourceCopy({
+            endpoint: '/video/remove-bg',
+            fields: { bg_type: bg },
+            title: 'Removing video background',
+            stageText: 'Extracting video subject and rendering cutout with RVM AI…',
+            fileName: `cutout_${bg}.${ext}`,
+            doneMsg: 'Cutout video is downloading.',
+            failMsg: 'Couldn’t remove video background. Try a shorter clip.',
         });
     }
 
@@ -1013,7 +1077,9 @@
         $('veSplitBtn').onclick = splitAtPlayhead;
         if ($('veDetectScenesBtn')) $('veDetectScenesBtn').onclick = detectScenes;
         if ($('veBurnSubtitlesBtn')) $('veBurnSubtitlesBtn').onclick = burnSubtitles;
-        if ($('veEnhanceQualityBtn')) $('veEnhanceQualityBtn').onclick = enhanceQuality;
+        if ($('veEnhanceQualityBtn')) $('veEnhanceQualityBtn').onclick = openEnhanceDialog;
+        if ($('veInterpolateBtn')) $('veInterpolateBtn').onclick = interpolateVideo;
+        if ($('veRemoveBgBtn')) $('veRemoveBgBtn').onclick = openGreenScreenDialog;
         $('veAddTextBtn').onclick = addText;
 
         // Zoom
@@ -1091,12 +1157,53 @@
             doExport(fmt);
         };
 
-        if ($('veDetectScenesBtn')) $('veDetectScenesBtn').onclick = detectScenes;
-        if ($('veBurnSubtitlesBtn')) $('veBurnSubtitlesBtn').onclick = burnSubtitles;
         $('veHelpBtn').onclick = () => openDialog('veShortcutsOverlay');
         $('veCloseShortcuts').onclick = () => closeDialog('veShortcutsOverlay');
+
+        // Enhance modal wiring
+        if ($('veCloseEnhance')) $('veCloseEnhance').onclick = () => closeDialog('veEnhanceOverlay');
+        if ($('veStartEnhanceBtn')) $('veStartEnhanceBtn').onclick = doEnhanceQuality;
+        if ($('veEnhanceResRow')) {
+            $('veEnhanceResRow').addEventListener('click', e => {
+                const b = e.target.closest('.ve-chip'); if (!b) return;
+                document.querySelectorAll('#veEnhanceResRow .ve-chip').forEach(c => c.classList.toggle('active', c === b));
+            });
+        }
+        if ($('veEnhanceEngineRow')) {
+            $('veEnhanceEngineRow').addEventListener('click', e => {
+                const b = e.target.closest('.ve-chip'); if (!b) return;
+                document.querySelectorAll('#veEnhanceEngineRow .ve-chip').forEach(c => c.classList.toggle('active', c === b));
+                const isAi = b.dataset.ai === 'true';
+                if ($('veEnhanceHint')) {
+                    $('veEnhanceHint').textContent = isAi 
+                        ? 'Deep neural reconstruction of textures, edges, and details with Real-ESRGAN.' 
+                        : 'Temporal noise suppression and adaptive edge clarity.';
+                }
+            });
+        }
+
+        // Green screen modal wiring
+        if ($('veCloseGreenScreen')) $('veCloseGreenScreen').onclick = () => closeDialog('veGreenScreenOverlay');
+        if ($('veStartGreenScreenBtn')) $('veStartGreenScreenBtn').onclick = doGreenScreen;
+        if ($('veGsTypeRow')) {
+            $('veGsTypeRow').addEventListener('click', e => {
+                const b = e.target.closest('.ve-chip'); if (!b) return;
+                document.querySelectorAll('#veGsTypeRow .ve-chip').forEach(c => c.classList.toggle('active', c === b));
+                const bg = b.dataset.bg;
+                if ($('veGsHint')) {
+                    const hints = {
+                        green: 'Green screen is ready for chroma-key compositing in any editor.',
+                        transparent: 'Transparent alpha channel saved as WebM format.',
+                        black: 'Clean subject cutout against pure black.',
+                        white: 'Clean subject cutout against pure white.'
+                    };
+                    $('veGsHint').textContent = hints[bg] || hints.green;
+                }
+            });
+        }
+
         // Click on the dimmed backdrop closes a dialog
-        ['veShortcutsOverlay', 'veExportOverlay', 'veQuickOverlay'].forEach(id => {
+        ['veShortcutsOverlay', 'veExportOverlay', 'veQuickOverlay', 'veEnhanceOverlay', 'veGreenScreenOverlay'].forEach(id => {
             const ov = $(id);
             if (ov) ov.addEventListener('mousedown', e => { if (e.target === ov) closeDialog(id); });
         });

@@ -205,11 +205,27 @@ def available_engines():
 
 def enhance_photo_clarity(src, out_path, denoise_strength=5, sharpen_strength=1.2):
     """
-    Applies professional halo-free photo clarity enhancement:
-    - Gentle grain reduction (subtle bilateral smoothing)
-    - Natural micro-contrast without ringing halos
-    - Dynamic range and histogram polish (CLAHE)
+    Applies professional SOTA photo clarity and deblurring enhancement:
+    - NAFNet deep nonlinear-activation-free restoration on CUDA GPU
+    - Graceful fallback to halo-free bilateral micro-contrast + CLAHE
     """
+    try:
+        import nafnet_processor
+        if nafnet_processor.is_available():
+            from model_manager import global_model_manager
+
+            def _load_naf():
+                return None, {"engine": "nafnet_sota_gpu"}
+
+            def _unload_naf(_):
+                pass
+
+            with global_model_manager.session("nafnet_clarity_enhancer", _load_naf, _unload_naf, min_free_ram_gb=1.0):
+                return nafnet_processor.enhance_clarity_gpu(src, out_path)
+    except Exception as naf_err:
+        import logging
+        logging.getLogger("image_processor").warning(f"NAFNet GPU failed, falling back to clarity enhancer: {naf_err}")
+
     try:
         import cv2
         import numpy as np
@@ -249,8 +265,16 @@ def enhance_photo_clarity(src, out_path, denoise_strength=5, sharpen_strength=1.
         return {"status": "success", "engine": "pil_fallback"}
 
 
-CUTOUT_BASELINE_MODEL = "isnet-general-use"
+def _cutout_model_installed(model_name):
+    """Only use weights already on disk so adaptive upgrades never trigger a download."""
+    home = os.environ.get("U2NET_HOME") or os.path.join(
+        os.environ.get("XDG_DATA_HOME") or os.path.expanduser("~"), ".u2net")
+    path = os.path.join(home, f"{model_name}.onnx")
+    return os.path.exists(path) and os.path.getsize(path) > 0
+
+
 CUTOUT_MAX_MODEL = "birefnet-general"
+CUTOUT_BASELINE_MODEL = "birefnet-general" if _cutout_model_installed(CUTOUT_MAX_MODEL) else "isnet-general-use"
 CUTOUT_VALID_MODELS = (CUTOUT_MAX_MODEL, "isnet-general-use", "u2net", "u2net_human_seg", "u2netp")
 CUTOUT_ADAPTIVE_ALIASES = {"auto", "ultra", "ultra-hd"}
 CUTOUT_ALIASES = {
@@ -260,14 +284,6 @@ CUTOUT_ALIASES = {
 }
 
 
-def _cutout_model_installed(model_name):
-    """Only use weights already on disk so adaptive upgrades never trigger a download."""
-    home = os.environ.get("U2NET_HOME") or os.path.join(
-        os.environ.get("XDG_DATA_HOME") or os.path.expanduser("~"), ".u2net")
-    path = os.path.join(home, f"{model_name}.onnx")
-    return os.path.exists(path) and os.path.getsize(path) > 0
-
-
 def _cutout_with(model_name, src_path, out_path, alpha_matting, min_free_ram_gb=0.0):
     from rembg import remove, new_session
     from PIL import Image, ImageFilter
@@ -275,7 +291,19 @@ def _cutout_with(model_name, src_path, out_path, alpha_matting, min_free_ram_gb=
     from model_manager import global_model_manager
 
     def _load_rembg():
-        session = new_session(model_name)
+        try:
+            import torch
+            torch_lib = os.path.join(os.path.dirname(torch.__file__), 'lib')
+            if os.path.exists(torch_lib):
+                os.environ['PATH'] = torch_lib + os.pathsep + os.environ.get('PATH', '')
+                if hasattr(os, 'add_dll_directory'):
+                    try:
+                        os.add_dll_directory(torch_lib)
+                    except Exception:
+                        pass
+            session = new_session(model_name, providers=["CUDAExecutionProvider", "CPUExecutionProvider"])
+        except Exception:
+            session = new_session(model_name)
         return session, {"engine": f"rembg_{model_name}"}
 
     def _unload_rembg(session):
@@ -287,7 +315,11 @@ def _cutout_with(model_name, src_path, out_path, alpha_matting, min_free_ram_gb=
         with Image.open(src_path) as opened:
             input_img = opened.copy()
 
-        if alpha_matting:
+        if str(model_name).startswith("birefnet"):
+            # BiRefNet outputs pristine sub-pixel alpha segmentation natively;
+            # avoid destructive 10px morphological erosion
+            output_img = remove(input_img, session=session)
+        elif alpha_matting:
             try:
                 output_img = remove(
                     input_img,
@@ -295,7 +327,7 @@ def _cutout_with(model_name, src_path, out_path, alpha_matting, min_free_ram_gb=
                     alpha_matting=True,
                     alpha_matting_foreground_threshold=240,
                     alpha_matting_background_threshold=10,
-                    alpha_matting_erode_size=10,
+                    alpha_matting_erode_size=5,
                     post_process_mask=True
                 )
             except Exception as error:
@@ -346,7 +378,7 @@ def remove_bg(src_path, out_path, model_name="auto", alpha_matting=True):
             ]
 
             def _operate(variant):
-                need = 3.0 if variant.variant_id == CUTOUT_MAX_MODEL else 0.0
+                need = 1.0 if (variant.variant_id == CUTOUT_MAX_MODEL and variant is not ladder[-1]) else 0.0
                 return _cutout_with(variant.variant_id, src_path, out_path, alpha_matting, need)
 
             info, _variant = global_quality_governor.run("image.cutout", ladder, _operate)
@@ -363,8 +395,26 @@ def remove_bg(src_path, out_path, model_name="auto", alpha_matting=True):
 
 def inpaint_object(src_path, mask_path, out_path, radius=3, method="telea"):
     """
-    AI Magic Eraser / Object Inpainting: Replaces brushed mask regions with background textures.
+    AI Magic Eraser / Object Inpainting: Replaces brushed mask regions with background textures
+    using LaMa (Large Mask Inpainting SOTA) on CUDA GPU, with fallback to OpenCV.
     """
+    try:
+        import lama_processor
+        if lama_processor.is_available():
+            from model_manager import global_model_manager
+
+            def _load_lama():
+                return None, {"engine": "lama_inpaint_sota"}
+
+            def _unload_lama(_):
+                pass
+
+            with global_model_manager.session("lama_object_inpaint", _load_lama, _unload_lama, min_free_ram_gb=1.0):
+                return lama_processor.inpaint_lama_gpu(src_path, mask_path, out_path)
+    except Exception as lama_err:
+        import logging
+        logging.getLogger("image_processor").warning(f"LaMa inpainting failed, falling back to OpenCV: {lama_err}")
+
     try:
         import cv2
         import numpy as np
@@ -389,11 +439,28 @@ def inpaint_object(src_path, mask_path, out_path, radius=3, method="telea"):
         raise RuntimeError(f"Magic Eraser Inpainting failed: {str(e)}")
 
 
-def restore_faces(src_path, out_path):
+def restore_faces(src_path, out_path, fidelity=0.7):
     """
-    AI Portrait & Face Detail Restorer: Detects faces and applies high-frequency detail restoration,
-    skin bilateral smoothing, and eye contrast sharpening.
+    AI Portrait & Face Detail Restorer: Restores high-frequency facial features, eyes,
+    and skin textures using CodeFormer SOTA codebook lookup transformer on CUDA GPU.
     """
+    try:
+        import codeformer_processor
+        if codeformer_processor.is_available():
+            from model_manager import global_model_manager
+
+            def _load_cf():
+                return None, {"engine": "codeformer_sota"}
+
+            def _unload_cf(_):
+                pass
+
+            with global_model_manager.session("codeformer_face_restorer", _load_cf, _unload_cf, min_free_ram_gb=1.0):
+                return codeformer_processor.restore_faces_gpu(src_path, out_path, fidelity=fidelity)
+    except Exception as cf_err:
+        import logging
+        logging.getLogger("image_processor").warning(f"CodeFormer GPU failed, falling back to OpenCV: {cf_err}")
+
     try:
         import cv2
         import numpy as np

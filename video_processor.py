@@ -717,10 +717,29 @@ def process_timeline(timeline_data, output_path):
 
 def detect_scenes(video_path, threshold=3.0, mode="adaptive"):
     """
-    Detects scene cut boundaries in video using scenedetect (PySceneDetect).
-    mode: 'adaptive' (AdaptiveDetector - best for dynamic shots & camera motion) or 'content' (ContentDetector).
-    Returns list of cut intervals: [{'start': sec, 'end': sec, 'duration': sec}]
+    Detects scene cut boundaries in video using TransNet V2 SOTA 3D temporal CNN on CUDA GPU,
+    with graceful fallback to PySceneDetect.
+    mode: 'adaptive' / 'auto' (TransNet V2 neural cut detector) or 'content' (ContentDetector).
+    Returns list of cut intervals: [{'scene_num': int, 'start': sec, 'end': sec, 'duration': sec}]
     """
+    if mode in ("adaptive", "auto", "transnet", "neural"):
+        try:
+            import transnetv2_processor
+            if transnetv2_processor.is_available():
+                from model_manager import global_model_manager
+
+                def _load_tn():
+                    return None, {"engine": "transnetv2_gpu"}
+
+                def _unload_tn(_):
+                    pass
+
+                with global_model_manager.session("transnet_scene_detector", _load_tn, _unload_tn, min_free_ram_gb=1.0):
+                    return transnetv2_processor.detect_scenes_transnetv2(video_path, threshold=0.45)
+        except Exception as tn_err:
+            import logging
+            logging.getLogger("video_processor").warning(f"TransNetV2 GPU scene detection failed, falling back to PySceneDetect: {tn_err}")
+
     try:
         from scenedetect import detect, AdaptiveDetector, ContentDetector
         if mode == "adaptive":
@@ -897,19 +916,104 @@ def _probe_display_size(path):
     raise ValueError("This file has no video track to enhance.")
 
 
+def _enhance_video_realesrgan(video_path, output_path):
+    import time
+    import cv2
+    import torch
+    import tempfile
+    import numpy as np
+    import realesrgan_processor as rep
+
+    model, device = rep.get_model()
+    cap = cv2.VideoCapture(video_path)
+    if not cap.isOpened():
+        raise ValueError(f"Could not open video: {video_path}")
+
+    fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
+    w_in = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    h_in = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    w_out, h_out = w_in * 4, h_in * 4
+
+    temp_video = os.path.join(tempfile.gettempdir(), f"sr_raw_{os.getpid()}_{int(time.time())}.mp4")
+
+    cmd = [
+        FFMPEG, "-y", "-f", "rawvideo", "-pix_fmt", "bgr24",
+        "-s", f"{w_out}x{h_out}", "-r", str(fps),
+        "-i", "-",
+        "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "18", "-preset", "fast",
+        temp_video
+    ]
+    proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stderr=subprocess.DEVNULL)
+
+    try:
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                break
+            rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB).astype(np.float32) / 255.0
+            t = torch.from_numpy(np.transpose(rgb, (2, 0, 1))).unsqueeze(0).to(device=device, dtype=torch.float16)
+            with torch.no_grad():
+                out_t = model(t)
+            out_np = (out_t.squeeze(0).permute(1, 2, 0).clamp(0, 1).cpu().numpy() * 255.0).astype(np.uint8)
+            bgr_out = cv2.cvtColor(out_np, cv2.COLOR_RGB2BGR)
+            proc.stdin.write(bgr_out.tobytes())
+
+        cap.release()
+        proc.stdin.close()
+        proc.wait()
+
+        combine_cmd = [
+            FFMPEG, "-y",
+            "-i", temp_video,
+            "-i", video_path,
+            "-map", "0:v:0", "-map", "1:a?",
+            "-c:v", "copy", "-c:a", "copy",
+            output_path
+        ]
+        _run(combine_cmd, timeout=600)
+
+        return {
+            "status": "success",
+            "width": w_out,
+            "height": h_out,
+            "engine": "realesrgan_gpu",
+            "scale": 4
+        }
+    finally:
+        cap.release()
+        if os.path.exists(temp_video):
+            try:
+                os.remove(temp_video)
+            except OSError:
+                pass
+
+
 def enhance_video_quality(video_path, output_path, mode="1080p", denoise=True, sharpen=True,
-                          pad=False):
+                          pad=False, ai_upscale=False):
     """
-    Spatio-temporal video quality enhancement:
-    - hqdn3d   (3D denoise for low-light grain)
-    - unsharp  (micro-contrast / texture sharpening)
-    - eq       (gentle contrast & saturation lift)
-    - scale    (Lanczos resize so the short edge matches ``mode``; aspect ratio
-               is preserved — 9:16 stays vertical, 4:3 stays 4:3)
-    ``pad=True`` explicitly requests a fixed 16:9 canvas with letterbox /
-    pillarbox bars instead. Raises ValueError for input without video and
-    RuntimeError (app-authored message) if encoding fails.
+    Video quality enhancement:
+    - If ai_upscale=True or mode in ('ai', 'realesrgan', '4k_ai'): runs Real-ESRGAN deep generative
+      super-resolution on CUDA GPU with audio preservation.
+    - Otherwise: Spatio-temporal FFmpeg pipeline (hqdn3d + unsharp + eq + Lanczos scale).
     """
+    if ai_upscale or str(mode).lower() in ("ai", "realesrgan", "4k_ai"):
+        try:
+            import realesrgan_processor
+            if realesrgan_processor.is_available():
+                from model_manager import global_model_manager
+
+                def _load_sr():
+                    return None, {"engine": "realesrgan_video_gpu"}
+
+                def _unload_sr(_):
+                    pass
+
+                with global_model_manager.session("realesrgan_video_enhancer", _load_sr, _unload_sr, min_free_ram_gb=1.0):
+                    return _enhance_video_realesrgan(video_path, output_path)
+        except Exception as esr_err:
+            import logging
+            logging.getLogger("video_processor").warning(f"Real-ESRGAN video upscale failed, falling back to FFmpeg: {esr_err}")
+
     src_w, src_h = _probe_display_size(video_path)
     out_w, out_h = _enhance_target_size(src_w, src_h, mode, pad=pad)
 
@@ -947,14 +1051,32 @@ def enhance_video_quality(video_path, output_path, mode="1080p", denoise=True, s
     except (RuntimeError, subprocess.TimeoutExpired) as err:
         raise RuntimeError("The video could not be enhanced. Try a shorter clip or "
                            "convert it to MP4 first.") from err
-    return {"status": "success", "width": out_w, "height": out_h, "padded": bool(pad)}
+    return {"status": "success", "width": out_w, "height": out_h, "padded": bool(pad), "engine": "ffmpeg_filter"}
 
 
 def interpolate_video_fps(video_path, output_path, target_fps=60):
     """
     AI Video Frame Interpolation / Slow-Motion Smoother:
-    Converts 24/30 FPS video to 60 FPS ultra-smooth video via FFmpeg motion compensation.
+    Converts 24/30 FPS video to 60 FPS ultra-smooth video via RIFE v4.26 SOTA neural network
+    on CUDA GPU, with graceful fallback to FFmpeg motion compensation.
     """
+    try:
+        import rife_processor
+        if rife_processor.is_available():
+            from model_manager import global_model_manager
+
+            def _load_rife():
+                return None, {"engine": "rife_v4.26_gpu"}
+
+            def _unload_rife(_):
+                pass
+
+            with global_model_manager.session("rife_video_interpolator", _load_rife, _unload_rife, min_free_ram_gb=1.0):
+                return rife_processor.interpolate_video_rife(video_path, output_path, target_fps=target_fps)
+    except Exception as rife_err:
+        import logging
+        logging.getLogger("video_processor").warning(f"RIFE GPU interpolation failed, falling back to FFmpeg: {rife_err}")
+
     cmd = [
         FFMPEG, "-y", "-i", video_path,
         "-filter:v", f"minterpolate=fps={target_fps}:mi_mode=mci:mc_mode=aobmc:me_mode=bidir:vsbmc=1",
@@ -964,3 +1086,22 @@ def interpolate_video_fps(video_path, output_path, target_fps=60):
     ]
     _run(cmd, timeout=1800)
     return {"status": "success", "target_fps": target_fps, "engine": "ffmpeg_minterpolate"}
+
+
+def remove_video_background(video_path, output_path, bg_type="green"):
+    """
+    AI Video Background Removal / Green Screen Matting:
+    Extracts humans/subjects and composites onto green screen, black, blur, or transparency
+    using RobustVideoMatting (RVM) SOTA neural network on CUDA GPU.
+    """
+    import rvm_processor
+    from model_manager import global_model_manager
+
+    def _load_rvm():
+        return None, {"engine": "rvm_video_gpu"}
+
+    def _unload_rvm(_):
+        pass
+
+    with global_model_manager.session("rvm_video_matting", _load_rvm, _unload_rvm, min_free_ram_gb=1.0):
+        return rvm_processor.remove_video_background(video_path, output_path, bg_type=bg_type)

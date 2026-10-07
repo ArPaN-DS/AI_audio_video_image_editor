@@ -22,6 +22,7 @@ Architecture:
 """
 
 import os
+import ipaddress
 import re
 import json
 import logging
@@ -70,8 +71,15 @@ def _local_reasoning_url():
         hostname = parsed.hostname
         if parsed.scheme not in {"http", "https"} or not hostname:
             return None
+        if hostname.lower() == "localhost":
+            return f"{REASONING_API_BASE.rstrip('/')}/chat/completions"
+        try:
+            if not ipaddress.ip_address(hostname).is_loopback:
+                return None
+        except ValueError:
+            return None
         return f"{REASONING_API_BASE.rstrip('/')}/chat/completions"
-    except ValueError:
+    except Exception:
         return None
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -384,13 +392,34 @@ class VideoSubAgent:
             mode = str(args.get("mode", "1080p")).lower()
             if mode not in ('720p', '1080p', '1440p', '4k', 'original'):
                 raise StepInputError('Choose 720p, 1080p, 1440p, 4K or original for video enhancement.')
+            ai_upscale = bool(args.get('ai', False))
             out_path = os.path.join(processed_dir, f"enhanced_{mode}_{base_name}.mp4")
             video_processor.enhance_video_quality(src_file, out_path, mode=mode,
                                                   denoise=bool(args.get('denoise', True)),
-                                                  sharpen=bool(args.get('sharpen', True)))
+                                                  sharpen=bool(args.get('sharpen', True)),
+                                                  ai_upscale=ai_upscale)
             step_res["output_file"] = out_path
+            engine_note = " with neural detail reconstruction" if ai_upscale else ""
             step_res["message"] = (f"Enhanced the picture ({'original size' if mode == 'original' else mode}, "
-                                   "aspect ratio preserved).")
+                                   f"aspect ratio preserved{engine_note}).")
+
+        elif tool_name == "interpolate_video":
+            fps = int(args.get("fps", 60))
+            if fps not in (30, 60, 120): fps = 60
+            out_path = os.path.join(processed_dir, f"smooth{fps}fps_{base_name}.mp4")
+            video_processor.interpolate_video_fps(src_file, out_path, target_fps=fps)
+            step_res["output_file"] = out_path
+            step_res["message"] = f"Synthesized intermediate frames to achieve smooth {fps} FPS motion."
+
+        elif tool_name == "remove_video_background":
+            bg_type = str(args.get("bg_type", "green")).lower()
+            if bg_type not in ('green', 'transparent', 'white', 'black'):
+                bg_type = 'green'
+            ext = ".webm" if bg_type == "transparent" else ".mp4"
+            out_path = os.path.join(processed_dir, f"cutout_{bg_type}_{base_name}{ext}")
+            video_processor.remove_video_background(src_file, out_path, bg_type=bg_type)
+            step_res["output_file"] = out_path
+            step_res["message"] = f"Extracted subject and generated video cutout with {bg_type} background." 
 
         elif tool_name == "extract_frame":
             metadata = video_processor.probe_media(src_file)

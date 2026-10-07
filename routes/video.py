@@ -100,7 +100,8 @@ def video_enhance_quality():
     out_path = os.path.join(app.config['PROCESSED_FOLDER'], f"enhanced_{uuid.uuid4()}.mp4")
     try:
         mode = request.form.get('mode', '1080p')
-        video_processor.enhance_video_quality(temp_path, out_path, mode=mode)
+        ai_upscale = request.form.get('ai', 'false').lower() in ('true', '1', 'yes')
+        video_processor.enhance_video_quality(temp_path, out_path, mode=mode, ai_upscale=ai_upscale)
         return send_file(out_path, mimetype='video/mp4', as_attachment=True, download_name="enhanced_quality_video.mp4")
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -119,6 +120,25 @@ def video_interpolate():
         target_fps = int(request.form.get('fps', 60))
         video_processor.interpolate_video_fps(temp_path, out_path, target_fps=target_fps)
         return send_file(out_path, mimetype='video/mp4', as_attachment=True, download_name="smooth_60fps_video.mp4")
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if os.path.exists(temp_path): os.remove(temp_path)
+
+@video_bp.route('/video/remove-bg', methods=['POST'])
+def video_remove_bg():
+    if 'file' not in request.files:
+        return jsonify({"error": "No video file"}), 400
+    file = request.files['file']
+
+    temp_path = save_temp_upload(file)
+    bg_type = request.form.get('bg_type', 'green').lower()
+    ext = ".webm" if bg_type == "transparent" else ".mp4"
+    mimetype = "video/webm" if bg_type == "transparent" else "video/mp4"
+    out_path = os.path.join(app.config['PROCESSED_FOLDER'], f"cutout_{uuid.uuid4()}{ext}")
+    try:
+        video_processor.remove_video_background(temp_path, out_path, bg_type=bg_type)
+        return send_file(out_path, mimetype=mimetype, as_attachment=True, download_name=f"cutout_video{ext}")
     except Exception as e:
         return jsonify({"error": str(e)}), 500
     finally:
@@ -261,6 +281,22 @@ def video_quick():
             out = os.path.join(PROCESSED_FOLDER, f"muted_{uid}.mp4")
             video_processor.quick_mute(path, out)
             return send_file(out, as_attachment=True, download_name=f"{base}_muted.mp4")
+
+        if op == 'interpolate':
+            fps = int(request.form.get('fps', 60))
+            out = os.path.join(PROCESSED_FOLDER, f"smooth_{uid}.mp4")
+            video_processor.interpolate_video_fps(path, out, target_fps=fps)
+            return send_file(out, as_attachment=True, download_name=f"{base}_smooth{fps}fps.mp4")
+
+        if op == 'greenscreen':
+            bg_type = request.form.get('bg_type', 'green').lower()
+            if bg_type not in ('green', 'transparent', 'white', 'black'):
+                bg_type = 'green'
+            ext = ".webm" if bg_type == "transparent" else ".mp4"
+            mimetype = "video/webm" if bg_type == "transparent" else "video/mp4"
+            out = os.path.join(PROCESSED_FOLDER, f"cutout_{uid}{ext}")
+            video_processor.remove_video_background(path, out, bg_type=bg_type)
+            return send_file(out, mimetype=mimetype, as_attachment=True, download_name=f"{base}_cutout{ext}")
 
         return jsonify({"error": f"Unknown operation: {op}"}), 400
     except Exception as e:
